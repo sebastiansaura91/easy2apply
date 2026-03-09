@@ -14,16 +14,218 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bullet_bank: {
+        Row: {
+          created_at: string
+          id: string
+          tags: string[] | null
+          text: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          tags?: string[] | null
+          text: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          tags?: string[] | null
+          text?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      job_postings: {
+        Row: {
+          created_at: string
+          id: string
+          text: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          text: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          text?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          language: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          language?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          language?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      resume_versions: {
+        Row: {
+          content_json: Json
+          created_at: string
+          id: string
+          resume_id: string
+          version_name: string
+        }
+        Insert: {
+          content_json?: Json
+          created_at?: string
+          id?: string
+          resume_id: string
+          version_name: string
+        }
+        Update: {
+          content_json?: Json
+          created_at?: string
+          id?: string
+          resume_id?: string
+          version_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resume_versions_resume_id_fkey"
+            columns: ["resume_id"]
+            isOneToOne: false
+            referencedRelation: "resumes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resumes: {
+        Row: {
+          content_json: Json
+          created_at: string
+          id: string
+          language: string
+          template_id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content_json?: Json
+          created_at?: string
+          id?: string
+          language?: string
+          template_id?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content_json?: Json
+          created_at?: string
+          id?: string
+          language?: string
+          template_id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tailoring_runs: {
+        Row: {
+          created_at: string
+          id: string
+          job_posting_id: string | null
+          resume_version_id: string | null
+          suggestions_json: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_posting_id?: string | null
+          resume_version_id?: string | null
+          suggestions_json?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_posting_id?: string | null
+          resume_version_id?: string | null
+          suggestions_json?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tailoring_runs_job_posting_id_fkey"
+            columns: ["job_posting_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tailoring_runs_resume_version_id_fkey"
+            columns: ["resume_version_id"]
+            isOneToOne: false
+            referencedRelation: "resume_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +352,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
