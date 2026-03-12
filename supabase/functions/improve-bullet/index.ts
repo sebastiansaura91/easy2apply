@@ -15,9 +15,11 @@ Regler:
 - Behåll samma språk som originalet
 - Hitta ALDRIG på fakta - använd [FYLL I] istället
 - Behåll samma grundbetydelse, men gör den starkare och mer professionell
-- Svara BARA med den förbättrade punkten, ingen annan text
+- Avvik INTE för långt från originalet – förbättra, omformulera inte helt
 - Nämn gärna personalansvar, budget, verktyg/metoder om det är relevant
-- Max 2 meningar`;
+- Max 2 meningar
+
+Returnera ALLTID via tool call.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -57,6 +59,31 @@ serve(async (req) => {
           { role: "user", content: `Förbättra denna punkt:${context}\n\nPunkt: "${bullet}"` },
         ],
         temperature: 0.4,
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "return_improvement",
+              description: "Return the improved bullet and a short explanation of what changed and why",
+              parameters: {
+                type: "object",
+                properties: {
+                  improved: {
+                    type: "string",
+                    description: "The improved bullet text",
+                  },
+                  reason: {
+                    type: "string",
+                    description: "1-2 korta meningar på svenska som förklarar vad som ändrades och varför det är bättre. T.ex. 'Starkare verb och tydligare scope. Lade till platshållare för mätetal.'",
+                  },
+                },
+                required: ["improved", "reason"],
+                additionalProperties: false,
+              },
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "return_improvement" } },
       }),
     });
 
@@ -79,16 +106,24 @@ serve(async (req) => {
     }
 
     const result = await response.json();
-    const improved = result.choices?.[0]?.message?.content?.trim();
+    const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
 
-    if (!improved) {
-      throw new Error("No response from AI");
+    if (toolCall) {
+      const parsed = JSON.parse(toolCall.function.arguments);
+      return new Response(JSON.stringify({
+        improved: parsed.improved.replace(/^["']|["']$/g, ""),
+        reason: parsed.reason,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Clean quotes if the model wraps the response
-    const cleaned = improved.replace(/^["']|["']$/g, "");
+    // Fallback if no tool call
+    const content = result.choices?.[0]?.message?.content?.trim();
+    if (!content) throw new Error("No response from AI");
+    const cleaned = content.replace(/^["']|["']$/g, "");
 
-    return new Response(JSON.stringify({ improved: cleaned }), {
+    return new Response(JSON.stringify({ improved: cleaned, reason: "Förbättrad formulering." }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
