@@ -4,10 +4,8 @@ import {
   ChevronDown,
   ChevronRight,
   Zap,
-  AlertTriangle,
-  CheckCircle2,
   Sparkles,
-  ArrowRight,
+  MessageCircle,
 } from "lucide-react";
 import { CVContent } from "@/types/cv";
 import { BulletOptimizerResult, BulletAnalysis, BulletSuggestion } from "@/types/bullet-optimizer";
@@ -17,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import { BulletCoachChat } from "./BulletCoachChat";
 
 /* ── Helpers ── */
 
@@ -51,10 +50,18 @@ function suggestionTypeLabel(type: string, lang: "sv" | "en"): string {
 
 /* ── Bullet Row ── */
 
-function BulletRow({ bullet, lang, onApply }: { bullet: BulletAnalysis; lang: "sv" | "en"; onApply: (bulletId: string, newText: string) => void }) {
+function BulletRow({
+  bullet,
+  lang,
+  onApply,
+  onCoach,
+}: {
+  bullet: BulletAnalysis;
+  lang: "sv" | "en";
+  onApply: (bulletId: string, newText: string) => void;
+  onCoach: (bulletId: string) => void;
+}) {
   const [open, setOpen] = useState(false);
-
-  // Extract role context from id
   const idParts = bullet.id.match(/^(\w+)\[(\d+)\]\.bullets\[(\d+)\]$/);
   const sectionLabel = idParts ? `${idParts[1]}[${idParts[2]}]` : bullet.id;
 
@@ -72,7 +79,6 @@ function BulletRow({ bullet, lang, onApply }: { bullet: BulletAnalysis; lang: "s
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="pl-3 pr-1 pb-2 space-y-2 mt-1">
-        {/* Issues */}
         {bullet.issues.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {bullet.issues.slice(0, 3).map((issue, i) => (
@@ -83,10 +89,20 @@ function BulletRow({ bullet, lang, onApply }: { bullet: BulletAnalysis; lang: "s
           </div>
         )}
 
-        {/* Suggestions */}
         {bullet.suggestions.map((suggestion, i) => (
           <SuggestionCard key={i} suggestion={suggestion} lang={lang} onApply={() => onApply(bullet.id, suggestion.suggested_rewrite)} />
         ))}
+
+        {/* Coach chat button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-1.5 text-[10px] h-7 mt-1"
+          onClick={() => onCoach(bullet.id)}
+        >
+          <MessageCircle className="h-3 w-3" />
+          {lang === "en" ? "Chat to clarify" : "Chatta för att förtydliga"}
+        </Button>
       </CollapsibleContent>
     </Collapsible>
   );
@@ -138,7 +154,11 @@ interface BulletOptimizerProps {
 export function BulletOptimizerPanel({ cv, cvLanguage, jobPostingText, onApplyBullet }: BulletOptimizerProps) {
   const [result, setResult] = useState<BulletOptimizerResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [coachBulletId, setCoachBulletId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Find bullet info for coach
+  const coachBullet = coachBulletId ? findBulletInfo(cv, coachBulletId) : null;
 
   const runOptimize = async () => {
     setLoading(true);
@@ -166,7 +186,6 @@ export function BulletOptimizerPanel({ cv, cvLanguage, jobPostingText, onApplyBu
 
   const handleApply = (bulletId: string, newText: string) => {
     onApplyBullet(bulletId, newText);
-    // Update local result to reflect the change
     if (result) {
       setResult({
         ...result,
@@ -192,11 +211,9 @@ export function BulletOptimizerPanel({ cv, cvLanguage, jobPostingText, onApplyBu
     );
   }
 
-  // Group bullets by experience role
   const experienceBullets = result.bullets.filter((b) => b.id.startsWith("experience"));
   const projectBullets = result.bullets.filter((b) => b.id.startsWith("projects"));
 
-  // Group experience bullets by role index
   const roleGroups: Record<string, BulletAnalysis[]> = {};
   for (const b of experienceBullets) {
     const match = b.id.match(/^experience\[(\d+)\]/);
@@ -207,7 +224,7 @@ export function BulletOptimizerPanel({ cv, cvLanguage, jobPostingText, onApplyBu
 
   return (
     <div className="space-y-3">
-      {/* Header with potential gain */}
+      {/* Header */}
       <div className="flex items-center justify-between rounded-lg bg-primary/10 p-3">
         <div className="flex items-center gap-2">
           <Zap className="h-4 w-4 text-primary" />
@@ -226,7 +243,13 @@ export function BulletOptimizerPanel({ cv, cvLanguage, jobPostingText, onApplyBu
           <div key={roleIdx} className="space-y-1.5">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{roleLabel}</p>
             {bullets.map((bullet) => (
-              <BulletRow key={bullet.id} bullet={bullet} lang={cvLanguage} onApply={handleApply} />
+              <BulletRow
+                key={bullet.id}
+                bullet={bullet}
+                lang={cvLanguage}
+                onApply={handleApply}
+                onCoach={setCoachBulletId}
+              />
             ))}
           </div>
         );
@@ -239,7 +262,13 @@ export function BulletOptimizerPanel({ cv, cvLanguage, jobPostingText, onApplyBu
             {cvLanguage === "en" ? "Projects" : "Projekt"}
           </p>
           {projectBullets.map((bullet) => (
-            <BulletRow key={bullet.id} bullet={bullet} lang={cvLanguage} onApply={handleApply} />
+            <BulletRow
+              key={bullet.id}
+              bullet={bullet}
+              lang={cvLanguage}
+              onApply={handleApply}
+              onCoach={setCoachBulletId}
+            />
           ))}
         </div>
       )}
@@ -251,6 +280,54 @@ export function BulletOptimizerPanel({ cv, cvLanguage, jobPostingText, onApplyBu
           ? (cvLanguage === "en" ? "Re-analyzing..." : "Analyserar om...")
           : (cvLanguage === "en" ? "Re-analyze All Bullets" : "Analysera om alla punkter")}
       </Button>
+
+      {/* Coach Chat Sheet */}
+      {coachBullet && (
+        <BulletCoachChat
+          open={!!coachBulletId}
+          onClose={() => setCoachBulletId(null)}
+          bulletId={coachBulletId!}
+          bulletText={coachBullet.text}
+          roleTitle={coachBullet.roleTitle}
+          company={coachBullet.company}
+          surroundingBullets={coachBullet.surroundingBullets}
+          jobPostingText={jobPostingText}
+          cvLanguage={cvLanguage}
+          onApply={handleApply}
+        />
+      )}
     </div>
   );
+}
+
+/* ── Find bullet info from CV ── */
+function findBulletInfo(cv: CVContent, bulletId: string) {
+  const match = bulletId.match(/^(\w+)\[(\d+)\]\.bullets\[(\d+)\]$/);
+  if (!match) return null;
+
+  const [, section, sectionIdxStr, bulletIdxStr] = match;
+  const si = parseInt(sectionIdxStr);
+  const bi = parseInt(bulletIdxStr);
+
+  if (section === "experience") {
+    const exp = cv.experience[si];
+    if (!exp?.bullets?.[bi]) return null;
+    return {
+      text: exp.bullets[bi],
+      roleTitle: exp.title,
+      company: exp.company,
+      surroundingBullets: exp.bullets.filter((_, i) => i !== bi),
+    };
+  }
+  if (section === "projects") {
+    const proj = cv.projects[si];
+    if (!proj?.bullets?.[bi]) return null;
+    return {
+      text: proj.bullets[bi],
+      roleTitle: proj.name,
+      company: undefined,
+      surroundingBullets: proj.bullets.filter((_, i) => i !== bi),
+    };
+  }
+  return null;
 }
