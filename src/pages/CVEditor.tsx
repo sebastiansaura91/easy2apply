@@ -53,7 +53,7 @@ const CVEditor = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const saveTimeout = useRef<number | null>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
+  
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -179,9 +179,8 @@ const CVEditor = () => {
               DOCX
             </Button>
             <Button variant="outline" size="sm" onClick={() => {
-              if (!previewRef.current) return;
               const safeName = (title || "cv").replace(/[^a-zA-Z0-9åäöÅÄÖ_-]/g, "_");
-              exportToPdf(previewRef.current, `${safeName}.pdf`).catch(() =>
+              exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`).catch(() =>
                 toast({ title: "PDF-export misslyckades", variant: "destructive" })
               );
             }}>
@@ -235,7 +234,7 @@ const CVEditor = () => {
         <ResizablePanel defaultSize={50} minSize={30} maxSize={70}>
           <ScrollArea className="h-full">
             <div className="bg-muted/50 p-8 flex justify-center min-h-full">
-              <A4Preview ref={previewRef} cv={cv} enabledSections={enabledSections} t={tCv} />
+              <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} />
             </div>
           </ScrollArea>
         </ResizablePanel>
