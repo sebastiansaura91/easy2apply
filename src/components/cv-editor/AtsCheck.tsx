@@ -110,7 +110,7 @@ interface AtsCheckPanelProps {
   onApplyBullet?: (bulletPath: string, newText: string) => void;
 }
 
-export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToSection }: AtsCheckPanelProps) {
+export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToSection, onApplyBullet }: AtsCheckPanelProps) {
   const [result, setResult] = useState<AtsCheckResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [jobText, setJobText] = useState(jobPostingText || "");
