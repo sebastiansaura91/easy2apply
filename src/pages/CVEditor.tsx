@@ -208,7 +208,7 @@ const CVEditor = () => {
                 </TabsContent>
 
                 <TabsContent value="ats" className="mt-4">
-                  <AtsCheckPanel cv={cv} t={t} />
+                  <AtsCheckPanel cv={cv} t={t} cvLanguage={cvLanguage} />
                 </TabsContent>
 
                 <TabsContent value="edit" className="space-y-6 mt-4">
