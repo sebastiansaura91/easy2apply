@@ -29,6 +29,7 @@ interface BulletWizardProps {
   endDate?: string;
   isPresent?: boolean;
   onAcceptBullets: (bullets: string[]) => void;
+  language?: "sv" | "en";
 }
 
 const STEPS = ["Roll & kontext", "Uppgifter", "Verktyg & stakeholders", "Resultat & ton"];
@@ -42,6 +43,7 @@ export function BulletWizard({
   endDate = "",
   isPresent = false,
   onAcceptBullets,
+  language = "sv",
 }: BulletWizardProps) {
   const [step, setStep] = useState(0);
   const [input, setInput] = useState<BulletWizardInput>({
@@ -72,7 +74,7 @@ export function BulletWizard({
     try {
       const cleanTasks = input.tasks.filter((t) => t.trim().length > 0);
       const { data, error } = await supabase.functions.invoke("generate-bullets", {
-        body: { ...input, tasks: cleanTasks },
+        body: { ...input, tasks: cleanTasks, language },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
