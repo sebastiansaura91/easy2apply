@@ -6,11 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2 } from "lucide-react";
+import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2 } from "lucide-react";
 import { CVContent, ExperienceItem, EducationItem } from "@/types/cv";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { BulletWizard } from "./BulletWizard";
 
 const bulletTips = [
   "💡 Kvantifiera resultat: \"Ökade försäljningen med 25% på 6 månader\"",
