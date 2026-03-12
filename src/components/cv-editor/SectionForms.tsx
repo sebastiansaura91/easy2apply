@@ -388,7 +388,6 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
             toast({ title: `✨ ${bullets.length} bullets tillagda`, description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare." });
           }}
         />
-        />
       )}
 
       {/* Improve All Preview Dialog */}
