@@ -5,9 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Plus, Trash2, X, Lightbulb } from "lucide-react";
 import { CVContent, ExperienceItem, EducationItem } from "@/types/cv";
 import { v4 as uuidv4 } from "uuid";
+
+const bulletTips = [
+  "💡 Kvantifiera resultat: \"Ökade försäljningen med 25% på 6 månader\"",
+  "📊 Använd KPI:er: omsättning, NPS, konverteringsgrad, kostnadsbesparingar",
+  "👥 Personalansvar? Ange antal: \"Ledde ett team på 8 personer\"",
+  "🎯 Nämn specifika projekt och din roll: \"Projektledare för ERP-implementation\"",
+  "🔧 Nämn verktyg och metoder: Agile, SAP, Power BI, etc.",
+  "📈 Visa förändring: \"Från X till Y\" visar tydlig påverkan",
+  "⏱️ Tidsramar stärker trovärdigheten: \"på 3 månader\", \"under Q2 2024\"",
+];
 
 interface SectionFormProps {
   cv: CVContent;
