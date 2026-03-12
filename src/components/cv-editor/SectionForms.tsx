@@ -284,41 +284,67 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
                   </div>
                 </div>
                 {exp.bullets.map((bullet, bIdx) => {
-                  const isImproving = improvingKey === `${idx}-${bIdx}`;
+                  const key = `${idx}-${bIdx}`;
+                  const isImproving = improvingKey === key;
+                  const preview = previews[key];
                   return (
-                    <div key={bIdx} className="flex gap-2">
-                      <span className="text-muted-foreground mt-2">•</span>
-                      <Textarea
-                        rows={2}
-                        value={bullet}
-                        onChange={(e) => {
-                          const newBullets = [...exp.bullets];
-                          newBullets[bIdx] = e.target.value;
-                          updateExperience(idx, { bullets: newBullets });
-                        }}
-                        className="min-h-[40px]"
-                      />
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="flex-shrink-0 mt-1 text-primary/60 hover:text-primary hover:bg-primary/10"
-                            onClick={() => improveBullet(idx, bIdx)}
-                            disabled={isImproving}
-                          >
-                            {isImproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p className="text-xs">Förbättra med AI</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
-                        updateExperience(idx, { bullets: exp.bullets.filter((_, i) => i !== bIdx) });
-                      }}>
-                        <X className="h-3 w-3" />
-                      </Button>
+                    <div key={bIdx} className="space-y-0">
+                      <div className="flex gap-2">
+                        <span className="text-muted-foreground mt-2">•</span>
+                        <Textarea
+                          rows={2}
+                          value={bullet}
+                          onChange={(e) => {
+                            const newBullets = [...exp.bullets];
+                            newBullets[bIdx] = e.target.value;
+                            updateExperience(idx, { bullets: newBullets });
+                          }}
+                          className="min-h-[40px]"
+                        />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="flex-shrink-0 mt-1 text-primary/60 hover:text-primary hover:bg-primary/10"
+                              onClick={() => improveBullet(idx, bIdx)}
+                              disabled={isImproving || !!preview}
+                            >
+                              {isImproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">Förbättra med AI</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
+                          updateExperience(idx, { bullets: exp.bullets.filter((_, i) => i !== bIdx) });
+                        }}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      {/* Inline preview card */}
+                      {preview && (
+                        <div className="ml-5 mt-1.5 rounded-md border border-primary/20 bg-primary/5 p-3 space-y-2">
+                          <div className="flex items-start gap-2">
+                            <Sparkles className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0 space-y-1.5">
+                              <p className="text-sm leading-relaxed">{preview.improved}</p>
+                              <p className="text-xs text-muted-foreground italic">{preview.reason}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => rejectPreview(idx, bIdx)}>
+                              <Undo2 className="h-3 w-3 mr-1" />
+                              Behåll original
+                            </Button>
+                            <Button size="sm" className="h-7 text-xs" onClick={() => acceptPreview(idx, bIdx)}>
+                              <Check className="h-3 w-3 mr-1" />
+                              Acceptera
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
