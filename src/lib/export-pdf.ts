@@ -1,80 +1,276 @@
-import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { CVContent, CVSection } from "@/types/cv";
 
 /**
- * Renders the A4 preview element to a PDF and triggers download.
- * Creates a temporary off-screen clone at full A4 scale (no CSS transform)
- * to ensure crisp output.
+ * Renders CV data directly to PDF using jsPDF text rendering.
+ * Produces crisp vector text that is selectable and ATS-parseable.
  */
 export async function exportToPdf(
-  previewElement: HTMLElement,
+  cv: CVContent,
+  enabledSections: CVSection[],
+  t: (k: string) => string,
   filename: string = "cv.pdf"
 ): Promise<void> {
-  // Clone the preview so we can render at full scale off-screen
-  const clone = previewElement.cloneNode(true) as HTMLElement;
-  clone.style.transform = "none";
-  clone.style.position = "absolute";
-  clone.style.left = "-9999px";
-  clone.style.top = "0";
-  clone.style.width = "210mm";
-  clone.style.minHeight = "297mm";
-  document.body.appendChild(clone);
+  const pdf = new jsPDF("p", "mm", "a4");
+  const pageW = 210;
+  const pageH = 297;
+  const marginL = 25;
+  const marginR = 25;
+  const marginTop = 20;
+  const marginBottom = 20;
+  const contentW = pageW - marginL - marginR;
+  let y = marginTop;
 
-  try {
-    const canvas = await html2canvas(clone, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      width: clone.scrollWidth,
-      height: clone.scrollHeight,
-    });
+  const colors = {
+    black: [15, 23, 42] as [number, number, number],
+    gray: [71, 85, 105] as [number, number, number],
+    border: [26, 26, 26] as [number, number, number],
+  };
 
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
+  function checkPage(needed: number) {
+    if (y + needed > pageH - marginBottom) {
+      pdf.addPage();
+      y = marginTop;
+    }
+  }
 
-    const pdfWidth = 210;
-    const pdfHeight = 297;
-    const canvasRatio = canvas.height / canvas.width;
-    const imgHeight = pdfWidth * canvasRatio;
+  function drawText(
+    text: string,
+    x: number,
+    currentY: number,
+    opts: {
+      fontSize?: number;
+      fontStyle?: string;
+      color?: [number, number, number];
+      maxWidth?: number;
+      lineHeight?: number;
+    } = {}
+  ): number {
+    const {
+      fontSize = 10,
+      fontStyle = "normal",
+      color = colors.black,
+      maxWidth = contentW,
+      lineHeight = 1.4,
+    } = opts;
 
-    // If content fits in one page
-    if (imgHeight <= pdfHeight) {
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, imgHeight);
-    } else {
-      // Multi-page: slice the canvas
-      let remainingHeight = canvas.height;
-      let position = 0;
-      const pageCanvasHeight = (pdfHeight / pdfWidth) * canvas.width;
+    pdf.setFontSize(fontSize);
+    pdf.setFont("helvetica", fontStyle);
+    pdf.setTextColor(...color);
 
-      while (remainingHeight > 0) {
-        const pageCanvas = document.createElement("canvas");
-        pageCanvas.width = canvas.width;
-        pageCanvas.height = Math.min(pageCanvasHeight, remainingHeight);
+    const lines = pdf.splitTextToSize(text, maxWidth);
+    const lineHeightMm = (fontSize * lineHeight * 0.3528); // pt to mm
 
-        const ctx = pageCanvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(
-            canvas,
-            0, position,
-            canvas.width, pageCanvas.height,
-            0, 0,
-            canvas.width, pageCanvas.height
-          );
-        }
-
-        const pageImgData = pageCanvas.toDataURL("image/png");
-        const pageImgHeight = (pageCanvas.height / canvas.width) * pdfWidth;
-
-        if (position > 0) pdf.addPage();
-        pdf.addImage(pageImgData, "PNG", 0, 0, pdfWidth, pageImgHeight);
-
-        remainingHeight -= pageCanvasHeight;
-        position += pageCanvasHeight;
-      }
+    for (const line of lines) {
+      checkPage(lineHeightMm);
+      pdf.text(line, x, y);
+      y += lineHeightMm;
     }
 
-    pdf.save(filename);
-  } finally {
-    document.body.removeChild(clone);
+    return y;
   }
+
+  function drawCenteredText(
+    text: string,
+    opts: {
+      fontSize?: number;
+      fontStyle?: string;
+      color?: [number, number, number];
+      maxWidth?: number;
+    } = {}
+  ) {
+    const { fontSize = 10, fontStyle = "normal", color = colors.black, maxWidth = contentW } = opts;
+    pdf.setFontSize(fontSize);
+    pdf.setFont("helvetica", fontStyle);
+    pdf.setTextColor(...color);
+
+    const lines = pdf.splitTextToSize(text, maxWidth);
+    const lineHeightMm = fontSize * 1.4 * 0.3528;
+
+    for (const line of lines) {
+      checkPage(lineHeightMm);
+      const textWidth = pdf.getTextWidth(line);
+      const x = marginL + (contentW - textWidth) / 2;
+      pdf.text(line, x, y);
+      y += lineHeightMm;
+    }
+  }
+
+  function drawH2(text: string) {
+    y += 3;
+    checkPage(8);
+    pdf.setFontSize(11);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(...colors.black);
+    const upper = text.toUpperCase();
+    pdf.text(upper, marginL, y);
+    y += 1.5;
+    // Border line
+    pdf.setDrawColor(...colors.border);
+    pdf.setLineWidth(0.4);
+    pdf.line(marginL, y, marginL + contentW, y);
+    y += 4;
+  }
+
+  function drawH3(text: string) {
+    checkPage(5);
+    drawText(text, marginL, y, { fontSize: 10.5, fontStyle: "bold" });
+  }
+
+  function drawBullet(text: string) {
+    checkPage(5);
+    const bulletX = marginL + 3;
+    const textX = marginL + 7;
+    const bulletMaxW = contentW - 7;
+
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(...colors.black);
+
+    // Draw bullet dot
+    pdf.circle(bulletX, y - 1, 0.5, "F");
+
+    const lines = pdf.splitTextToSize(text, bulletMaxW);
+    const lineHeightMm = 10 * 1.4 * 0.3528;
+
+    for (const line of lines) {
+      checkPage(lineHeightMm);
+      pdf.text(line, textX, y);
+      y += lineHeightMm;
+    }
+    y += 0.5;
+  }
+
+  // === RENDER SECTIONS ===
+  for (const section of enabledSections) {
+    switch (section.type) {
+      case "contact": {
+        // Name centered
+        checkPage(12);
+        drawCenteredText(cv.contact.name || "Ditt Namn", {
+          fontSize: 18,
+          fontStyle: "bold",
+        });
+        y += 1;
+        // Contact line
+        const contactParts = [
+          cv.contact.email,
+          cv.contact.phone,
+          cv.contact.city,
+          cv.contact.linkedin,
+          cv.contact.website,
+        ].filter(Boolean);
+        if (contactParts.length > 0) {
+          drawCenteredText(contactParts.join("  ·  "), {
+            fontSize: 9,
+            color: colors.gray,
+          });
+        }
+        y += 2;
+        break;
+      }
+
+      case "profile": {
+        if (!cv.profile) break;
+        drawH2(t("sectionProfile"));
+        drawText(cv.profile, marginL, y, { color: colors.black });
+        y += 1;
+        break;
+      }
+
+      case "experience": {
+        if (cv.experience.length === 0) break;
+        drawH2(t("sectionExperience"));
+        for (const exp of cv.experience) {
+          // Title line
+          let titleLine = exp.title;
+          if (exp.company) titleLine += `, ${exp.company}`;
+          if (exp.location) titleLine += ` – ${exp.location}`;
+          drawH3(titleLine);
+
+          // Date line
+          const dateLine = `${exp.startDate} – ${exp.isPresent ? (t("present") || "Nuvarande") : exp.endDate}`;
+          drawText(dateLine, marginL, y, { fontSize: 9, color: colors.gray });
+          y += 1;
+
+          // Bullets
+          const validBullets = exp.bullets.filter(Boolean);
+          for (const bullet of validBullets) {
+            drawBullet(bullet);
+          }
+          y += 2;
+        }
+        break;
+      }
+
+      case "education": {
+        if (cv.education.length === 0) break;
+        drawH2(t("sectionEducation"));
+        for (const edu of cv.education) {
+          let titleLine = edu.degree;
+          if (edu.field) titleLine += `, ${edu.field}`;
+          drawH3(titleLine);
+
+          const dateLine = `${edu.school}  ·  ${edu.startDate} – ${edu.endDate}`;
+          drawText(dateLine, marginL, y, { fontSize: 9, color: colors.gray });
+          y += 3;
+        }
+        break;
+      }
+
+      case "skills": {
+        if (cv.skills.length === 0) break;
+        drawH2(t("sectionSkills"));
+        drawText(cv.skills.join(", "), marginL, y);
+        y += 1;
+        break;
+      }
+
+      case "certifications": {
+        if (cv.certifications.length === 0) break;
+        drawH2(t("sectionCertifications"));
+        for (const cert of cv.certifications) {
+          drawText(`${cert.name} – ${cert.issuer} (${cert.date})`, marginL, y);
+          y += 1;
+        }
+        break;
+      }
+
+      case "projects": {
+        if (cv.projects.length === 0) break;
+        drawH2(t("sectionProjects"));
+        for (const p of cv.projects) {
+          drawH3(p.name);
+          if (p.description) {
+            drawText(p.description, marginL, y, { color: colors.gray });
+          }
+          for (const b of p.bullets) {
+            drawBullet(b);
+          }
+          y += 2;
+        }
+        break;
+      }
+
+      case "languages": {
+        if (cv.languages.length === 0) break;
+        drawH2(t("sectionLanguages"));
+        for (const lang of cv.languages) {
+          drawText(`${lang.language} – ${lang.level}`, marginL, y);
+          y += 1;
+        }
+        break;
+      }
+
+      case "other": {
+        if (!cv.other) break;
+        drawH2(t("sectionOther"));
+        drawText(cv.other, marginL, y);
+        y += 1;
+        break;
+      }
+    }
+  }
+
+  pdf.save(filename);
 }
