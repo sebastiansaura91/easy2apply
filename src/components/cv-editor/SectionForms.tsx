@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2 } from "lucide-react";
+import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2, Check, Undo2 } from "lucide-react";
 import { CVContent, ExperienceItem, EducationItem } from "@/types/cv";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,6 +65,10 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
   const [improvingKey, setImprovingKey] = useState<string | null>(null);
   const [improvingAll, setImprovingAll] = useState<number | null>(null);
   const [wizardExpIdx, setWizardExpIdx] = useState<number | null>(null);
+  // Preview state: { expIdx-bulletIdx: { original, improved, reason } }
+  const [previews, setPreviews] = useState<Record<string, { original: string; improved: string; reason: string }>>({});
+  // "Improve all" preview: expIdx -> array of previews
+  const [allPreviews, setAllPreviews] = useState<{ expIdx: number; items: { bulletIdx: number; original: string; improved: string; reason: string }[] } | null>(null);
   const { toast } = useToast();
 
   const addExperience = () => {
@@ -98,10 +103,10 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
       if (data?.error) throw new Error(data.error);
 
       if (data?.improved) {
-        const newBullets = [...exp.bullets];
-        newBullets[bulletIdx] = data.improved;
-        updateExperience(expIdx, { bullets: newBullets });
-        toast({ title: "✨ Punkt förbättrad", description: "Granska och justera [FYLL I]-platshållare." });
+        setPreviews((prev) => ({
+          ...prev,
+          [key]: { original: bullet, improved: data.improved, reason: data.reason || "Förbättrad formulering." },
+        }));
       }
     } catch (err: any) {
       toast({ title: "Kunde inte förbättra", description: err.message || "Något gick fel", variant: "destructive" });
@@ -110,36 +115,90 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
     }
   };
 
+  const acceptPreview = (expIdx: number, bulletIdx: number) => {
+    const key = `${expIdx}-${bulletIdx}`;
+    const preview = previews[key];
+    if (!preview) return;
+    const newBullets = [...cv.experience[expIdx].bullets];
+    newBullets[bulletIdx] = preview.improved;
+    updateExperience(expIdx, { bullets: newBullets });
+    setPreviews((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const rejectPreview = (expIdx: number, bulletIdx: number) => {
+    const key = `${expIdx}-${bulletIdx}`;
+    setPreviews((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
   const improveAllBullets = async (expIdx: number) => {
     const exp = cv.experience[expIdx];
-    const nonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
+    const nonEmpty = exp.bullets.map((b, i) => ({ b, i })).filter(({ b }) => b.trim().length > 0);
     if (nonEmpty.length === 0) {
       toast({ title: "Inga punkter att förbättra", variant: "destructive" });
       return;
     }
 
     setImprovingAll(expIdx);
-    const newBullets = [...exp.bullets];
-    let improved = 0;
+    const items: { bulletIdx: number; original: string; improved: string; reason: string }[] = [];
 
-    for (let bIdx = 0; bIdx < newBullets.length; bIdx++) {
-      if (!newBullets[bIdx].trim()) continue;
+    for (const { b, i: bIdx } of nonEmpty) {
       try {
         const { data, error } = await supabase.functions.invoke("improve-bullet", {
-          body: { bullet: newBullets[bIdx], jobTitle: exp.title, company: exp.company },
+          body: { bullet: b, jobTitle: exp.title, company: exp.company },
         });
         if (!error && data?.improved) {
-          newBullets[bIdx] = data.improved;
-          improved++;
+          items.push({ bulletIdx: bIdx, original: b, improved: data.improved, reason: data.reason || "Förbättrad formulering." });
         }
       } catch {
-        // continue with next bullet
+        // continue
       }
     }
 
-    updateExperience(expIdx, { bullets: newBullets });
     setImprovingAll(null);
-    toast({ title: `✨ ${improved} punkt${improved !== 1 ? "er" : ""} förbättrade`, description: "Granska [FYLL I]-platshållare." });
+    if (items.length > 0) {
+      setAllPreviews({ expIdx, items });
+    } else {
+      toast({ title: "Kunde inte förbättra några punkter", variant: "destructive" });
+    }
+  };
+
+  const acceptAllPreviews = () => {
+    if (!allPreviews) return;
+    const exp = cv.experience[allPreviews.expIdx];
+    const newBullets = [...exp.bullets];
+    for (const item of allPreviews.items) {
+      newBullets[item.bulletIdx] = item.improved;
+    }
+    updateExperience(allPreviews.expIdx, { bullets: newBullets });
+    toast({ title: `✨ ${allPreviews.items.length} punkter uppdaterade` });
+    setAllPreviews(null);
+  };
+
+  const acceptSingleFromAll = (itemIdx: number) => {
+    if (!allPreviews) return;
+    const item = allPreviews.items[itemIdx];
+    const exp = cv.experience[allPreviews.expIdx];
+    const newBullets = [...exp.bullets];
+    newBullets[item.bulletIdx] = item.improved;
+    updateExperience(allPreviews.expIdx, { bullets: newBullets });
+    const remaining = allPreviews.items.filter((_, i) => i !== itemIdx);
+    if (remaining.length === 0) setAllPreviews(null);
+    else setAllPreviews({ ...allPreviews, items: remaining });
+  };
+
+  const rejectSingleFromAll = (itemIdx: number) => {
+    if (!allPreviews) return;
+    const remaining = allPreviews.items.filter((_, i) => i !== itemIdx);
+    if (remaining.length === 0) setAllPreviews(null);
+    else setAllPreviews({ ...allPreviews, items: remaining });
   };
 
   return (
@@ -226,41 +285,67 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
                   </div>
                 </div>
                 {exp.bullets.map((bullet, bIdx) => {
-                  const isImproving = improvingKey === `${idx}-${bIdx}`;
+                  const key = `${idx}-${bIdx}`;
+                  const isImproving = improvingKey === key;
+                  const preview = previews[key];
                   return (
-                    <div key={bIdx} className="flex gap-2">
-                      <span className="text-muted-foreground mt-2">•</span>
-                      <Textarea
-                        rows={2}
-                        value={bullet}
-                        onChange={(e) => {
-                          const newBullets = [...exp.bullets];
-                          newBullets[bIdx] = e.target.value;
-                          updateExperience(idx, { bullets: newBullets });
-                        }}
-                        className="min-h-[40px]"
-                      />
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="flex-shrink-0 mt-1 text-primary/60 hover:text-primary hover:bg-primary/10"
-                            onClick={() => improveBullet(idx, bIdx)}
-                            disabled={isImproving}
-                          >
-                            {isImproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p className="text-xs">Förbättra med AI</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
-                        updateExperience(idx, { bullets: exp.bullets.filter((_, i) => i !== bIdx) });
-                      }}>
-                        <X className="h-3 w-3" />
-                      </Button>
+                    <div key={bIdx} className="space-y-0">
+                      <div className="flex gap-2">
+                        <span className="text-muted-foreground mt-2">•</span>
+                        <Textarea
+                          rows={2}
+                          value={bullet}
+                          onChange={(e) => {
+                            const newBullets = [...exp.bullets];
+                            newBullets[bIdx] = e.target.value;
+                            updateExperience(idx, { bullets: newBullets });
+                          }}
+                          className="min-h-[40px]"
+                        />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="flex-shrink-0 mt-1 text-primary/60 hover:text-primary hover:bg-primary/10"
+                              onClick={() => improveBullet(idx, bIdx)}
+                              disabled={isImproving || !!preview}
+                            >
+                              {isImproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p className="text-xs">Förbättra med AI</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
+                          updateExperience(idx, { bullets: exp.bullets.filter((_, i) => i !== bIdx) });
+                        }}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      {/* Inline preview card */}
+                      {preview && (
+                        <div className="ml-5 mt-1.5 rounded-md border border-primary/20 bg-primary/5 p-3 space-y-2">
+                          <div className="flex items-start gap-2">
+                            <Sparkles className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0 space-y-1.5">
+                              <p className="text-sm leading-relaxed">{preview.improved}</p>
+                              <p className="text-xs text-muted-foreground italic">{preview.reason}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => rejectPreview(idx, bIdx)}>
+                              <Undo2 className="h-3 w-3 mr-1" />
+                              Behåll original
+                            </Button>
+                            <Button size="sm" className="h-7 text-xs" onClick={() => acceptPreview(idx, bIdx)}>
+                              <Check className="h-3 w-3 mr-1" />
+                              Acceptera
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -291,6 +376,48 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
             toast({ title: `✨ ${bullets.length} bullets tillagda`, description: "Granska och fyll i [FYLL I]-platshållare." });
           }}
         />
+      )}
+
+      {/* Improve All Preview Dialog */}
+      {allPreviews && (
+        <Dialog open={true} onOpenChange={() => setAllPreviews(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Förhandsgranskning – {allPreviews.items.length} förbättringar
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              {allPreviews.items.map((item, i) => (
+                <div key={i} className="rounded-md border border-border p-3 space-y-2">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground line-through">{item.original}</p>
+                    <p className="text-sm">{item.improved}</p>
+                    <p className="text-xs text-muted-foreground italic">{item.reason}</p>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => rejectSingleFromAll(i)}>
+                      <X className="h-3 w-3 mr-1" />
+                      Skippa
+                    </Button>
+                    <Button size="sm" className="h-6 text-xs" onClick={() => acceptSingleFromAll(i)}>
+                      <Check className="h-3 w-3 mr-1" />
+                      Acceptera
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between pt-2 border-t border-border">
+              <Button variant="ghost" onClick={() => setAllPreviews(null)}>Avbryt</Button>
+              <Button onClick={acceptAllPreviews}>
+                <Check className="h-4 w-4 mr-1" />
+                Acceptera alla ({allPreviews.items.length})
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
