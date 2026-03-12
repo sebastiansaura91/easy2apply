@@ -190,6 +190,7 @@ const HARD_RULES = `
 const SCORING_RULES = `
 ## BULLET SCORING (0–10)
 - Structure (0–3): strong verb start + clear object + readable length
+  - SENIOR RULE: +1 bonus if bullet begins with Outcome/Decision-Purpose (what it enabled) rather than a generic activity verb. Penalize generic activity-first bullets (Developed/Worked/Responsible) unless the activity is unusually specific.
 - Concreteness (0–3): specific activity + named tools/methods/processes
 - Evidence/Impact (0–2): outcome signal or mechanism described (numbers NOT required)
 - Keyword alignment (0–2): relevant industry/role terms in context (if job posting provided)
