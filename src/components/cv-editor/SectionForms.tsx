@@ -330,7 +330,17 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
                           <div className="flex items-start gap-2">
                             <Sparkles className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
                             <div className="flex-1 min-w-0 space-y-1.5">
-                              <p className="text-sm leading-relaxed">{preview.improved}</p>
+                              <Textarea
+                                rows={2}
+                                value={preview.improved}
+                                onChange={(e) => {
+                                  setPreviews((prev) => ({
+                                    ...prev,
+                                    [key]: { ...prev[key], improved: e.target.value },
+                                  }));
+                                }}
+                                className="min-h-[40px] bg-background/50 text-sm"
+                              />
                               <p className="text-xs text-muted-foreground italic">{preview.reason}</p>
                             </div>
                           </div>
