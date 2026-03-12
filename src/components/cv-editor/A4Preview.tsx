@@ -10,7 +10,6 @@ interface A4PreviewProps {
 export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4Preview({ cv, enabledSections, t }, ref) {
   return (
     <div ref={ref} className="a4-preview" style={{ transform: "scale(0.75)", transformOrigin: "top center" }}>
-    <div className="a4-preview" style={{ transform: "scale(0.75)", transformOrigin: "top center" }}>
       {enabledSections.map((section) => {
         switch (section.type) {
           case "contact":
