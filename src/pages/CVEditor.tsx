@@ -179,9 +179,8 @@ const CVEditor = () => {
               DOCX
             </Button>
             <Button variant="outline" size="sm" onClick={() => {
-              if (!previewRef.current) return;
               const safeName = (title || "cv").replace(/[^a-zA-Z0-9åäöÅÄÖ_-]/g, "_");
-              exportToPdf(previewRef.current, `${safeName}.pdf`).catch(() =>
+              exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`).catch(() =>
                 toast({ title: "PDF-export misslyckades", variant: "destructive" })
               );
             }}>
