@@ -24,9 +24,17 @@ A) Verb + objekt + metod/verktyg + effekt (om känd)
 B) Scope + leverans + cross-functional signal
 C) Problem → åtgärd → outcome (utan hittepå)
 
-4. SPRÅK: Skriv ALLT på svenska. Aldrig engelska.
+4. SENIOR BULLET ORDERING (Outcome/Decision First):
+- Standardmönster för seniora roller: börja med Outcome eller Decision-Purpose (vad det möjliggjorde), sedan metod/hur, sedan scope, avsluta med mätetal om angivet annars placeholder.
+- Om bullet börjar med generiskt aktivitetsverb (Utvecklade, Arbetade, Ansvarade): omformulera till outcome-first ("Möjliggjorde X genom att...", "Förbättrade X genom att...", "Stöttade beslut om X genom att...")
+- Ge +1 struktur om bullet börjar med outcome/decision-purpose och är saklig.
+- Straffa generiska aktivitets-first-bullets om aktiviteten inte är ovanligt specifik.
+- Om inget mätbart utfall finns: använd [FYLL I: ROI / besparing / marginal / godkännande / tid-till-beslut]
+
+5. SPRÅK: Skriv ALLT på svenska. Aldrig engelska.
 - Kort, aktivt språk. 1 rad per bullet (max 2)
 - Starka verb: byggde, drev, införde, automatiserade, standardiserade, analyserade, förhandlade, lanserade, migrerade, förbättrade, säkrade, optimerade, etablerade, samordnade
+- Outcome-first verb: möjliggjorde, stöttade, förbättrade, accelererade, säkerställde, effektiviserade
 
 5. TRE NIVÅER:
 - "bas": ATS-safe, standard, professionell.
