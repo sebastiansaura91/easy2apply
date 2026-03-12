@@ -40,7 +40,7 @@ export function A4Preview({ cv, enabledSections, t }: A4PreviewProps) {
                       {exp.location ? ` – ${exp.location}` : ""}
                     </h3>
                     <p className="contact-line">
-                      {exp.startDate} – {exp.isPresent ? "Nuvarande" : exp.endDate}
+                      {exp.startDate} – {exp.isPresent ? t("present") : exp.endDate}
                     </p>
                     {exp.bullets.filter(Boolean).length > 0 && (
                       <ul>
