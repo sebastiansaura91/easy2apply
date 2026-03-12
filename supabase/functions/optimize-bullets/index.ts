@@ -231,18 +231,20 @@ F) "language_fix" — Translate bullet to match system language
 const SYSTEM_PROMPT_SV = `Du är en expert-CV-coach och ATS-specialist. Analysera VARJE bullet och ge konkreta förbättringsförslag.
 
 ${SCORING_RULES}
+${SENIOR_BULLET_RULE}
 ${SUGGESTION_TYPES}
 ${HARD_RULES}
 
-ALL output MUST be in Swedish. Var saklig, konkret och floskelfri. Ge alltid 2–4 förslag per bullet.`;
+ALL output MUST be in Swedish. Var saklig, konkret och floskelfri. Ge alltid 2–4 förslag per bullet. Prioritera outcome-first-struktur för seniora roller.`;
 
 const SYSTEM_PROMPT_EN = `You are an expert CV coach and ATS specialist. Analyze EVERY bullet and provide concrete improvement suggestions.
 
 ${SCORING_RULES}
+${SENIOR_BULLET_RULE}
 ${SUGGESTION_TYPES}
 ${HARD_RULES}
 
-ALL output MUST be in English. Be factual, concrete, and buzzword-free. Always give 2–4 suggestions per bullet.`;
+ALL output MUST be in English. Be factual, concrete, and buzzword-free. Always give 2–4 suggestions per bullet. Prioritize outcome-first structure for senior roles.`;
 
 // --- Output schema ---
 const RESULT_SCHEMA = {
