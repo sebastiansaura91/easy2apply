@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, FileDown, CheckCircle2, AlertTriangle, Globe } from "lucide-react";
+import { ArrowLeft, Save, FileDown, CheckCircle2, AlertTriangle, Globe, Languages, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   DndContext,
@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/resizable";
 import { cvHeadings } from "@/i18n/cvHeadings";
 import { exportToPdf } from "@/lib/export-pdf";
+import { detectCvLanguages, type LanguageCheckResult } from "@/lib/language-detection";
 
 const CVEditor = () => {
   const { id } = useParams<{ id: string }>();
@@ -52,18 +53,26 @@ const CVEditor = () => {
   const [cvLanguage, setCvLanguage] = useState<"sv" | "en">("sv");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [translating, setTranslating] = useState(false);
   const saveTimeout = useRef<number | null>(null);
-  
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // CV-specific translation for headings based on CV language
   const tCv = useCallback((key: string) => {
     return cvHeadings[cvLanguage]?.[key] || key;
   }, [cvLanguage]);
+
+  // Language detection (debounced)
+  const langCheck: LanguageCheckResult = useMemo(() => {
+    return detectCvLanguages(cv, cvLanguage);
+  }, [cv, cvLanguage]);
+
+  const mismatchSections = langCheck.detected_sections.filter(
+    (s) => s.language !== "unknown" && s.language !== cvLanguage && s.confidence > 0.5
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -101,7 +110,6 @@ const CVEditor = () => {
     }
   }, [id, user, title, cv, cvLanguage, t, toast]);
 
-  // Auto-save with debounce
   useEffect(() => {
     if (loading) return;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
@@ -123,6 +131,46 @@ const CVEditor = () => {
     const oldIdx = cv.sections.findIndex((s) => s.id === active.id);
     const newIdx = cv.sections.findIndex((s) => s.id === over.id);
     updateCv("sections", arrayMove(cv.sections, oldIdx, newIdx).map((s, i) => ({ ...s, order: i })));
+  };
+
+  const handleTranslateCV = async () => {
+    setTranslating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("translate-cv", {
+        body: { resume_content_json: cv, target_language: cvLanguage },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Merge translated content while preserving sections order
+      setCv((prev) => ({
+        ...prev,
+        contact: data.contact || prev.contact,
+        profile: data.profile ?? prev.profile,
+        experience: data.experience || prev.experience,
+        education: data.education || prev.education,
+        skills: data.skills || prev.skills,
+        certifications: data.certifications || prev.certifications,
+        projects: data.projects || prev.projects,
+        languages: data.languages || prev.languages,
+        other: data.other ?? prev.other,
+      }));
+
+      toast({
+        title: cvLanguage === "en" ? "CV translated to English" : "CV översatt till svenska",
+        description: cvLanguage === "en"
+          ? "Review the translation and fill in any [FILL IN] placeholders."
+          : "Granska översättningen och fyll i eventuella [FYLL I]-platshållare.",
+      });
+    } catch (err: any) {
+      toast({
+        title: cvLanguage === "en" ? "Translation failed" : "Översättningen misslyckades",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setTranslating(false);
+    }
   };
 
   const atsResults = runAtsCheck(cv, t);
@@ -166,6 +214,15 @@ const CVEditor = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Language mismatch badge */}
+            {langCheck.mismatch && mismatchSections.length > 0 && (
+              <Badge variant="outline" className="gap-1 border-warning text-warning text-xs">
+                <Languages className="h-3 w-3" />
+                {mismatchSections.length} mixed
+              </Badge>
+            )}
+
             <Badge variant={atsScore === atsResults.length ? "default" : "secondary"} className="gap-1">
               {atsScore === atsResults.length ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
               ATS {atsScore}/{atsResults.length}
@@ -190,6 +247,38 @@ const CVEditor = () => {
           </div>
         </div>
       </nav>
+
+      {/* Language mismatch warning bar */}
+      {langCheck.mismatch && mismatchSections.length > 0 && (
+        <div className="border-b border-warning/30 bg-warning/5 px-4 py-2 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Languages className="h-4 w-4 text-warning" />
+            <span className="text-sm text-foreground">
+              {cvLanguage === "en"
+                ? `Mixed languages detected in ${mismatchSections.length} section(s): ${mismatchSections.map((s) => s.section).join(", ")}`
+                : `Blandade språk i ${mismatchSections.length} sektion(er): ${mismatchSections.map((s) => s.section).join(", ")}`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs border-warning/50 hover:bg-warning/10"
+              onClick={handleTranslateCV}
+              disabled={translating}
+            >
+              {translating ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <Languages className="h-3 w-3 mr-1" />
+              )}
+              {translating
+                ? (cvLanguage === "en" ? "Translating..." : "Översätter...")
+                : (cvLanguage === "en" ? `Convert to English` : `Konvertera till svenska`)}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Main Editor with resizable panels */}
       <ResizablePanelGroup direction="horizontal" className="flex-1">
