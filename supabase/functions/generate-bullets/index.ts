@@ -65,9 +65,17 @@ A) Verb + object + method/tool + effect (if known)
 B) Scope + deliverable + cross-functional signal
 C) Problem → action → outcome (without fabrication)
 
-4. LANGUAGE: Write EVERYTHING in English. Never Swedish.
+4. SENIOR BULLET ORDERING (Outcome/Decision First):
+- Default pattern for senior roles: start with Outcome or Decision-Purpose (what it enabled), then method/how, then scope, end with result metric only if provided otherwise placeholder.
+- If bullet starts with a generic activity verb (Developed, Worked, Responsible, Managed, Handled, Led): rewrite into outcome-first phrasing ("Supported investment decisions by...", "Enabled prioritization by...", "Improved forecast accuracy by...")
+- Give +1 structure score if bullet begins with outcome/decision-purpose and remains factual.
+- Penalize generic activity-first bullets unless the activity is unusually specific.
+- If no measurable outcome is provided: use [FILL IN: ROI / savings / margin / approval / time-to-decision]
+
+5. LANGUAGE: Write EVERYTHING in English. Never Swedish.
 - Concise, active language. 1 line per bullet (max 2)
 - Strong verbs: built, drove, implemented, automated, standardized, analyzed, negotiated, launched, migrated, improved, secured, optimized, established, coordinated
+- Outcome-first verbs: enabled, supported, improved, accelerated, ensured, streamlined
 
 5. THREE LEVELS:
 - "bas": ATS-safe, standard, professional.
