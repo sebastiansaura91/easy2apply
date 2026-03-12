@@ -21,10 +21,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
+    const autoLogin = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setSession(session);
+        setLoading(false);
+        return;
+      }
+      // Auto-login with test user
+      const testEmail = "test@cvsäkert.dev";
+      const testPassword = "testpassword123";
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email: testEmail, password: testPassword });
+      if (signInError) {
+        // User doesn't exist yet, sign up first
+        await supabase.auth.signUp({ email: testEmail, password: testPassword });
+        await supabase.auth.signInWithPassword({ email: testEmail, password: testPassword });
+      }
+    };
+    autoLogin();
 
     return () => subscription.unsubscribe();
   }, []);
