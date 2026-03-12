@@ -97,7 +97,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
 
     try {
       const { data, error } = await supabase.functions.invoke("improve-bullet", {
-        body: { bullet, jobTitle: exp.title, company: exp.company },
+        body: { bullet, jobTitle: exp.title, company: exp.company, language: cvLanguage || "sv" },
       });
 
       if (error) throw error;
