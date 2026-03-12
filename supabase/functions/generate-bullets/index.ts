@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `Du är en expertrekryterare och CV-skribent på seniornivå. Du genererar CV-bullets som är recruiter-grade, konkreta, och strikt icke-hallucinerande.
+const SYSTEM_PROMPT_SV = `Du är en expertrekryterare och CV-skribent på seniornivå. Du genererar CV-bullets som är recruiter-grade, konkreta, och strikt icke-hallucinerande.
 
 ## HÅRDA REGLER – BRYT ALDRIG:
 
@@ -15,49 +15,62 @@ const SYSTEM_PROMPT = `Du är en expertrekryterare och CV-skribent på seniorniv
 - Om mätetal saknas: skriv "[FYLL I: t.ex. +X% / -Y% / SEK Z / timmar / NPS]"
 - Om ansvar är oklart: skriv neutralt ("Bidrog till…", "Stöttade…", "Drev del av…")
 - Påstå ALDRIG att användaren "ägde P&L", "ledde team", "byggde strategi" om det inte står i input.
-- Flagga osäkerheter som "[Behöver bekräftas]" istället för att gissa.
 
 2. FLOSKEL-FILTER (blocklista):
-Dessa ord/fraser får ALDRIG användas fristående utan konkret substans:
 "resultatorienterad", "driven", "passionerad", "team player", "hög nivå", "strategisk", "innovativ", "ansvarade för", "hands-on", "proaktiv", "engagerad"
-Om någon MÅSTE användas (sällsynt), para den med konkret leverans + objekt.
 
-3. BULLET-FORMAT (recruiter-grade mallar):
+3. BULLET-FORMAT (recruiter-grade):
 A) Verb + objekt + metod/verktyg + effekt (om känd)
 B) Scope + leverans + cross-functional signal
 C) Problem → åtgärd → outcome (utan hittepå)
-D) Signal bullets (ATS + senioritet): stakeholders, metoder – sparsamt
 
-4. SPRÅKREGLER:
-- Svenska som default
+4. SPRÅK: Skriv ALLT på svenska. Aldrig engelska.
 - Kort, aktivt språk. 1 rad per bullet (max 2)
-- Börja med starka verb: byggde, drev, införde, automatiserade, standardiserade, analyserade, förhandlade, lanserade, migrerade, förbättrade, säkrade, optimerade, etablerade, samordnade
-- Undvik passiv form och "jag"
-- Inga upprepade verb i samma jobb
+- Starka verb: byggde, drev, införde, automatiserade, standardiserade, analyserade, förhandlade, lanserade, migrerade, förbättrade, säkrade, optimerade, etablerade, samordnade
 
 5. TRE NIVÅER:
-- "bas": ATS-safe, standard, professionell. Raka bullets utan flair.
-- "skarpt": Mer konverterande men fortfarande sakligt. Tydligare impact-signaler.
-- "max": Mest "stick out" men fortfarande 100% icke-hallucinerande. Starkare verb, tydligare scope.
+- "bas": ATS-safe, standard, professionell.
+- "skarpt": Mer konverterande, tydligare impact-signaler.
+- "max": Mest "stick out" men fortfarande 100% icke-hallucinerande.
 
-6. TONVAL (anpassa efter input):
-- "Saklig": Neutralt, formellt, faktadrivet
-- "Skarpt": Direkt, kraftfullt, resultatfokuserat
-- "Konsult": Strukturerat, metodiskt, ramverksdrivet
-- "Ledarskap": Scope-tyngd, stakeholders, governance
-
-7. SENIORITET (anpassa scope):
-- IC: Fokus på hands-on leverans, verktyg, kvalitet
-- Manager: Team, processer, stakeholders, budget
-- Program: Cross-functional, portfölj, governance, roadmap
-- Head-of: Strategi, P&L (bara om bekräftat), organisation, board-level
-
-8. KVALITETSKONTROLL:
-Innan du returnerar, kör intern check:
+6. KVALITETSKONTROLL:
 - Finns hallucinerade siffror? → Ta bort eller ersätt med [FYLL I]
 - Finns floskler utan substans? → Omformulera
 - Överdrivna claims? → Tona ner
-- Är varje bullet unik (inga dubbletter/upprepningar)? → Dedup`;
+- Är varje bullet unik? → Dedup`;
+
+const SYSTEM_PROMPT_EN = `You are a senior-level expert recruiter and CV writer. You generate recruiter-grade, concrete, strictly non-hallucinating CV bullets.
+
+## HARD RULES – NEVER BREAK:
+
+1. ANTI-HALLUCINATION:
+- NEVER fabricate metrics, numbers, percentages, currency, team size, clients, brands, certifications, or technologies the user has NOT provided.
+- If metrics are missing: write "[FILL IN: e.g. +X% / -Y% / $Z / hours / NPS]"
+- If responsibility is unclear: write neutrally ("Contributed to…", "Supported…", "Drove part of…")
+- NEVER claim the user "owned P&L", "led team", "built strategy" unless stated in input.
+
+2. BUZZWORD FILTER (blocklist):
+"results-oriented", "driven", "passionate", "team player", "high level", "strategic", "innovative", "responsible for", "hands-on", "proactive", "engaged"
+
+3. BULLET FORMAT (recruiter-grade):
+A) Verb + object + method/tool + effect (if known)
+B) Scope + deliverable + cross-functional signal
+C) Problem → action → outcome (without fabrication)
+
+4. LANGUAGE: Write EVERYTHING in English. Never Swedish.
+- Concise, active language. 1 line per bullet (max 2)
+- Strong verbs: built, drove, implemented, automated, standardized, analyzed, negotiated, launched, migrated, improved, secured, optimized, established, coordinated
+
+5. THREE LEVELS:
+- "bas": ATS-safe, standard, professional.
+- "skarpt": More converting, clearer impact signals.
+- "max": Most "stand out" but still 100% non-hallucinating.
+
+6. QUALITY CONTROL:
+- Hallucinated numbers? → Remove or replace with [FILL IN]
+- Buzzwords without substance? → Rephrase
+- Overclaimed? → Tone down
+- Every bullet unique? → Dedup`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -66,10 +79,11 @@ serve(async (req) => {
 
   try {
     const input = await req.json();
-    const { jobTitle, period, industry, companyType, tasks, tools, stakeholders, results, constraints, tone, seniority } = input;
+    const { jobTitle, period, industry, companyType, tasks, tools, stakeholders, results, constraints, tone, seniority, language } = input;
+    const lang = language === "en" ? "en" : "sv";
 
     if (!jobTitle || !tasks || tasks.length === 0) {
-      return new Response(JSON.stringify({ error: "Rolltitel och minst en uppgift krävs" }), {
+      return new Response(JSON.stringify({ error: lang === "en" ? "Job title and at least one task required" : "Rolltitel och minst en uppgift krävs" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -78,24 +92,40 @@ serve(async (req) => {
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
-    const userPrompt = `Generera CV-bullets för följande roll:
+    const systemPrompt = lang === "en" ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_SV;
 
-**Roll:** ${jobTitle}
-**Period:** ${period || "Ej angiven"}
-**Bransch:** ${industry || "Ej angiven"}
-**Bolagstyp:** ${companyType || "Ej angiven"}
-**Senioritet:** ${seniority || "IC"}
-**Ton:** ${tone || "Saklig"}
+    const labels = lang === "en" ? {
+      generate: "Generate CV bullets for the following role:",
+      role: "Role", period: "Period", industry: "Industry", company_type: "Company type",
+      seniority: "Seniority", tone: "Tone", tasks: "Key tasks", tools: "Tools/methods",
+      stakeholders: "Stakeholders", results: "Results/impact", constraints: "Do NOT mention",
+      none: "None specified", no_metrics: "No metrics provided – use [FILL IN] for all metrics",
+    } : {
+      generate: "Generera CV-bullets för följande roll:",
+      role: "Roll", period: "Period", industry: "Bransch", company_type: "Bolagstyp",
+      seniority: "Senioritet", tone: "Ton", tasks: "Huvuduppgifter", tools: "Verktyg/metoder",
+      stakeholders: "Stakeholders", results: "Resultat/impact", constraints: "Saker som INTE ska nämnas",
+      none: "Inga angivna", no_metrics: "Inga mätetal angivna – använd [FYLL I] för alla mätetal",
+    };
 
-**Huvuduppgifter:**
+    const userPrompt = `${labels.generate}
+
+**${labels.role}:** ${jobTitle}
+**${labels.period}:** ${period || labels.none}
+**${labels.industry}:** ${industry || labels.none}
+**${labels.company_type}:** ${companyType || labels.none}
+**${labels.seniority}:** ${seniority || "IC"}
+**${labels.tone}:** ${tone || (lang === "en" ? "Factual" : "Saklig")}
+
+**${labels.tasks}:**
 ${tasks.map((t: string, i: number) => `${i + 1}. ${t}`).join("\n")}
 
-**Verktyg/metoder:** ${tools?.length ? tools.join(", ") : "Inga angivna"}
-**Stakeholders:** ${stakeholders?.length ? stakeholders.join(", ") : "Inga angivna"}
-**Resultat/impact:** ${results || "Inga mätetal angivna – använd [FYLL I] för alla mätetal"}
-**Saker som INTE ska nämnas:** ${constraints || "Inga begränsningar"}
+**${labels.tools}:** ${tools?.length ? tools.join(", ") : labels.none}
+**${labels.stakeholders}:** ${stakeholders?.length ? stakeholders.join(", ") : labels.none}
+**${labels.results}:** ${results || labels.no_metrics}
+**${labels.constraints}:** ${constraints || (lang === "en" ? "No constraints" : "Inga begränsningar")}
 
-Generera 4-6 bullets per nivå (bas, skarpt, max). Returnera som JSON via tool call.`;
+${lang === "en" ? "Generate 4-6 bullets per level (bas, skarpt, max). Return as JSON via tool call." : "Generera 4-6 bullets per nivå (bas, skarpt, max). Returnera som JSON via tool call."}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -106,7 +136,7 @@ Generera 4-6 bullets per nivå (bas, skarpt, max). Returnera som JSON via tool c
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.5,
@@ -134,14 +164,8 @@ Generera 4-6 bullets per nivå (bas, skarpt, max). Returnera som JSON via tool c
                       additionalProperties: false,
                     },
                   },
-                  follow_up_questions: {
-                    type: "array",
-                    items: { type: "string" },
-                  },
-                  blocked_phrases_detected: {
-                    type: "array",
-                    items: { type: "string" },
-                  },
+                  follow_up_questions: { type: "array", items: { type: "string" } },
+                  blocked_phrases_detected: { type: "array", items: { type: "string" } },
                 },
                 required: ["bullets", "follow_up_questions", "blocked_phrases_detected"],
                 additionalProperties: false,
@@ -155,12 +179,12 @@ Generera 4-6 bullets per nivå (bas, skarpt, max). Returnera som JSON via tool c
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "För många förfrågningar, vänta en stund." }), {
+        return new Response(JSON.stringify({ error: lang === "en" ? "Too many requests, please wait." : "För många förfrågningar, vänta en stund." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI-krediter slut. Fyll på i inställningarna." }), {
+        return new Response(JSON.stringify({ error: lang === "en" ? "AI credits depleted." : "AI-krediter slut." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -173,7 +197,6 @@ Generera 4-6 bullets per nivå (bas, skarpt, max). Returnera som JSON via tool c
     const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
 
     if (!toolCall) {
-      // Fallback: try to parse content as JSON
       const content = result.choices?.[0]?.message?.content;
       if (content) {
         let jsonStr = content.trim();
