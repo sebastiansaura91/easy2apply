@@ -53,6 +53,7 @@ const CVEditor = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const saveTimeout = useRef<number | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
