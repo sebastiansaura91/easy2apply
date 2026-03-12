@@ -201,9 +201,26 @@ const SCORING_RULES = `
 - low: solid structure, concrete, has evidence
 `;
 
+const SENIOR_BULLET_RULE = `
+## SENIOR BULLET ORDERING (Outcome/Decision First)
+Default pattern for senior-level bullets:
+1. Start with Outcome or Decision-Purpose (what it enabled/supported/improved)
+2. Then: method/how (modeling, analysis, workshops, tools)
+3. Then: scope (business area/region/stakeholders)
+4. End with result metric ONLY if provided; otherwise use placeholder.
+
+If bullet starts with a generic activity verb (Developed, Worked, Responsible, Managed, Handled, Led):
+- Rewrite suggestion MUST reframe into outcome-first phrasing.
+- Examples: "Supported investment decisions by modeling...", "Enabled prioritization by building...", "Improved forecast accuracy by redesigning..."
+
+Anti-hallucination for outcomes:
+- If no measurable outcome is provided, do NOT fabricate it.
+- Use placeholders: "[FILL IN: ROI / savings / margin / approval / time-to-decision]" (EN) or "[FYLL I: ROI / besparing / marginal / godkännande / tid-till-beslut]" (SV)
+`;
+
 const SUGGESTION_TYPES = `
 ## SUGGESTION TYPES (choose 2–4 most relevant per bullet)
-A) "stronger_verb_start" — Replace with a stronger, more distinct verb
+A) "stronger_verb_start" — Replace with a stronger, more distinct verb. For senior roles, reframe generic activity verbs into outcome/decision-purpose verbs (enabled, supported, improved, drove, accelerated).
 B) "add_how" — Add method/tools/process details
 C) "add_outcome" — Add outcome signal with placeholder if needed
 D) "split" — Split long bullet into 2 shorter ones
