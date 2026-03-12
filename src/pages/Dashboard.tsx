@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, FileText, Copy, Trash2, Edit3, Shield, Settings, LogOut } from "lucide-react";
+import { UploadCVDialog } from "@/components/dashboard/UploadCVDialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import {
