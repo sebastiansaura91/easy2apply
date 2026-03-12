@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { CVContent, CVSection } from "@/types/cv";
 
 interface A4PreviewProps {
@@ -6,9 +7,9 @@ interface A4PreviewProps {
   t: (k: any) => string;
 }
 
-export function A4Preview({ cv, enabledSections, t }: A4PreviewProps) {
+export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4Preview({ cv, enabledSections, t }, ref) {
   return (
-    <div className="a4-preview" style={{ transform: "scale(0.75)", transformOrigin: "top center" }}>
+    <div ref={ref} className="a4-preview" style={{ transform: "scale(0.75)", transformOrigin: "top center" }}>
       {enabledSections.map((section) => {
         switch (section.type) {
           case "contact":
@@ -116,4 +117,4 @@ export function A4Preview({ cv, enabledSections, t }: A4PreviewProps) {
       })}
     </div>
   );
-}
+});
