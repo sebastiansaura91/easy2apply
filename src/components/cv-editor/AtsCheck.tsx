@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import { BulletOptimizerPanel } from "./BulletOptimizer";
 
 // Legacy quick-check for top bar badge
 export function runAtsCheck(cv: CVContent, t: (k: any) => string) {
@@ -106,9 +107,10 @@ interface AtsCheckPanelProps {
   cvLanguage?: "sv" | "en";
   jobPostingText?: string;
   onNavigateToSection?: (sectionType: string) => void;
+  onApplyBullet?: (bulletPath: string, newText: string) => void;
 }
 
-export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToSection }: AtsCheckPanelProps) {
+export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToSection, onApplyBullet }: AtsCheckPanelProps) {
   const [result, setResult] = useState<AtsCheckResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [jobText, setJobText] = useState(jobPostingText || "");
@@ -330,13 +332,29 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
         </div>
       )}
 
+      {/* ── Bullet Optimizer ── */}
+      {onApplyBullet && (
+        <div className="pt-2 border-t border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 mb-2">
+            <Zap className="h-3.5 w-3.5" />
+            {cvLanguage === "en" ? "Bullet Optimizer" : "Punkt-optimerare"}
+          </p>
+          <BulletOptimizerPanel
+            cv={cv}
+            cvLanguage={cvLanguage || "sv"}
+            jobPostingText={jobText}
+            onApplyBullet={onApplyBullet}
+          />
+        </div>
+      )}
+
       {/* ── Re-run ── */}
       <div className="pt-2 border-t border-border space-y-2">
         <Textarea rows={3} value={jobText} onChange={(e) => setJobText(e.target.value)}
-          placeholder="Klistra in jobbannons..." className="text-xs" />
+          placeholder={cvLanguage === "en" ? "Paste job posting..." : "Klistra in jobbannons..."} className="text-xs" />
         <Button onClick={runCheck} disabled={loading} variant="outline" size="sm" className="w-full gap-1.5">
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-          {loading ? "Analyserar..." : "Kör om ATS-kontroll"}
+          {loading ? (cvLanguage === "en" ? "Analyzing..." : "Analyserar...") : (cvLanguage === "en" ? "Re-run ATS Check" : "Kör om ATS-kontroll")}
         </Button>
       </div>
     </div>

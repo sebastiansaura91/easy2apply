@@ -304,7 +304,39 @@ const CVEditor = () => {
                 </TabsContent>
 
                 <TabsContent value="ats" className="mt-4">
-                  <AtsCheckPanel cv={cv} t={t} cvLanguage={cvLanguage} />
+                  <AtsCheckPanel
+                    cv={cv}
+                    t={t}
+                    cvLanguage={cvLanguage}
+                    onApplyBullet={(bulletPath, newText) => {
+                      // Parse path like "experience[0].bullets[2]"
+                      const match = bulletPath.match(/^(\w+)\[(\d+)\]\.bullets\[(\d+)\]$/);
+                      if (!match) return;
+                      const [, section, sectionIdx, bulletIdx] = match;
+                      const si = parseInt(sectionIdx);
+                      const bi = parseInt(bulletIdx);
+
+                      if (section === "experience") {
+                        const updated = [...cv.experience];
+                        if (updated[si]?.bullets?.[bi] !== undefined) {
+                          updated[si] = {
+                            ...updated[si],
+                            bullets: updated[si].bullets.map((b, i) => i === bi ? newText : b),
+                          };
+                          updateCv("experience", updated);
+                        }
+                      } else if (section === "projects") {
+                        const updated = [...cv.projects];
+                        if (updated[si]?.bullets?.[bi] !== undefined) {
+                          updated[si] = {
+                            ...updated[si],
+                            bullets: updated[si].bullets.map((b, i) => i === bi ? newText : b),
+                          };
+                          updateCv("projects", updated);
+                        }
+                      }
+                    }}
+                  />
                 </TabsContent>
 
                 <TabsContent value="edit" className="space-y-6 mt-4">

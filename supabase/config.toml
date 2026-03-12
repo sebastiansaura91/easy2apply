@@ -1,1 +1,4 @@
 project_id = "suokeaxtmhgakgtgcdwc"
+
+[functions.optimize-bullets]
+verify_jwt = false
