@@ -403,7 +403,19 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
                 <div key={i} className="rounded-md border border-border p-3 space-y-2">
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground line-through">{item.original}</p>
-                    <p className="text-sm">{item.improved}</p>
+                    <Textarea
+                      rows={2}
+                      value={item.improved}
+                      onChange={(e) => {
+                        setAllPreviews((prev) => {
+                          if (!prev) return prev;
+                          const items = [...prev.items];
+                          items[i] = { ...items[i], improved: e.target.value };
+                          return { ...prev, items };
+                        });
+                      }}
+                      className="min-h-[40px] text-sm"
+                    />
                     <p className="text-xs text-muted-foreground italic">{item.reason}</p>
                   </div>
                   <div className="flex gap-2 justify-end">
