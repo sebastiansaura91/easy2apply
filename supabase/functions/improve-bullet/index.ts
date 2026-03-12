@@ -44,7 +44,9 @@ serve(async (req) => {
   }
 
   try {
-    const { bullet, jobTitle, company } = await req.json();
+    const { bullet, jobTitle, company, language } = await req.json();
+    const lang = language === "en" ? "en" : "sv";
+    const systemPrompt = lang === "en" ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_SV;
 
     if (!bullet || bullet.trim().length === 0) {
       return new Response(JSON.stringify({ error: "No bullet provided" }), {
