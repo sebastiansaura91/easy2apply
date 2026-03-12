@@ -5,9 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Plus, Trash2, X, Lightbulb } from "lucide-react";
 import { CVContent, ExperienceItem, EducationItem } from "@/types/cv";
 import { v4 as uuidv4 } from "uuid";
+
+const bulletTips = [
+  "💡 Kvantifiera resultat: \"Ökade försäljningen med 25% på 6 månader\"",
+  "📊 Använd KPI:er: omsättning, NPS, konverteringsgrad, kostnadsbesparingar",
+  "👥 Personalansvar? Ange antal: \"Ledde ett team på 8 personer\"",
+  "🎯 Nämn specifika projekt och din roll: \"Projektledare för ERP-implementation\"",
+  "🔧 Nämn verktyg och metoder: Agile, SAP, Power BI, etc.",
+  "📈 Visa förändring: \"Från X till Y\" visar tydlig påverkan",
+  "⏱️ Tidsramar stärker trovärdigheten: \"på 3 månader\", \"under Q2 2024\"",
+];
 
 interface SectionFormProps {
   cv: CVContent;
@@ -92,7 +103,22 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
               <span className="text-sm">{t("expPresent")}</span>
             </div>
             <div className="space-y-2">
-              <span className="text-sm font-medium">{t("expBullets")}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium">{t("expBullets")}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center cursor-help">
+                      <Lightbulb className="h-3.5 w-3.5 text-primary/60 hover:text-primary transition-colors" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs space-y-1 p-3">
+                    <p className="font-semibold text-xs mb-1.5">Tips för starka punkter:</p>
+                    {bulletTips.map((tip, i) => (
+                      <p key={i} className="text-xs leading-relaxed">{tip}</p>
+                    ))}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               {exp.bullets.map((bullet, bIdx) => (
                 <div key={bIdx} className="flex gap-2">
                   <span className="text-muted-foreground mt-2">•</span>
