@@ -29,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       // Auto-login with test user
-      const testEmail = "test@cvsäkert.dev";
+      const testEmail = "test@cvsakert-demo.dev";
       const testPassword = "testpassword123";
       const { error: signInError } = await supabase.auth.signInWithPassword({ email: testEmail, password: testPassword });
       if (signInError) {
