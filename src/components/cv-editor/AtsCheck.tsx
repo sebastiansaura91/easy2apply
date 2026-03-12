@@ -332,13 +332,29 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
         </div>
       )}
 
+      {/* ── Bullet Optimizer ── */}
+      {onApplyBullet && (
+        <div className="pt-2 border-t border-border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 mb-2">
+            <Zap className="h-3.5 w-3.5" />
+            {cvLanguage === "en" ? "Bullet Optimizer" : "Punkt-optimerare"}
+          </p>
+          <BulletOptimizerPanel
+            cv={cv}
+            cvLanguage={cvLanguage || "sv"}
+            jobPostingText={jobText}
+            onApplyBullet={onApplyBullet}
+          />
+        </div>
+      )}
+
       {/* ── Re-run ── */}
       <div className="pt-2 border-t border-border space-y-2">
         <Textarea rows={3} value={jobText} onChange={(e) => setJobText(e.target.value)}
-          placeholder="Klistra in jobbannons..." className="text-xs" />
+          placeholder={cvLanguage === "en" ? "Paste job posting..." : "Klistra in jobbannons..."} className="text-xs" />
         <Button onClick={runCheck} disabled={loading} variant="outline" size="sm" className="w-full gap-1.5">
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-          {loading ? "Analyserar..." : "Kör om ATS-kontroll"}
+          {loading ? (cvLanguage === "en" ? "Analyzing..." : "Analyserar...") : (cvLanguage === "en" ? "Re-run ATS Check" : "Kör om ATS-kontroll")}
         </Button>
       </div>
     </div>
