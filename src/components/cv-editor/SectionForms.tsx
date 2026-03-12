@@ -64,6 +64,10 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
   const [improvingKey, setImprovingKey] = useState<string | null>(null);
   const [improvingAll, setImprovingAll] = useState<number | null>(null);
   const [wizardExpIdx, setWizardExpIdx] = useState<number | null>(null);
+  // Preview state: { expIdx-bulletIdx: { original, improved, reason } }
+  const [previews, setPreviews] = useState<Record<string, { original: string; improved: string; reason: string }>>({});
+  // "Improve all" preview: expIdx -> array of previews
+  const [allPreviews, setAllPreviews] = useState<{ expIdx: number; items: { bulletIdx: number; original: string; improved: string; reason: string }[] } | null>(null);
   const { toast } = useToast();
 
   const addExperience = () => {
@@ -98,10 +102,10 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
       if (data?.error) throw new Error(data.error);
 
       if (data?.improved) {
-        const newBullets = [...exp.bullets];
-        newBullets[bulletIdx] = data.improved;
-        updateExperience(expIdx, { bullets: newBullets });
-        toast({ title: "✨ Punkt förbättrad", description: "Granska och justera [FYLL I]-platshållare." });
+        setPreviews((prev) => ({
+          ...prev,
+          [key]: { original: bullet, improved: data.improved, reason: data.reason || "Förbättrad formulering." },
+        }));
       }
     } catch (err: any) {
       toast({ title: "Kunde inte förbättra", description: err.message || "Något gick fel", variant: "destructive" });
@@ -110,36 +114,90 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
     }
   };
 
+  const acceptPreview = (expIdx: number, bulletIdx: number) => {
+    const key = `${expIdx}-${bulletIdx}`;
+    const preview = previews[key];
+    if (!preview) return;
+    const newBullets = [...cv.experience[expIdx].bullets];
+    newBullets[bulletIdx] = preview.improved;
+    updateExperience(expIdx, { bullets: newBullets });
+    setPreviews((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const rejectPreview = (expIdx: number, bulletIdx: number) => {
+    const key = `${expIdx}-${bulletIdx}`;
+    setPreviews((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
   const improveAllBullets = async (expIdx: number) => {
     const exp = cv.experience[expIdx];
-    const nonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
+    const nonEmpty = exp.bullets.map((b, i) => ({ b, i })).filter(({ b }) => b.trim().length > 0);
     if (nonEmpty.length === 0) {
       toast({ title: "Inga punkter att förbättra", variant: "destructive" });
       return;
     }
 
     setImprovingAll(expIdx);
-    const newBullets = [...exp.bullets];
-    let improved = 0;
+    const items: { bulletIdx: number; original: string; improved: string; reason: string }[] = [];
 
-    for (let bIdx = 0; bIdx < newBullets.length; bIdx++) {
-      if (!newBullets[bIdx].trim()) continue;
+    for (const { b, i: bIdx } of nonEmpty) {
       try {
         const { data, error } = await supabase.functions.invoke("improve-bullet", {
-          body: { bullet: newBullets[bIdx], jobTitle: exp.title, company: exp.company },
+          body: { bullet: b, jobTitle: exp.title, company: exp.company },
         });
         if (!error && data?.improved) {
-          newBullets[bIdx] = data.improved;
-          improved++;
+          items.push({ bulletIdx: bIdx, original: b, improved: data.improved, reason: data.reason || "Förbättrad formulering." });
         }
       } catch {
-        // continue with next bullet
+        // continue
       }
     }
 
-    updateExperience(expIdx, { bullets: newBullets });
     setImprovingAll(null);
-    toast({ title: `✨ ${improved} punkt${improved !== 1 ? "er" : ""} förbättrade`, description: "Granska [FYLL I]-platshållare." });
+    if (items.length > 0) {
+      setAllPreviews({ expIdx, items });
+    } else {
+      toast({ title: "Kunde inte förbättra några punkter", variant: "destructive" });
+    }
+  };
+
+  const acceptAllPreviews = () => {
+    if (!allPreviews) return;
+    const exp = cv.experience[allPreviews.expIdx];
+    const newBullets = [...exp.bullets];
+    for (const item of allPreviews.items) {
+      newBullets[item.bulletIdx] = item.improved;
+    }
+    updateExperience(allPreviews.expIdx, { bullets: newBullets });
+    toast({ title: `✨ ${allPreviews.items.length} punkter uppdaterade` });
+    setAllPreviews(null);
+  };
+
+  const acceptSingleFromAll = (itemIdx: number) => {
+    if (!allPreviews) return;
+    const item = allPreviews.items[itemIdx];
+    const exp = cv.experience[allPreviews.expIdx];
+    const newBullets = [...exp.bullets];
+    newBullets[item.bulletIdx] = item.improved;
+    updateExperience(allPreviews.expIdx, { bullets: newBullets });
+    const remaining = allPreviews.items.filter((_, i) => i !== itemIdx);
+    if (remaining.length === 0) setAllPreviews(null);
+    else setAllPreviews({ ...allPreviews, items: remaining });
+  };
+
+  const rejectSingleFromAll = (itemIdx: number) => {
+    if (!allPreviews) return;
+    const remaining = allPreviews.items.filter((_, i) => i !== itemIdx);
+    if (remaining.length === 0) setAllPreviews(null);
+    else setAllPreviews({ ...allPreviews, items: remaining });
   };
 
   return (
