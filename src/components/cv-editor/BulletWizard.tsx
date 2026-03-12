@@ -29,6 +29,7 @@ interface BulletWizardProps {
   endDate?: string;
   isPresent?: boolean;
   onAcceptBullets: (bullets: string[]) => void;
+  language?: "sv" | "en";
 }
 
 const STEPS = ["Roll & kontext", "Uppgifter", "Verktyg & stakeholders", "Resultat & ton"];
