@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import { BulletOptimizerPanel } from "./BulletOptimizer";
 
 // Legacy quick-check for top bar badge
 export function runAtsCheck(cv: CVContent, t: (k: any) => string) {
