@@ -153,7 +153,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
     for (const { b, i: bIdx } of nonEmpty) {
       try {
         const { data, error } = await supabase.functions.invoke("improve-bullet", {
-          body: { bullet: b, jobTitle: exp.title, company: exp.company },
+          body: { bullet: b, jobTitle: exp.title, company: exp.company, language: cvLanguage || "sv" },
         });
         if (!error && data?.improved) {
           items.push({ bulletIdx: bIdx, original: b, improved: data.improved, reason: data.reason || "Förbättrad formulering." });
