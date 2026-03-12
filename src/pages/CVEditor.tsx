@@ -38,6 +38,7 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 import { cvHeadings } from "@/i18n/cvHeadings";
+import { exportToPdf } from "@/lib/export-pdf";
 
 const CVEditor = () => {
   const { id } = useParams<{ id: string }>();
