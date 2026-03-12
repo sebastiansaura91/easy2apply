@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, FileText, Copy, Trash2, Edit3, Shield, Settings, LogOut } from "lucide-react";
+import { UploadCVDialog } from "@/components/dashboard/UploadCVDialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import {
@@ -143,6 +144,7 @@ const Dashboard = () => {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold font-['Space_Grotesk']">{t("dashTitle")}</h1>
           <div className="flex gap-2">
+            <UploadCVDialog />
             <Button variant="outline" onClick={() => createResume(true)}>
               <FileText className="mr-2 h-4 w-4" />
               Exempel-CV
