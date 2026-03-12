@@ -668,8 +668,8 @@ const sectionFormMap: Record<string, React.ComponentType<SectionFormProps>> = {
   other: OtherForm,
 };
 
-export function SectionFormRenderer({ sectionType, cv, updateCv, t }: { sectionType: string } & SectionFormProps) {
+export function SectionFormRenderer({ sectionType, cv, updateCv, t, cvLanguage }: { sectionType: string } & SectionFormProps) {
   const FormComponent = sectionFormMap[sectionType];
   if (!FormComponent) return null;
-  return <FormComponent cv={cv} updateCv={updateCv} t={t} />;
+  return <FormComponent cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />;
 }
