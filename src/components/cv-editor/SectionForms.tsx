@@ -28,6 +28,7 @@ interface SectionFormProps {
   cv: CVContent;
   updateCv: <K extends keyof CVContent>(key: K, value: CVContent[K]) => void;
   t: (k: any) => string;
+  cvLanguage?: "sv" | "en";
 }
 
 export function ContactForm({ cv, updateCv, t }: SectionFormProps) {
@@ -61,7 +62,7 @@ export function ProfileForm({ cv, updateCv, t }: SectionFormProps) {
   );
 }
 
-export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
+export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   const [improvingKey, setImprovingKey] = useState<string | null>(null);
   const [improvingAll, setImprovingAll] = useState<number | null>(null);
   const [wizardExpIdx, setWizardExpIdx] = useState<number | null>(null);
@@ -96,7 +97,7 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
 
     try {
       const { data, error } = await supabase.functions.invoke("improve-bullet", {
-        body: { bullet, jobTitle: exp.title, company: exp.company },
+        body: { bullet, jobTitle: exp.title, company: exp.company, language: cvLanguage || "sv" },
       });
 
       if (error) throw error;
@@ -152,7 +153,7 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
     for (const { b, i: bIdx } of nonEmpty) {
       try {
         const { data, error } = await supabase.functions.invoke("improve-bullet", {
-          body: { bullet: b, jobTitle: exp.title, company: exp.company },
+          body: { bullet: b, jobTitle: exp.title, company: exp.company, language: cvLanguage || "sv" },
         });
         if (!error && data?.improved) {
           items.push({ bulletIdx: bIdx, original: b, improved: data.improved, reason: data.reason || "Förbättrad formulering." });
@@ -330,7 +331,17 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
                           <div className="flex items-start gap-2">
                             <Sparkles className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
                             <div className="flex-1 min-w-0 space-y-1.5">
-                              <p className="text-sm leading-relaxed">{preview.improved}</p>
+                              <Textarea
+                                rows={2}
+                                value={preview.improved}
+                                onChange={(e) => {
+                                  setPreviews((prev) => ({
+                                    ...prev,
+                                    [key]: { ...prev[key], improved: e.target.value },
+                                  }));
+                                }}
+                                className="min-h-[40px] bg-background/50 text-sm"
+                              />
                               <p className="text-xs text-muted-foreground italic">{preview.reason}</p>
                             </div>
                           </div>
@@ -393,7 +404,19 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
                 <div key={i} className="rounded-md border border-border p-3 space-y-2">
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground line-through">{item.original}</p>
-                    <p className="text-sm">{item.improved}</p>
+                    <Textarea
+                      rows={2}
+                      value={item.improved}
+                      onChange={(e) => {
+                        setAllPreviews((prev) => {
+                          if (!prev) return prev;
+                          const items = [...prev.items];
+                          items[i] = { ...items[i], improved: e.target.value };
+                          return { ...prev, items };
+                        });
+                      }}
+                      className="min-h-[40px] text-sm"
+                    />
                     <p className="text-xs text-muted-foreground italic">{item.reason}</p>
                   </div>
                   <div className="flex gap-2 justify-end">
@@ -645,8 +668,8 @@ const sectionFormMap: Record<string, React.ComponentType<SectionFormProps>> = {
   other: OtherForm,
 };
 
-export function SectionFormRenderer({ sectionType, cv, updateCv, t }: { sectionType: string } & SectionFormProps) {
+export function SectionFormRenderer({ sectionType, cv, updateCv, t, cvLanguage }: { sectionType: string } & SectionFormProps) {
   const FormComponent = sectionFormMap[sectionType];
   if (!FormComponent) return null;
-  return <FormComponent cv={cv} updateCv={updateCv} t={t} />;
+  return <FormComponent cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />;
 }

@@ -6,20 +6,37 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `Du är en expert-CV-skribent. Din uppgift är att förbättra en enskild punkt (bullet point) i ett CV.
+const SYSTEM_PROMPT_SV = `Du är en expert-CV-skribent. Din uppgift är att förbättra en enskild punkt (bullet point) i ett CV.
 
 Regler:
 - Gör punkten mer kvantifierbar och resultatfokuserad
 - Använd aktiva verb i början (Ledde, Utvecklade, Implementerade, Ökade, Reducerade, etc.)
 - Lägg till platshållare [FYLL I] för siffror/KPI:er som du inte vet, t.ex. [FYLL I antal], [FYLL I %], [FYLL I MSEK]
-- Behåll samma språk som originalet
+- Skriv på svenska
 - Hitta ALDRIG på fakta - använd [FYLL I] istället
 - Behåll samma grundbetydelse, men gör den starkare och mer professionell
 - Avvik INTE för långt från originalet – förbättra, omformulera inte helt
 - Nämn gärna personalansvar, budget, verktyg/metoder om det är relevant
 - Max 2 meningar
+- Svara på svenska, inklusive reason-fältet
 
 Returnera ALLTID via tool call.`;
+
+const SYSTEM_PROMPT_EN = `You are an expert CV writer. Your task is to improve a single bullet point in a CV/resume.
+
+Rules:
+- Make the bullet more quantifiable and results-focused
+- Use strong action verbs at the start (Led, Developed, Implemented, Increased, Reduced, etc.)
+- Add placeholders [FILL IN] for unknown figures/KPIs, e.g. [FILL IN number], [FILL IN %], [FILL IN $]
+- Write in English
+- NEVER fabricate facts - use [FILL IN] instead
+- Keep the same core meaning, but make it stronger and more professional
+- Do NOT deviate too far from the original – improve, don't rewrite completely
+- Mention team size, budget, tools/methods where relevant
+- Max 2 sentences
+- Respond in English, including the reason field
+
+ALWAYS return via tool call.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -27,7 +44,9 @@ serve(async (req) => {
   }
 
   try {
-    const { bullet, jobTitle, company } = await req.json();
+    const { bullet, jobTitle, company, language } = await req.json();
+    const lang = language === "en" ? "en" : "sv";
+    const systemPrompt = lang === "en" ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_SV;
 
     if (!bullet || bullet.trim().length === 0) {
       return new Response(JSON.stringify({ error: "No bullet provided" }), {
@@ -55,8 +74,8 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Förbättra denna punkt:${context}\n\nPunkt: "${bullet}"` },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `${lang === "en" ? "Improve this bullet point" : "Förbättra denna punkt"}:${context}\n\n${lang === "en" ? "Bullet" : "Punkt"}: "${bullet}"` },
         ],
         temperature: 0.4,
         tools: [

@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Save, FileDown, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Save, FileDown, CheckCircle2, AlertTriangle, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   DndContext,
@@ -36,6 +37,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import { cvHeadings } from "@/i18n/cvHeadings";
 
 const CVEditor = () => {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +48,7 @@ const CVEditor = () => {
 
   const [cv, setCv] = useState<CVContent>(emptyCV);
   const [title, setTitle] = useState("");
+  const [cvLanguage, setCvLanguage] = useState<"sv" | "en">("sv");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const saveTimeout = useRef<number | null>(null);
@@ -55,12 +58,17 @@ const CVEditor = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // CV-specific translation for headings based on CV language
+  const tCv = useCallback((key: string) => {
+    return cvHeadings[cvLanguage]?.[key] || key;
+  }, [cvLanguage]);
+
   useEffect(() => {
     const load = async () => {
       if (!id || !user) return;
       const { data, error } = await supabase
         .from("resumes")
-        .select("title, content_json")
+        .select("title, content_json, language")
         .eq("id", id)
         .single();
 
@@ -71,6 +79,7 @@ const CVEditor = () => {
       }
       setTitle(data.title);
       setCv(data.content_json as unknown as CVContent);
+      setCvLanguage((data.language as "sv" | "en") || "sv");
       setLoading(false);
     };
     load();
@@ -81,14 +90,14 @@ const CVEditor = () => {
     setSaving(true);
     const { error } = await supabase
       .from("resumes")
-      .update({ title, content_json: cv as any, updated_at: new Date().toISOString() })
+      .update({ title, content_json: cv as any, language: cvLanguage, updated_at: new Date().toISOString() })
       .eq("id", id);
 
     setSaving(false);
     if (error) {
       toast({ title: t("error"), description: error.message, variant: "destructive" });
     }
-  }, [id, user, title, cv, t, toast]);
+  }, [id, user, title, cv, cvLanguage, t, toast]);
 
   // Auto-save with debounce
   useEffect(() => {
@@ -96,7 +105,7 @@ const CVEditor = () => {
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = window.setTimeout(() => saveCV(), 2000);
     return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
-  }, [cv, title, loading]);
+  }, [cv, title, cvLanguage, loading]);
 
   const updateCv = <K extends keyof CVContent>(key: K, value: CVContent[K]) => {
     setCv((prev) => ({ ...prev, [key]: value }));
@@ -142,6 +151,19 @@ const CVEditor = () => {
             />
           </div>
           <div className="flex items-center gap-2">
+            {/* CV Language selector */}
+            <div className="flex items-center gap-1.5">
+              <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+              <Select value={cvLanguage} onValueChange={(v: "sv" | "en") => setCvLanguage(v)}>
+                <SelectTrigger className="h-8 w-24 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sv">Svenska</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Badge variant={atsScore === atsResults.length ? "default" : "secondary"} className="gap-1">
               {atsScore === atsResults.length ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
               ATS {atsScore}/{atsResults.length}
@@ -191,7 +213,7 @@ const CVEditor = () => {
 
                 <TabsContent value="edit" className="space-y-6 mt-4">
                   {enabledSections.map((section) => (
-                    <SectionFormRenderer key={section.id} sectionType={section.type} cv={cv} updateCv={updateCv} t={t} />
+                    <SectionFormRenderer key={section.id} sectionType={section.type} cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />
                   ))}
                 </TabsContent>
               </Tabs>
@@ -205,7 +227,7 @@ const CVEditor = () => {
         <ResizablePanel defaultSize={50} minSize={30} maxSize={70}>
           <ScrollArea className="h-full">
             <div className="bg-muted/50 p-8 flex justify-center min-h-full">
-              <A4Preview cv={cv} enabledSections={enabledSections} t={t} />
+              <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} />
             </div>
           </ScrollArea>
         </ResizablePanel>
