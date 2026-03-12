@@ -74,8 +74,8 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Förbättra denna punkt:${context}\n\nPunkt: "${bullet}"` },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `${lang === "en" ? "Improve this bullet point" : "Förbättra denna punkt"}:${context}\n\n${lang === "en" ? "Bullet" : "Punkt"}: "${bullet}"` },
         ],
         temperature: 0.4,
         tools: [
