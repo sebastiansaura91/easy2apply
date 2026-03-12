@@ -74,7 +74,7 @@ export function BulletWizard({
     try {
       const cleanTasks = input.tasks.filter((t) => t.trim().length > 0);
       const { data, error } = await supabase.functions.invoke("generate-bullets", {
-        body: { ...input, tasks: cleanTasks },
+        body: { ...input, tasks: cleanTasks, language },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
