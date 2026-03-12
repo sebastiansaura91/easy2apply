@@ -60,6 +60,9 @@ export function ProfileForm({ cv, updateCv, t }: SectionFormProps) {
 }
 
 export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
+  const [improvingKey, setImprovingKey] = useState<string | null>(null);
+  const { toast } = useToast();
+
   const addExperience = () => {
     updateCv("experience", [...cv.experience, { id: uuidv4(), title: "", company: "", location: "", startDate: "", endDate: "", isPresent: false, bullets: [""] }]);
   };
@@ -70,6 +73,38 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
 
   const removeExperience = (idx: number) => {
     updateCv("experience", cv.experience.filter((_, i) => i !== idx));
+  };
+
+  const improveBullet = async (expIdx: number, bulletIdx: number) => {
+    const exp = cv.experience[expIdx];
+    const bullet = exp.bullets[bulletIdx];
+    if (!bullet.trim()) {
+      toast({ title: "Skriv något först", description: "Fyll i punkten innan du förbättrar den med AI.", variant: "destructive" });
+      return;
+    }
+
+    const key = `${expIdx}-${bulletIdx}`;
+    setImprovingKey(key);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("improve-bullet", {
+        body: { bullet, jobTitle: exp.title, company: exp.company },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.improved) {
+        const newBullets = [...exp.bullets];
+        newBullets[bulletIdx] = data.improved;
+        updateExperience(expIdx, { bullets: newBullets });
+        toast({ title: "✨ Punkt förbättrad", description: "Granska och justera [FYLL I]-platshållare." });
+      }
+    } catch (err: any) {
+      toast({ title: "Kunde inte förbättra", description: err.message || "Något gick fel", variant: "destructive" });
+    } finally {
+      setImprovingKey(null);
+    }
   };
 
   return (
@@ -121,26 +156,45 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {exp.bullets.map((bullet, bIdx) => (
-                <div key={bIdx} className="flex gap-2">
-                  <span className="text-muted-foreground mt-2">•</span>
-                  <Textarea
-                    rows={2}
-                    value={bullet}
-                    onChange={(e) => {
-                      const newBullets = [...exp.bullets];
-                      newBullets[bIdx] = e.target.value;
-                      updateExperience(idx, { bullets: newBullets });
-                    }}
-                    className="min-h-[40px]"
-                  />
-                  <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
-                    updateExperience(idx, { bullets: exp.bullets.filter((_, i) => i !== bIdx) });
-                  }}>
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
+              {exp.bullets.map((bullet, bIdx) => {
+                const isImproving = improvingKey === `${idx}-${bIdx}`;
+                return (
+                  <div key={bIdx} className="flex gap-2">
+                    <span className="text-muted-foreground mt-2">•</span>
+                    <Textarea
+                      rows={2}
+                      value={bullet}
+                      onChange={(e) => {
+                        const newBullets = [...exp.bullets];
+                        newBullets[bIdx] = e.target.value;
+                        updateExperience(idx, { bullets: newBullets });
+                      }}
+                      className="min-h-[40px]"
+                    />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="flex-shrink-0 mt-1 text-primary/60 hover:text-primary hover:bg-primary/10"
+                          onClick={() => improveBullet(idx, bIdx)}
+                          disabled={isImproving}
+                        >
+                          {isImproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p className="text-xs">Förbättra med AI</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
+                      updateExperience(idx, { bullets: exp.bullets.filter((_, i) => i !== bIdx) });
+                    }}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                );
+              })}
               <Button variant="ghost" size="sm" onClick={() => updateExperience(idx, { bullets: [...exp.bullets, ""] })}>
                 <Plus className="h-3 w-3 mr-1" />
                 {t("editorAddBullet")}
