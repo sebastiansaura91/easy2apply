@@ -28,6 +28,7 @@ interface SectionFormProps {
   cv: CVContent;
   updateCv: <K extends keyof CVContent>(key: K, value: CVContent[K]) => void;
   t: (k: any) => string;
+  cvLanguage?: "sv" | "en";
 }
 
 export function ContactForm({ cv, updateCv, t }: SectionFormProps) {
