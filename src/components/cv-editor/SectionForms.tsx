@@ -103,20 +103,22 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
               <span className="text-sm">{t("expPresent")}</span>
             </div>
             <div className="space-y-2">
-              <span className="text-sm font-medium">{t("expBullets")}</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex items-center ml-1 cursor-help">
-                    <Lightbulb className="h-3.5 w-3.5 text-primary/60 hover:text-primary transition-colors" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-xs space-y-1 p-3">
-                  <p className="font-semibold text-xs mb-1.5">Tips för starka punkter:</p>
-                  {bulletTips.map((tip, i) => (
-                    <p key={i} className="text-xs leading-relaxed">{tip}</p>
-                  ))}
-                </TooltipContent>
-              </Tooltip>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium">{t("expBullets")}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center cursor-help">
+                      <Lightbulb className="h-3.5 w-3.5 text-primary/60 hover:text-primary transition-colors" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs space-y-1 p-3">
+                    <p className="font-semibold text-xs mb-1.5">Tips för starka punkter:</p>
+                    {bulletTips.map((tip, i) => (
+                      <p key={i} className="text-xs leading-relaxed">{tip}</p>
+                    ))}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               {exp.bullets.map((bullet, bIdx) => (
                 <div key={bIdx} className="flex gap-2">
                   <span className="text-muted-foreground mt-2">•</span>
