@@ -2,3 +2,6 @@ project_id = "suokeaxtmhgakgtgcdwc"
 
 [functions.optimize-bullets]
 verify_jwt = false
+
+[functions.bullet-coach]
+verify_jwt = false
