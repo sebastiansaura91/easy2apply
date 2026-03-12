@@ -43,6 +43,7 @@ export function BulletWizard({
   endDate = "",
   isPresent = false,
   onAcceptBullets,
+  language = "sv",
 }: BulletWizardProps) {
   const [step, setStep] = useState(0);
   const [input, setInput] = useState<BulletWizardInput>({
