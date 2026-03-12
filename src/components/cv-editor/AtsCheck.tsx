@@ -107,6 +107,7 @@ interface AtsCheckPanelProps {
   cvLanguage?: "sv" | "en";
   jobPostingText?: string;
   onNavigateToSection?: (sectionType: string) => void;
+  onApplyBullet?: (bulletPath: string, newText: string) => void;
 }
 
 export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToSection }: AtsCheckPanelProps) {
