@@ -178,7 +178,13 @@ const CVEditor = () => {
               <FileDown className="mr-1 h-3 w-3" />
               DOCX
             </Button>
-            <Button variant="outline" size="sm" onClick={() => toast({ title: "PDF export – kommer snart!" })}>
+            <Button variant="outline" size="sm" onClick={() => {
+              if (!previewRef.current) return;
+              const safeName = (title || "cv").replace(/[^a-zA-Z0-9åäöÅÄÖ_-]/g, "_");
+              exportToPdf(previewRef.current, `${safeName}.pdf`).catch(() =>
+                toast({ title: "PDF-export misslyckades", variant: "destructive" })
+              );
+            }}>
               <FileDown className="mr-1 h-3 w-3" />
               PDF
             </Button>
