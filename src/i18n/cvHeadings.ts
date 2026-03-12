@@ -1,0 +1,27 @@
+/** CV-specific heading translations for the A4 preview and export */
+export const cvHeadings: Record<string, Record<string, string>> = {
+  sv: {
+    sectionContact: "Kontaktuppgifter",
+    sectionProfile: "Profil",
+    sectionExperience: "Arbetslivserfarenhet",
+    sectionEducation: "Utbildning",
+    sectionSkills: "Kompetenser",
+    sectionCertifications: "Certifieringar",
+    sectionProjects: "Projekt",
+    sectionLanguages: "Språk",
+    sectionOther: "Övrigt",
+    present: "Nuvarande",
+  },
+  en: {
+    sectionContact: "Contact Information",
+    sectionProfile: "Profile",
+    sectionExperience: "Work Experience",
+    sectionEducation: "Education",
+    sectionSkills: "Skills",
+    sectionCertifications: "Certifications",
+    sectionProjects: "Projects",
+    sectionLanguages: "Languages",
+    sectionOther: "Other",
+    present: "Present",
+  },
+};
