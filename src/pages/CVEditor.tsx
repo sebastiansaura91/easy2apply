@@ -234,7 +234,7 @@ const CVEditor = () => {
         <ResizablePanel defaultSize={50} minSize={30} maxSize={70}>
           <ScrollArea className="h-full">
             <div className="bg-muted/50 p-8 flex justify-center min-h-full">
-              <A4Preview ref={previewRef} cv={cv} enabledSections={enabledSections} t={tCv} />
+              <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} />
             </div>
           </ScrollArea>
         </ResizablePanel>
