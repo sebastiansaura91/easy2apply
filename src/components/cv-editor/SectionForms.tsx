@@ -376,6 +376,48 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
           }}
         />
       )}
+
+      {/* Improve All Preview Dialog */}
+      {allPreviews && (
+        <Dialog open={true} onOpenChange={() => setAllPreviews(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Förhandsgranskning – {allPreviews.items.length} förbättringar
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              {allPreviews.items.map((item, i) => (
+                <div key={i} className="rounded-md border border-border p-3 space-y-2">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground line-through">{item.original}</p>
+                    <p className="text-sm">{item.improved}</p>
+                    <p className="text-xs text-muted-foreground italic">{item.reason}</p>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => rejectSingleFromAll(i)}>
+                      <X className="h-3 w-3 mr-1" />
+                      Skippa
+                    </Button>
+                    <Button size="sm" className="h-6 text-xs" onClick={() => acceptSingleFromAll(i)}>
+                      <Check className="h-3 w-3 mr-1" />
+                      Acceptera
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between pt-2 border-t border-border">
+              <Button variant="ghost" onClick={() => setAllPreviews(null)}>Avbryt</Button>
+              <Button onClick={acceptAllPreviews}>
+                <Check className="h-4 w-4 mr-1" />
+                Acceptera alla ({allPreviews.items.length})
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
