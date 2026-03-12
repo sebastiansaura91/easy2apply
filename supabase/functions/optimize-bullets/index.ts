@@ -190,6 +190,7 @@ const HARD_RULES = `
 const SCORING_RULES = `
 ## BULLET SCORING (0–10)
 - Structure (0–3): strong verb start + clear object + readable length
+  - SENIOR RULE: +1 bonus if bullet begins with Outcome/Decision-Purpose (what it enabled) rather than a generic activity verb. Penalize generic activity-first bullets (Developed/Worked/Responsible) unless the activity is unusually specific.
 - Concreteness (0–3): specific activity + named tools/methods/processes
 - Evidence/Impact (0–2): outcome signal or mechanism described (numbers NOT required)
 - Keyword alignment (0–2): relevant industry/role terms in context (if job posting provided)
@@ -200,9 +201,26 @@ const SCORING_RULES = `
 - low: solid structure, concrete, has evidence
 `;
 
+const SENIOR_BULLET_RULE = `
+## SENIOR BULLET ORDERING (Outcome/Decision First)
+Default pattern for senior-level bullets:
+1. Start with Outcome or Decision-Purpose (what it enabled/supported/improved)
+2. Then: method/how (modeling, analysis, workshops, tools)
+3. Then: scope (business area/region/stakeholders)
+4. End with result metric ONLY if provided; otherwise use placeholder.
+
+If bullet starts with a generic activity verb (Developed, Worked, Responsible, Managed, Handled, Led):
+- Rewrite suggestion MUST reframe into outcome-first phrasing.
+- Examples: "Supported investment decisions by modeling...", "Enabled prioritization by building...", "Improved forecast accuracy by redesigning..."
+
+Anti-hallucination for outcomes:
+- If no measurable outcome is provided, do NOT fabricate it.
+- Use placeholders: "[FILL IN: ROI / savings / margin / approval / time-to-decision]" (EN) or "[FYLL I: ROI / besparing / marginal / godkännande / tid-till-beslut]" (SV)
+`;
+
 const SUGGESTION_TYPES = `
 ## SUGGESTION TYPES (choose 2–4 most relevant per bullet)
-A) "stronger_verb_start" — Replace with a stronger, more distinct verb
+A) "stronger_verb_start" — Replace with a stronger, more distinct verb. For senior roles, reframe generic activity verbs into outcome/decision-purpose verbs (enabled, supported, improved, drove, accelerated).
 B) "add_how" — Add method/tools/process details
 C) "add_outcome" — Add outcome signal with placeholder if needed
 D) "split" — Split long bullet into 2 shorter ones
@@ -213,18 +231,20 @@ F) "language_fix" — Translate bullet to match system language
 const SYSTEM_PROMPT_SV = `Du är en expert-CV-coach och ATS-specialist. Analysera VARJE bullet och ge konkreta förbättringsförslag.
 
 ${SCORING_RULES}
+${SENIOR_BULLET_RULE}
 ${SUGGESTION_TYPES}
 ${HARD_RULES}
 
-ALL output MUST be in Swedish. Var saklig, konkret och floskelfri. Ge alltid 2–4 förslag per bullet.`;
+ALL output MUST be in Swedish. Var saklig, konkret och floskelfri. Ge alltid 2–4 förslag per bullet. Prioritera outcome-first-struktur för seniora roller.`;
 
 const SYSTEM_PROMPT_EN = `You are an expert CV coach and ATS specialist. Analyze EVERY bullet and provide concrete improvement suggestions.
 
 ${SCORING_RULES}
+${SENIOR_BULLET_RULE}
 ${SUGGESTION_TYPES}
 ${HARD_RULES}
 
-ALL output MUST be in English. Be factual, concrete, and buzzword-free. Always give 2–4 suggestions per bullet.`;
+ALL output MUST be in English. Be factual, concrete, and buzzword-free. Always give 2–4 suggestions per bullet. Prioritize outcome-first structure for senior roles.`;
 
 // --- Output schema ---
 const RESULT_SCHEMA = {
