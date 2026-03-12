@@ -62,6 +62,8 @@ export function ProfileForm({ cv, updateCv, t }: SectionFormProps) {
 
 export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
   const [improvingKey, setImprovingKey] = useState<string | null>(null);
+  const [improvingAll, setImprovingAll] = useState<number | null>(null);
+  const [wizardExpIdx, setWizardExpIdx] = useState<number | null>(null);
   const { toast } = useToast();
 
   const addExperience = () => {
@@ -108,103 +110,189 @@ export function ExperienceForm({ cv, updateCv, t }: SectionFormProps) {
     }
   };
 
+  const improveAllBullets = async (expIdx: number) => {
+    const exp = cv.experience[expIdx];
+    const nonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
+    if (nonEmpty.length === 0) {
+      toast({ title: "Inga punkter att förbättra", variant: "destructive" });
+      return;
+    }
+
+    setImprovingAll(expIdx);
+    const newBullets = [...exp.bullets];
+    let improved = 0;
+
+    for (let bIdx = 0; bIdx < newBullets.length; bIdx++) {
+      if (!newBullets[bIdx].trim()) continue;
+      try {
+        const { data, error } = await supabase.functions.invoke("improve-bullet", {
+          body: { bullet: newBullets[bIdx], jobTitle: exp.title, company: exp.company },
+        });
+        if (!error && data?.improved) {
+          newBullets[bIdx] = data.improved;
+          improved++;
+        }
+      } catch {
+        // continue with next bullet
+      }
+    }
+
+    updateExperience(expIdx, { bullets: newBullets });
+    setImprovingAll(null);
+    toast({ title: `✨ ${improved} punkt${improved !== 1 ? "er" : ""} förbättrade`, description: "Granska [FYLL I]-platshållare." });
+  };
+
   return (
-    <Card>
-      <CardHeader className="pb-3 flex flex-row items-center justify-between">
-        <CardTitle className="text-base">{t("sectionExperience")}</CardTitle>
-        <Button variant="ghost" size="sm" onClick={addExperience}>
-          <Plus className="h-4 w-4 mr-1" />
-          {t("editorAddItem")}
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {cv.experience.map((exp, idx) => (
-          <div key={exp.id} className="space-y-3 pb-4 border-b border-border last:border-0">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-muted-foreground">#{idx + 1}</span>
-              <Button variant="ghost" size="icon" onClick={() => removeExperience(idx)}>
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Input placeholder={t("expTitle")} value={exp.title} onChange={(e) => updateExperience(idx, { title: e.target.value })} />
-              <Input placeholder={t("expCompany")} value={exp.company} onChange={(e) => updateExperience(idx, { company: e.target.value })} />
-              <Input placeholder={t("expLocation")} value={exp.location} onChange={(e) => updateExperience(idx, { location: e.target.value })} />
-              <div />
-              <Input type="month" placeholder={t("expStartDate")} value={exp.startDate} onChange={(e) => updateExperience(idx, { startDate: e.target.value })} />
-              {!exp.isPresent && (
-                <Input type="month" placeholder={t("expEndDate")} value={exp.endDate} onChange={(e) => updateExperience(idx, { endDate: e.target.value })} />
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox checked={exp.isPresent} onCheckedChange={(v) => updateExperience(idx, { isPresent: !!v, endDate: "" })} />
-              <span className="text-sm">{t("expPresent")}</span>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-medium">{t("expBullets")}</span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex items-center cursor-help">
-                      <Lightbulb className="h-3.5 w-3.5 text-primary/60 hover:text-primary transition-colors" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-xs space-y-1 p-3">
-                    <p className="font-semibold text-xs mb-1.5">Tips för starka punkter:</p>
-                    {bulletTips.map((tip, i) => (
-                      <p key={i} className="text-xs leading-relaxed">{tip}</p>
-                    ))}
-                  </TooltipContent>
-                </Tooltip>
+    <>
+      <Card>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-base">{t("sectionExperience")}</CardTitle>
+          <Button variant="ghost" size="sm" onClick={addExperience}>
+            <Plus className="h-4 w-4 mr-1" />
+            {t("editorAddItem")}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {cv.experience.map((exp, idx) => (
+            <div key={exp.id} className="space-y-3 pb-4 border-b border-border last:border-0">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">#{idx + 1}</span>
+                <Button variant="ghost" size="icon" onClick={() => removeExperience(idx)}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
               </div>
-              {exp.bullets.map((bullet, bIdx) => {
-                const isImproving = improvingKey === `${idx}-${bIdx}`;
-                return (
-                  <div key={bIdx} className="flex gap-2">
-                    <span className="text-muted-foreground mt-2">•</span>
-                    <Textarea
-                      rows={2}
-                      value={bullet}
-                      onChange={(e) => {
-                        const newBullets = [...exp.bullets];
-                        newBullets[bIdx] = e.target.value;
-                        updateExperience(idx, { bullets: newBullets });
-                      }}
-                      className="min-h-[40px]"
-                    />
+              <div className="grid grid-cols-2 gap-3">
+                <Input placeholder={t("expTitle")} value={exp.title} onChange={(e) => updateExperience(idx, { title: e.target.value })} />
+                <Input placeholder={t("expCompany")} value={exp.company} onChange={(e) => updateExperience(idx, { company: e.target.value })} />
+                <Input placeholder={t("expLocation")} value={exp.location} onChange={(e) => updateExperience(idx, { location: e.target.value })} />
+                <div />
+                <Input type="month" placeholder={t("expStartDate")} value={exp.startDate} onChange={(e) => updateExperience(idx, { startDate: e.target.value })} />
+                {!exp.isPresent && (
+                  <Input type="month" placeholder={t("expEndDate")} value={exp.endDate} onChange={(e) => updateExperience(idx, { endDate: e.target.value })} />
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={exp.isPresent} onCheckedChange={(v) => updateExperience(idx, { isPresent: !!v, endDate: "" })} />
+                <span className="text-sm">{t("expPresent")}</span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-medium">{t("expBullets")}</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center cursor-help">
+                          <Lightbulb className="h-3.5 w-3.5 text-primary/60 hover:text-primary transition-colors" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs space-y-1 p-3">
+                        <p className="font-semibold text-xs mb-1.5">Tips för starka punkter:</p>
+                        {bulletTips.map((tip, i) => (
+                          <p key={i} className="text-xs leading-relaxed">{tip}</p>
+                        ))}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="flex gap-1">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="flex-shrink-0 mt-1 text-primary/60 hover:text-primary hover:bg-primary/10"
-                          onClick={() => improveBullet(idx, bIdx)}
-                          disabled={isImproving}
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => improveAllBullets(idx)}
+                          disabled={improvingAll === idx}
                         >
-                          {isImproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                          {improvingAll === idx ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                          Förbättra alla
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <p className="text-xs">Förbättra med AI</p>
-                      </TooltipContent>
+                      <TooltipContent><p className="text-xs">Förbättra alla punkter med AI</p></TooltipContent>
                     </Tooltip>
-                    <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
-                      updateExperience(idx, { bullets: exp.bullets.filter((_, i) => i !== bIdx) });
-                    }}>
-                      <X className="h-3 w-3" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => setWizardExpIdx(idx)}
+                        >
+                          <Wand2 className="h-3 w-3" />
+                          Skapa bullets
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p className="text-xs">Generera nya bullets med AI-wizard</p></TooltipContent>
+                    </Tooltip>
                   </div>
-                );
-              })}
-              <Button variant="ghost" size="sm" onClick={() => updateExperience(idx, { bullets: [...exp.bullets, ""] })}>
-                <Plus className="h-3 w-3 mr-1" />
-                {t("editorAddBullet")}
-              </Button>
+                </div>
+                {exp.bullets.map((bullet, bIdx) => {
+                  const isImproving = improvingKey === `${idx}-${bIdx}`;
+                  return (
+                    <div key={bIdx} className="flex gap-2">
+                      <span className="text-muted-foreground mt-2">•</span>
+                      <Textarea
+                        rows={2}
+                        value={bullet}
+                        onChange={(e) => {
+                          const newBullets = [...exp.bullets];
+                          newBullets[bIdx] = e.target.value;
+                          updateExperience(idx, { bullets: newBullets });
+                        }}
+                        className="min-h-[40px]"
+                      />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="flex-shrink-0 mt-1 text-primary/60 hover:text-primary hover:bg-primary/10"
+                            onClick={() => improveBullet(idx, bIdx)}
+                            disabled={isImproving}
+                          >
+                            {isImproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p className="text-xs">Förbättra med AI</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
+                        updateExperience(idx, { bullets: exp.bullets.filter((_, i) => i !== bIdx) });
+                      }}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  );
+                })}
+                <Button variant="ghost" size="sm" onClick={() => updateExperience(idx, { bullets: [...exp.bullets, ""] })}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  {t("editorAddBullet")}
+                </Button>
+              </div>
             </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Bullet Wizard Dialog */}
+      {wizardExpIdx !== null && (
+        <BulletWizard
+          open={true}
+          onClose={() => setWizardExpIdx(null)}
+          jobTitle={cv.experience[wizardExpIdx]?.title || ""}
+          company={cv.experience[wizardExpIdx]?.company || ""}
+          startDate={cv.experience[wizardExpIdx]?.startDate || ""}
+          endDate={cv.experience[wizardExpIdx]?.endDate || ""}
+          isPresent={cv.experience[wizardExpIdx]?.isPresent || false}
+          onAcceptBullets={(bullets) => {
+            const exp = cv.experience[wizardExpIdx];
+            const existingNonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
+            updateExperience(wizardExpIdx, { bullets: [...existingNonEmpty, ...bullets] });
+            toast({ title: `✨ ${bullets.length} bullets tillagda`, description: "Granska och fyll i [FYLL I]-platshållare." });
+          }}
+        />
+      )}
+    </>
   );
 }
 
