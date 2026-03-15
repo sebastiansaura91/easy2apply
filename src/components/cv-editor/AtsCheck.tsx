@@ -10,9 +10,13 @@ import {
   Zap,
   Target,
   ArrowRight,
+  Eye,
+  FileSearch,
+  Languages,
+  XCircle,
 } from "lucide-react";
 import { CVContent } from "@/types/cv";
-import { AtsCheckResult } from "@/types/ats-check";
+import { AtsCheckResult, ScanabilityItem, ParseCheckItem, BulletFeedback } from "@/types/ats-check";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,23 +60,33 @@ function gradeColor(grade: string) {
   }
 }
 
-function severityBadge(severity: string) {
-  switch (severity) {
-    case "high": return <Badge variant="destructive" className="text-[9px] h-4">Hög</Badge>;
-    case "medium": return <Badge variant="outline" className="text-[9px] h-4 border-yellow-500 text-yellow-600">Medel</Badge>;
-    case "low": return <Badge variant="secondary" className="text-[9px] h-4">Låg</Badge>;
+function statusIcon(status: string) {
+  switch (status) {
+    case "pass": return <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />;
+    case "warning": return <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />;
+    case "fail": return <XCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />;
     default: return null;
   }
 }
 
-function categoryLabel(cat: string) {
-  switch (cat) {
-    case "parse": return "Parse";
-    case "relevance": return "Relevans";
-    case "evidence": return "Evidens";
-    case "readability": return "Läsbarhet";
-    default: return cat;
+function statusBadge(status: string) {
+  switch (status) {
+    case "pass": return <Badge variant="secondary" className="text-[9px] h-4 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-0">Pass</Badge>;
+    case "warning": return <Badge variant="outline" className="text-[9px] h-4 border-yellow-500 text-yellow-600">Warning</Badge>;
+    case "fail": return <Badge variant="destructive" className="text-[9px] h-4">Fail</Badge>;
+    default: return null;
   }
+}
+
+function dimensionLabel(dim: string): string {
+  const labels: Record<string, string> = {
+    single_column_flow: "Single-column flow",
+    contact_info: "Contact info placement",
+    plain_text_layout: "Plain-text layout",
+    job_language_match: "Job ad language match",
+    clean_vs_cluttered: "Clean vs cluttered",
+  };
+  return labels[dim] || dim;
 }
 
 function ScoreRing({ score, grade }: { score: number; grade: string }) {
@@ -99,6 +113,24 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
   );
 }
 
+function scoreBadge(score: number) {
+  const color = score >= 8 ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+    : score >= 5 ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+    : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${color}`}>{score}/10</span>;
+}
+
+function suggestionTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    decision_first: "Outcome first",
+    keyword_alignment: "Keyword match",
+    shorter: "Shorter",
+    clearer: "Clearer",
+    language_match: "Language match",
+  };
+  return labels[type] || type;
+}
+
 /* ── Main Panel ── */
 
 interface AtsCheckPanelProps {
@@ -114,9 +146,12 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
   const [result, setResult] = useState<AtsCheckResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [jobText, setJobText] = useState(jobPostingText || "");
-  const [issuesOpen, setIssuesOpen] = useState(false);
-  const [keywordsOpen, setKeywordsOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(true);
+  const [parseOpen, setParseOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
+  const [bulletsOpen, setBulletsOpen] = useState(false);
   const { toast } = useToast();
+  const isSv = cvLanguage !== "en";
 
   const runCheck = async () => {
     setLoading(true);
@@ -132,7 +167,7 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
       if (data?.error) throw new Error(data.error);
       setResult(data as AtsCheckResult);
     } catch (err: any) {
-      toast({ title: "ATS-kontroll misslyckades", description: err.message, variant: "destructive" });
+      toast({ title: isSv ? "ATS-kontroll misslyckades" : "ATS check failed", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -142,9 +177,8 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
   if (!result) {
     return (
       <div className="space-y-4">
-        {/* Legacy quick checks */}
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Snabbkontroll</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{isSv ? "Snabbkontroll" : "Quick check"}</p>
           {runAtsCheck(cv, t).map((check) => (
             <div key={check.key} className="flex items-center gap-3 p-2.5 rounded-lg border border-border">
               {check.pass ? <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" /> : <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />}
@@ -157,14 +191,14 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Jobbannons (valfritt)</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{isSv ? "Jobbannons (valfritt)" : "Job posting (optional)"}</p>
           <Textarea rows={4} value={jobText} onChange={(e) => setJobText(e.target.value)}
-            placeholder="Klistra in jobbannons för keyword-matchning..." className="text-xs" />
+            placeholder={isSv ? "Klistra in jobbannons för bättre analys..." : "Paste job posting for better analysis..."} className="text-xs" />
         </div>
 
         <Button onClick={runCheck} disabled={loading} className="w-full gap-2">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-          {loading ? "Analyserar CV..." : "Kör ATS-kontroll"}
+          {loading ? (isSv ? "Analyserar CV..." : "Analyzing CV...") : (isSv ? "Kör ATS + Rekryterarkontroll" : "Run ATS + Recruiter Check")}
         </Button>
       </div>
     );
@@ -172,23 +206,23 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
 
   // ── Results view ──
   const subscoreItems: [string, number, number][] = [
-    ["Parse", result.subscores.parse, 40],
-    ["Relevans", result.subscores.relevance, 30],
-    ["Evidens", result.subscores.evidence, 20],
-    ["Läsbarhet", result.subscores.readability, 10],
+    ["Parse", result.subscores.parse, 30],
+    [isSv ? "Skanning" : "Scan", result.subscores.scanability, 30],
+    [isSv ? "Relevans" : "Relevance", result.subscores.relevance, 25],
+    [isSv ? "Evidens" : "Evidence", result.subscores.evidence, 15],
   ];
 
-  const hasKeywordGap = result.keyword_gap.must_have_missing.length > 0 ||
-    result.keyword_gap.nice_to_have_missing.length > 0 ||
-    result.keyword_gap.suggested_insertions.length > 0;
+  const hasLangMatch = result.job_language_match.missing_phrases.length > 0 ||
+    result.job_language_match.generic_phrases_to_replace.length > 0 ||
+    result.job_language_match.suggested_replacements.length > 0;
 
   return (
     <div className="space-y-4">
-      {/* ── Score + Summary ── */}
+      {/* ── 1. Score + Summary ── */}
       <div className="flex items-center gap-4">
-        <ScoreRing score={result.ats_score} grade={result.grade} />
+        <ScoreRing score={result.overall_score} grade={result.grade} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold">ATS Score</p>
+          <p className="text-sm font-semibold">{isSv ? "ATS + Rekryterarscore" : "ATS + Recruiter Score"}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{result.summary}</p>
         </div>
       </div>
@@ -204,112 +238,157 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
         ))}
       </div>
 
-      {/* ── Blockers ── */}
-      {result.blockers.length > 0 && (
+      {/* ── 2. What a recruiter sees first ── */}
+      {result.first_scan_issues.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-destructive flex items-center gap-1.5">
-            <AlertOctagon className="h-3.5 w-3.5" />
-            {result.blockers.length} Blockers
+          <p className="text-xs font-semibold flex items-center gap-1.5">
+            <Eye className="h-3.5 w-3.5 text-primary" />
+            {isSv ? "Vad en rekryterare ser först" : "What a recruiter sees first"}
           </p>
-          {result.blockers.map((b, i) => (
-            <Card key={i} className="border-destructive/30 bg-destructive/5">
-              <CardContent className="p-3 space-y-1.5">
-                <p className="text-xs font-semibold text-destructive">{b.title}</p>
-                <p className="text-[10px] text-muted-foreground">{b.why_it_matters}</p>
-                <p className="text-[10px] italic">Evidence: {b.evidence}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-[10px] font-medium flex-1">→ {b.fix}</p>
-                </div>
+          {result.first_scan_issues.map((issue, i) => (
+            <Card key={i} className="border-destructive/20 bg-destructive/5">
+              <CardContent className="p-3 space-y-1">
+                <p className="text-xs font-semibold text-destructive">{issue.title}</p>
+                <p className="text-[10px] text-muted-foreground">{issue.why_it_matters}</p>
+                <p className="text-[10px] font-medium">→ {issue.fix}</p>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      {/* ── Top Issues ── */}
-      {result.top_issues.length > 0 && (
-        <Collapsible open={issuesOpen} onOpenChange={setIssuesOpen}>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs">
-              <span className="flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {result.top_issues.length} Problem
-              </span>
-              {issuesOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-2 mt-2">
-            {result.top_issues.map((issue, i) => (
-              <Card key={i} className="border-border">
-                <CardContent className="p-3 space-y-1">
-                  <div className="flex items-center gap-2">
-                    {severityBadge(issue.severity)}
-                    <Badge variant="outline" className="text-[9px] h-4">{categoryLabel(issue.category)}</Badge>
-                  </div>
-                  <p className="text-xs font-medium">{issue.problem}</p>
-                  <p className="text-[10px] text-muted-foreground">{issue.evidence}</p>
-                  <p className="text-[10px] font-medium">→ {issue.fix}</p>
-                  {issue.example_rewrite && (
-                    <p className="text-[10px] italic text-primary">Ex: "{issue.example_rewrite}"</p>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </CollapsibleContent>
-        </Collapsible>
-      )}
+      {/* ── 3. Recruiter Scan Check ── */}
+      <Collapsible open={scanOpen} onOpenChange={setScanOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs">
+            <span className="flex items-center gap-1.5">
+              <Eye className="h-3.5 w-3.5" />
+              {isSv ? "Rekryterarskanningskontroll" : "Recruiter Scan Check"}
+              <ScanSummaryBadge items={result.scanability_check} />
+            </span>
+            {scanOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-1.5 mt-2">
+          {result.scanability_check.map((item, i) => (
+            <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-border">
+              {statusIcon(item.status)}
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium">{dimensionLabel(item.dimension)}</p>
+                  {statusBadge(item.status)}
+                </div>
+                <p className="text-[10px] text-muted-foreground">{item.why_it_matters}</p>
+                {item.status !== "pass" && (
+                  <p className="text-[10px] font-medium text-primary">→ {item.recommendation}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
 
-      {/* ── Keyword Gap ── */}
-      {hasKeywordGap && (
-        <Collapsible open={keywordsOpen} onOpenChange={setKeywordsOpen}>
+      {/* ── 4. ATS / Parse Check ── */}
+      <Collapsible open={parseOpen} onOpenChange={setParseOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs">
+            <span className="flex items-center gap-1.5">
+              <FileSearch className="h-3.5 w-3.5" />
+              ATS / Parse Check
+              <ScanSummaryBadge items={result.parse_check} />
+            </span>
+            {parseOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-1.5 mt-2">
+          {result.parse_check.map((item, i) => (
+            <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-border">
+              {statusIcon(item.status)}
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium">{item.dimension}</p>
+                  {statusBadge(item.status)}
+                </div>
+                <p className="text-[10px] text-muted-foreground">{item.why_it_matters}</p>
+                {item.status !== "pass" && (
+                  <p className="text-[10px] font-medium text-primary">→ {item.recommendation}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* ── 5. Job Ad Language Match ── */}
+      {hasLangMatch && (
+        <Collapsible open={langOpen} onOpenChange={setLangOpen}>
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs">
               <span className="flex items-center gap-1.5">
-                <Target className="h-3.5 w-3.5" />
-                Keyword Gap
+                <Languages className="h-3.5 w-3.5" />
+                {isSv ? "Språkmatchning mot jobbannonsen" : "Job Ad Language Match"}
               </span>
-              {keywordsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              {langOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-3 mt-2">
-            {result.keyword_gap.must_have_missing.length > 0 && (
+            {result.job_language_match.missing_phrases.length > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold text-destructive">Saknade must-have</p>
+                <p className="text-[10px] font-semibold text-destructive">{isSv ? "Saknade fraser från annonsen" : "Missing phrases from the ad"}</p>
                 <div className="flex flex-wrap gap-1">
-                  {result.keyword_gap.must_have_missing.map((term) => (
+                  {result.job_language_match.missing_phrases.map((term) => (
                     <Badge key={term} variant="destructive" className="text-[10px] h-5">{term}</Badge>
                   ))}
                 </div>
               </div>
             )}
 
-            {result.keyword_gap.nice_to_have_missing.length > 0 && (
+            {result.job_language_match.generic_phrases_to_replace.length > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold text-yellow-600">Saknade nice-to-have</p>
+                <p className="text-[10px] font-semibold text-yellow-600">{isSv ? "Generiska fraser att ersätta" : "Generic phrases to replace"}</p>
                 <div className="flex flex-wrap gap-1">
-                  {result.keyword_gap.nice_to_have_missing.map((term) => (
+                  {result.job_language_match.generic_phrases_to_replace.map((term) => (
                     <Badge key={term} variant="outline" className="text-[10px] h-5 border-yellow-500">{term}</Badge>
                   ))}
                 </div>
               </div>
             )}
 
-            {result.keyword_gap.suggested_insertions.length > 0 && (
+            {result.job_language_match.suggested_replacements.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Föreslagna insättningar</p>
-                {result.keyword_gap.suggested_insertions.map((sp, i) => (
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{isSv ? "Föreslagna ersättningar" : "Suggested replacements"}</p>
+                {result.job_language_match.suggested_replacements.map((r, i) => (
                   <div key={i} className="rounded border border-primary/20 bg-primary/5 p-2 space-y-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <Target className="h-3 w-3 text-primary flex-shrink-0" />
-                      <span className="text-[10px] font-medium">{sp.keyword}</span>
-                      <ArrowRight className="h-2.5 w-2.5 text-muted-foreground" />
-                      <span className="text-[10px] text-muted-foreground">{sp.where}</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] line-through text-muted-foreground">{r.from}</span>
+                      <ArrowRight className="h-2.5 w-2.5 text-primary" />
+                      <span className="text-[10px] font-medium text-primary">{r.to}</span>
                     </div>
-                    <p className="text-[10px] italic pl-4">{sp.safe_phrase}</p>
+                    <p className="text-[9px] text-muted-foreground">{r.where}</p>
                   </div>
                 ))}
               </div>
             )}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {/* ── 6. Bullet Feedback ── */}
+      {result.bullet_feedback.length > 0 && (
+        <Collapsible open={bulletsOpen} onOpenChange={setBulletsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs">
+              <span className="flex items-center gap-1.5">
+                <Target className="h-3.5 w-3.5" />
+                {isSv ? "Bullet-feedback" : "Bullet Feedback"} ({result.bullet_feedback.length})
+              </span>
+              {bulletsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2 mt-2">
+            {result.bullet_feedback.map((bf, i) => (
+              <BulletFeedbackCard key={i} feedback={bf} onApply={onApplyBullet} />
+            ))}
           </CollapsibleContent>
         </Collapsible>
       )}
@@ -319,7 +398,7 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
             <Zap className="h-3.5 w-3.5" />
-            Prioriterade åtgärder
+            {isSv ? "Prioriterade åtgärder" : "Prioritized actions"}
           </p>
           {result.next_actions.map((action, i) => (
             <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-border">
@@ -337,7 +416,7 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
         <div className="pt-2 border-t border-border">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 mb-2">
             <Zap className="h-3.5 w-3.5" />
-            {cvLanguage === "en" ? "Bullet Optimizer" : "Punkt-optimerare"}
+            {isSv ? "Punkt-optimerare" : "Bullet Optimizer"}
           </p>
           <BulletOptimizerPanel
             cv={cv}
@@ -351,12 +430,73 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
       {/* ── Re-run ── */}
       <div className="pt-2 border-t border-border space-y-2">
         <Textarea rows={3} value={jobText} onChange={(e) => setJobText(e.target.value)}
-          placeholder={cvLanguage === "en" ? "Paste job posting..." : "Klistra in jobbannons..."} className="text-xs" />
+          placeholder={isSv ? "Klistra in jobbannons..." : "Paste job posting..."} className="text-xs" />
         <Button onClick={runCheck} disabled={loading} variant="outline" size="sm" className="w-full gap-1.5">
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-          {loading ? (cvLanguage === "en" ? "Analyzing..." : "Analyserar...") : (cvLanguage === "en" ? "Re-run ATS Check" : "Kör om ATS-kontroll")}
+          {loading ? (isSv ? "Analyserar..." : "Analyzing...") : (isSv ? "Kör om kontroll" : "Re-run check")}
         </Button>
       </div>
     </div>
+  );
+}
+
+/* ── Scan Summary Badge ── */
+function ScanSummaryBadge({ items }: { items: (ScanabilityItem | ParseCheckItem)[] }) {
+  const fails = items.filter((i) => i.status === "fail").length;
+  const warns = items.filter((i) => i.status === "warning").length;
+  if (fails > 0) return <Badge variant="destructive" className="text-[9px] h-4">{fails} fail</Badge>;
+  if (warns > 0) return <Badge variant="outline" className="text-[9px] h-4 border-yellow-500 text-yellow-600">{warns} warn</Badge>;
+  return <Badge variant="secondary" className="text-[9px] h-4 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-0">All pass</Badge>;
+}
+
+/* ── Bullet Feedback Card ── */
+function BulletFeedbackCard({ feedback, onApply }: { feedback: BulletFeedback; onApply?: (bulletPath: string, newText: string) => void }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
+          <div className="flex items-center gap-2">
+            {open ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
+            {scoreBadge(feedback.score)}
+            <span className="text-[10px] text-muted-foreground flex-shrink-0">{feedback.bullet_id}</span>
+          </div>
+          <p className="text-[10px] italic text-muted-foreground mt-1">{feedback.recruiter_comment}</p>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pl-3 pr-1 pb-2 space-y-2 mt-1">
+        {feedback.issues.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {feedback.issues.map((issue, i) => (
+              <Badge key={i} variant="outline" className="text-[9px] h-4 border-destructive/40 text-destructive">
+                {issue}
+              </Badge>
+            ))}
+          </div>
+        )}
+        {feedback.suggestions.map((s, i) => (
+          <Card key={i} className="border-primary/20 bg-primary/5">
+            <CardContent className="p-2.5 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="outline" className="text-[9px] h-4">{suggestionTypeLabel(s.type)}</Badge>
+                  <span className="text-[9px] text-green-600 dark:text-green-400 font-medium">{s.estimated_gain}</span>
+                </div>
+                {onApply && (
+                  <Button size="sm" variant="default" className="h-5 text-[10px] px-2" onClick={() => onApply(feedback.bullet_id, s.rewrite)}>
+                    Apply
+                  </Button>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground">{s.why}</p>
+              <div className="rounded bg-background border border-border p-2">
+                <p className="text-xs italic text-foreground">{s.rewrite}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
