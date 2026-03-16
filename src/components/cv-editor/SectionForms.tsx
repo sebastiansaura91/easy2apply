@@ -558,10 +558,31 @@ export function CertificationsForm({ cv, updateCv, t }: SectionFormProps) {
   );
 }
 
+const LANGUAGE_LEVELS_SV = [
+  { value: "Modersmål", label: "Modersmål" },
+  { value: "Flytande", label: "Flytande" },
+  { value: "Avancerad", label: "Avancerad" },
+  { value: "Övre mellannivå", label: "Övre mellannivå" },
+  { value: "Mellannivå", label: "Mellannivå" },
+  { value: "Grundläggande", label: "Grundläggande" },
+];
+
+const LANGUAGE_LEVELS_EN = [
+  { value: "Native speaker", label: "Native speaker" },
+  { value: "Fluent", label: "Fluent" },
+  { value: "Advanced", label: "Advanced" },
+  { value: "Upper intermediate", label: "Upper intermediate" },
+  { value: "Intermediate", label: "Intermediate" },
+  { value: "Basic", label: "Basic" },
+];
+
 export function LanguagesForm({ cv, updateCv, t }: SectionFormProps) {
   const addLanguage = () => {
     updateCv("languages", [...cv.languages, { id: uuidv4(), language: "", level: "" }]);
   };
+
+  const isSv = t("sectionLanguages") === "Språk";
+  const levels = isSv ? LANGUAGE_LEVELS_SV : LANGUAGE_LEVELS_EN;
 
   return (
     <Card>
@@ -575,8 +596,25 @@ export function LanguagesForm({ cv, updateCv, t }: SectionFormProps) {
       <CardContent className="space-y-3">
         {cv.languages.map((lang, idx) => (
           <div key={lang.id} className="flex gap-2 items-center">
-            <Input placeholder="Språk" value={lang.language} onChange={(e) => updateCv("languages", cv.languages.map((l, i) => i === idx ? { ...l, language: e.target.value } : l))} />
-            <Input placeholder="Nivå" value={lang.level} onChange={(e) => updateCv("languages", cv.languages.map((l, i) => i === idx ? { ...l, level: e.target.value } : l))} />
+            <Input
+              className="flex-1"
+              placeholder={isSv ? "Språk" : "Language"}
+              value={lang.language}
+              onChange={(e) => updateCv("languages", cv.languages.map((l, i) => i === idx ? { ...l, language: e.target.value } : l))}
+            />
+            <Select
+              value={levels.some(lv => lv.value === lang.level) ? lang.level : ""}
+              onValueChange={(val) => updateCv("languages", cv.languages.map((l, i) => i === idx ? { ...l, level: val } : l))}
+            >
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder={isSv ? "Välj nivå" : "Select level"} />
+              </SelectTrigger>
+              <SelectContent>
+                {levels.map((lv) => (
+                  <SelectItem key={lv.value} value={lv.value}>{lv.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="ghost" size="icon" onClick={() => updateCv("languages", cv.languages.filter((_, i) => i !== idx))}>
               <Trash2 className="h-3 w-3" />
             </Button>
