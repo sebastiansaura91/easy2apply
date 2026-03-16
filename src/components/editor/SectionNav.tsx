@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { CVContent, CVSection } from "@/types/cv";
-import { User, FileText, Briefcase, GraduationCap, Wrench, Award, FolderKanban, Globe, MoreHorizontal } from "lucide-react";
+import { findCvIssues } from "@/lib/cv-quality";
+import { User, FileText, Briefcase, GraduationCap, Wrench, Award, FolderKanban, Globe, MoreHorizontal, AlertOctagon, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const sectionMeta: Record<string, { icon: typeof User; label: string }> = {
@@ -34,9 +36,23 @@ interface Props {
   activeSection: string;
   onSelect: (type: string) => void;
   cv: CVContent;
+  cvLanguage?: "sv" | "en";
 }
 
-export function SectionNav({ sections, activeSection, onSelect, cv }: Props) {
+export function SectionNav({ sections, activeSection, onSelect, cv, cvLanguage = "sv" }: Props) {
+  const issues = useMemo(() => findCvIssues(cv, cvLanguage), [cv, cvLanguage]);
+
+  // Count issues per section
+  const issueCounts = useMemo(() => {
+    const counts: Record<string, { errors: number; warnings: number }> = {};
+    issues.forEach(issue => {
+      if (!counts[issue.section]) counts[issue.section] = { errors: 0, warnings: 0 };
+      if (issue.severity === "error") counts[issue.section].errors++;
+      else if (issue.severity === "warning") counts[issue.section].warnings++;
+    });
+    return counts;
+  }, [issues]);
+
   return (
     <nav className="py-4 px-3 space-y-0.5">
       <p className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider px-2 mb-2">Sections</p>
@@ -45,6 +61,10 @@ export function SectionNav({ sections, activeSection, onSelect, cv }: Props) {
         const Icon = meta.icon;
         const filled = hasContent(cv, s.type);
         const active = activeSection === s.type;
+        const sectionIssues = issueCounts[s.type];
+        const hasErrors = sectionIssues?.errors > 0;
+        const hasWarnings = sectionIssues?.warnings > 0;
+
         return (
           <button key={s.id} onClick={() => onSelect(s.type)}
             className={cn(
@@ -53,7 +73,19 @@ export function SectionNav({ sections, activeSection, onSelect, cv }: Props) {
             )}>
             <Icon className="h-4 w-4 flex-shrink-0" />
             <span className="truncate text-left flex-1">{meta.label}</span>
-            {filled && <div className="h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" />}
+            {hasErrors ? (
+              <span className="flex items-center gap-0.5 text-destructive">
+                <AlertOctagon className="h-3 w-3" />
+                <span className="text-[9px] font-bold">{sectionIssues.errors}</span>
+              </span>
+            ) : hasWarnings ? (
+              <span className="flex items-center gap-0.5 text-warning">
+                <AlertTriangle className="h-3 w-3" />
+                <span className="text-[9px] font-bold">{sectionIssues.warnings}</span>
+              </span>
+            ) : filled ? (
+              <div className="h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" />
+            ) : null}
           </button>
         );
       })}

@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BulletWizard } from "./BulletWizard";
+import { analyzeBullet } from "@/lib/cv-quality";
 
 const bulletTips = [
   "💡 Kvantifiera resultat: \"Ökade försäljningen med 25% på 6 månader\"",
@@ -292,6 +293,17 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                   const preview = previews[key];
                   return (
                     <div key={bIdx} className="space-y-0">
+                      {/* Inline bullet quality indicator */}
+                      {bullet.trim() && (() => {
+                        const quality = analyzeBullet(bullet, cvLanguage || "sv");
+                        if (quality.score === "good") return null;
+                        return (
+                          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-t-md text-[10px] ${quality.score === "weak" ? "bg-destructive/5 text-destructive" : "bg-warning/5 text-warning"}`}>
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full flex-shrink-0 ${quality.score === "weak" ? "bg-destructive" : "bg-warning"}`} />
+                            {quality.issues.slice(0, 2).join(" · ")}
+                          </div>
+                        );
+                      })()}
                       <div className="flex gap-2">
                         <span className="text-muted-foreground mt-2">•</span>
                         <Textarea
