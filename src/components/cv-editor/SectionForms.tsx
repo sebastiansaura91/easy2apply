@@ -576,12 +576,12 @@ const LANGUAGE_LEVELS_EN = [
   { value: "Basic", label: "Basic" },
 ];
 
-export function LanguagesForm({ cv, updateCv, t }: SectionFormProps) {
+export function LanguagesForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   const addLanguage = () => {
     updateCv("languages", [...cv.languages, { id: uuidv4(), language: "", level: "" }]);
   };
 
-  const isSv = t("sectionLanguages") === "Språk";
+  const isSv = cvLanguage === "sv";
   const levels = isSv ? LANGUAGE_LEVELS_SV : LANGUAGE_LEVELS_EN;
 
   return (
