@@ -261,6 +261,7 @@ const CVEditor = () => {
                 t={t}
                 jobPostingText={flow.jobPostingText || undefined}
                 onApplyBullet={handleApplyBullet}
+                onNavigateToSection={scrollToSection}
               />
             </ScrollArea>
           </aside>
