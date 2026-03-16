@@ -206,7 +206,7 @@ const CVEditor = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Section nav */}
         <aside className="w-48 border-r border-border bg-card/30 overflow-y-auto flex-shrink-0 hidden md:block">
-          <SectionNav sections={enabledSections} activeSection={activeSection} onSelect={scrollToSection} cv={cv} />
+          <SectionNav sections={enabledSections} activeSection={activeSection} onSelect={scrollToSection} cv={cv} cvLanguage={cvLanguage} />
           <div className="px-3 pb-4">
             <Button variant="ghost" size="sm" className="w-full text-xs justify-start" onClick={() => setShowPreview(!showPreview)}>
               {showPreview ? "Hide preview" : "Show preview"}
