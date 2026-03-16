@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CVUploadZone } from "@/components/shared/CVUploadZone";
+import { CVPicker } from "@/components/shared/CVPicker";
 import { Shield, ArrowLeft, Loader2, BarChart3, CheckCircle2, AlertTriangle, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
