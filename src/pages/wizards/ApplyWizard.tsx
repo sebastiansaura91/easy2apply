@@ -48,9 +48,10 @@ export default function ApplyWizard() {
     } finally { setAnalyzing(false); }
   };
 
-  const handleCVParsed = (cv: CVContent) => {
+  const handleCVParsed = (cv: CVContent, existingResumeId?: string) => {
     setParsedCV(cv);
     flow.setParsedCV(cv);
+    if (existingResumeId) flow.setResumeId(existingResumeId);
   };
 
   const runMatch = async () => {
