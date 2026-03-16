@@ -76,7 +76,7 @@ export default function ExploreWizard() {
                 <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Explore your CV strength</h2>
                 <p className="text-sm text-muted-foreground mt-1">Upload your CV for a quick recruiter-style analysis. No commitment needed.</p>
               </div>
-              <CVUploadZone onParsed={handleParsed} />
+              <CVPicker onParsed={handleParsed} />
             </motion.div>
           )}
 

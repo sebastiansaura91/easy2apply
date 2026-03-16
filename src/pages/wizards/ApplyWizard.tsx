@@ -211,7 +211,7 @@ export default function ApplyWizard() {
                 <p className="text-sm text-muted-foreground mt-1">Upload your existing CV to see how well it matches the role.</p>
               </div>
 
-              <CVUploadZone onParsed={handleCVParsed} />
+              <CVPicker onParsed={handleCVParsed} />
 
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-border" />

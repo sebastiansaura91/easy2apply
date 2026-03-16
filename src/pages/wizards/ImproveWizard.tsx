@@ -94,7 +94,7 @@ export default function ImproveWizard() {
                 <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Upload your CV</h2>
                 <p className="text-sm text-muted-foreground mt-1">We'll run a full audit — ATS safety, recruiter scan, bullet analysis, and language check.</p>
               </div>
-              <CVUploadZone onParsed={handleParsed} />
+              <CVPicker onParsed={handleParsed} />
             </motion.div>
           )}
 
