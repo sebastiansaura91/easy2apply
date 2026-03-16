@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CVUploadZone } from "@/components/shared/CVUploadZone";
+import { CVPicker } from "@/components/shared/CVPicker";
 import { Shield, ArrowLeft, Loader2, TrendingUp, CheckCircle2, AlertTriangle, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
@@ -94,7 +94,7 @@ export default function ImproveWizard() {
                 <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Upload your CV</h2>
                 <p className="text-sm text-muted-foreground mt-1">We'll run a full audit — ATS safety, recruiter scan, bullet analysis, and language check.</p>
               </div>
-              <CVUploadZone onParsed={handleParsed} />
+              <CVPicker onParsed={handleParsed} />
             </motion.div>
           )}
 

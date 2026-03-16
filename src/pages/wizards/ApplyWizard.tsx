@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { CVUploadZone } from "@/components/shared/CVUploadZone";
+import { CVPicker } from "@/components/shared/CVPicker";
 import { Shield, ArrowLeft, ArrowRight, Loader2, Briefcase, Target, Users, Award, CheckCircle2, AlertTriangle, Eye, FileText, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
@@ -48,9 +48,10 @@ export default function ApplyWizard() {
     } finally { setAnalyzing(false); }
   };
 
-  const handleCVParsed = (cv: CVContent) => {
+  const handleCVParsed = (cv: CVContent, existingResumeId?: string) => {
     setParsedCV(cv);
     flow.setParsedCV(cv);
+    if (existingResumeId) flow.setResumeId(existingResumeId);
   };
 
   const runMatch = async () => {
@@ -210,7 +211,7 @@ export default function ApplyWizard() {
                 <p className="text-sm text-muted-foreground mt-1">Upload your existing CV to see how well it matches the role.</p>
               </div>
 
-              <CVUploadZone onParsed={handleCVParsed} />
+              <CVPicker onParsed={handleCVParsed} />
 
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-border" />
