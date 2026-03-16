@@ -4,6 +4,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CVContent, emptyCV } from "@/types/cv";
+import { convertLanguageLevels } from "@/lib/language-level-mapping";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -109,6 +110,20 @@ const CVEditor = () => {
       toast({ title: t("error"), description: error.message, variant: "destructive" });
     }
   }, [id, user, title, cv, cvLanguage, t, toast]);
+
+  // Auto-convert language levels when CV language changes
+  const prevLangRef = useRef(cvLanguage);
+  useEffect(() => {
+    if (loading) return;
+    if (prevLangRef.current !== cvLanguage) {
+      const converted = convertLanguageLevels(cv, cvLanguage);
+      const changed = converted.some((l, i) => l.level !== cv.languages[i]?.level);
+      if (changed) {
+        setCv((prev) => ({ ...prev, languages: converted }));
+      }
+      prevLangRef.current = cvLanguage;
+    }
+  }, [cvLanguage, loading]);
 
   useEffect(() => {
     if (loading) return;

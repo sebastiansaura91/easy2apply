@@ -38,6 +38,15 @@ const EN_INDICATORS = [
   "languages", "summary", "profile", "other",
 ];
 
+// Common Swedish proper nouns / place names that contain å, ä, ö but shouldn't count as Swedish text
+const SV_PROPER_NOUNS_WITH_SPECIAL_CHARS = [
+  "malmö", "göteborg", "västerås", "jönköping", "linköping", "norrköping",
+  "örebro", "gävle", "sundsvall", "östersund", "härnösand", "växjö",
+  "kalmar", "hälsingborg", "ängelholm", "märsta", "södertälje", "täby",
+  "nacka", "lidingö", "solna", "höör", "luleå", "umeå", "skövde",
+  "köping", "åkersberga", "strömsund",
+];
+
 function detectLanguageOfText(text: string): { language: "sv" | "en" | "mixed" | "unknown"; confidence: number } {
   if (!text || text.trim().length < 10) {
     return { language: "unknown", confidence: 0 };
@@ -54,9 +63,13 @@ function detectLanguageOfText(text: string): { language: "sv" | "en" | "mixed" |
     if (EN_INDICATORS.includes(word)) enScore++;
   }
 
-  // Check for Swedish-specific characters
-  const hasSwedishChars = /[åäö]/i.test(text);
-  if (hasSwedishChars) svScore += 3;
+  // Only count Swedish chars if they appear in actual Swedish indicator words,
+  // not in proper nouns like city names (Malmö, Nacka, etc.)
+  const wordsWithSwedishChars = words.filter(w => /[åäö]/.test(w));
+  const meaningfulSwedishCharWords = wordsWithSwedishChars.filter(
+    w => !SV_PROPER_NOUNS_WITH_SPECIAL_CHARS.includes(w) && SV_INDICATORS.includes(w)
+  );
+  if (meaningfulSwedishCharWords.length > 0) svScore += 1;
 
   const total = svScore + enScore;
   if (total === 0) return { language: "unknown", confidence: 0 };
