@@ -111,6 +111,20 @@ const CVEditor = () => {
     }
   }, [id, user, title, cv, cvLanguage, t, toast]);
 
+  // Auto-convert language levels when CV language changes
+  const prevLangRef = useRef(cvLanguage);
+  useEffect(() => {
+    if (loading) return;
+    if (prevLangRef.current !== cvLanguage) {
+      const converted = convertLanguageLevels(cv, cvLanguage);
+      const changed = converted.some((l, i) => l.level !== cv.languages[i]?.level);
+      if (changed) {
+        setCv((prev) => ({ ...prev, languages: converted }));
+      }
+      prevLangRef.current = cvLanguage;
+    }
+  }, [cvLanguage, loading]);
+
   useEffect(() => {
     if (loading) return;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
