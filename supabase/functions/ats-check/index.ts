@@ -206,6 +206,7 @@ const SCORING_MODEL = `
 - Standard headings recognized: 0–8
 - Contact info in body flow (name + email required): 0–8
 - Date consistency (YYYY-MM or similar): 0–6
+  IMPORTANT: Use TODAY'S DATE (provided in the user prompt) to determine if dates are in the future. Only flag dates that are actually after today's date.
 - Language consistency: 0–4
 - No parser noise (emojis, symbol rows, pipes): 0–4
 
