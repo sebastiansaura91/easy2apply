@@ -28,7 +28,18 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a job posting analyst. Extract structured information from job postings. Be precise and concise. Return results via the analyze_job_posting tool.`,
+            content: `You are a job posting analyst. Extract structured information from job postings. Be precise and concise. Return results via the analyze_job_posting tool.
+
+## SENIORITY LEVEL RULES (MANDATORY)
+Determine seniority strictly from the job TITLE using these rules:
+- "Director", "Head of", "VP", "Vice President", "C-level" (CEO, CFO, CTO, COO, etc.) → "Upper Management"
+- "Manager", "Chef" (Swedish for manager) → "Management"  
+- "Lead", "Principal", "Staff", "Specialist", "Senior" → "Senior"
+- "Mid-level", no explicit seniority qualifier → "Mid-level"
+- "Junior", "Graduate", "Trainee", "Intern" → "Junior"
+
+Use ONLY these five levels: Junior, Mid-level, Senior, Management, Upper Management.
+Always base seniority on the title, NOT on the job description content.`,
           },
           {
             role: "user",
@@ -45,7 +56,7 @@ serve(async (req) => {
               properties: {
                 job_title: { type: "string", description: "The job title" },
                 company_name: { type: "string", description: "Company name (or 'Unknown' if not found)" },
-                seniority_level: { type: "string", description: "e.g. Junior, Mid-level, Senior, Lead, Director, VP, C-level" },
+                seniority_level: { type: "string", enum: ["Junior", "Mid-level", "Senior", "Management", "Upper Management"], description: "Determined strictly from job title keywords" },
                 key_requirements: { type: "array", items: { type: "string" }, description: "Must-have requirements and skills (max 10)" },
                 nice_to_have: { type: "array", items: { type: "string" }, description: "Nice-to-have skills (max 5)" },
                 core_responsibilities: { type: "array", items: { type: "string" }, description: "Main responsibilities (max 6)" },
