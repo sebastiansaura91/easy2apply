@@ -136,9 +136,11 @@ export function FixIssueWizard({
       onApplyToProfile(text);
       onNavigateToSection?.("profile");
     } else if (targetSection === "experience") {
-      // For experience, split into bullets (one per line)
-      const bullets = text.split("\n").map(b => b.replace(/^[•\-–]\s*/, "").trim()).filter(b => b.length > 0);
-      onApplyToExperience(targetExpIdx, bullets);
+      // For experience, split into bullets and MERGE with existing ones
+      const newBullets = text.split("\n").map(b => b.replace(/^[•\-–]\s*/, "").trim()).filter(b => b.length > 0);
+      const existingBullets = cv.experience[targetExpIdx]?.bullets || [];
+      const merged = [...existingBullets, ...newBullets.filter(nb => !existingBullets.includes(nb))];
+      onApplyToExperience(targetExpIdx, merged);
       onNavigateToSection?.("experience");
     } else if (targetSection === "skills") {
       const newSkills = text.split(/[,\n]/).map(s => s.trim()).filter(s => s.length > 0);
