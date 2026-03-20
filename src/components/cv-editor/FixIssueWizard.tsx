@@ -241,18 +241,18 @@ export function FixIssueWizard({
         <div className="space-y-4">
           {questions.map((q, qi) => (
             <div key={qi} className="space-y-2">
-              <p className="text-xs font-semibold">{q.question}</p>
+              <p className="text-xs font-semibold break-words">{q.question}</p>
               <RadioGroup value={answers[qi] || ""} onValueChange={v => setAnswers(prev => ({ ...prev, [qi]: v }))}>
                 {q.options.map((opt, oi) => (
-                  <div key={oi} className="flex items-center gap-2">
-                    <RadioGroupItem value={opt} id={`q${qi}-o${oi}`} />
-                    <Label htmlFor={`q${qi}-o${oi}`} className="text-xs cursor-pointer">{opt}</Label>
+                  <div key={oi} className="flex items-start gap-2">
+                    <RadioGroupItem value={opt} id={`q${qi}-o${oi}`} className="mt-0.5 flex-shrink-0" />
+                    <Label htmlFor={`q${qi}-o${oi}`} className="text-xs cursor-pointer break-words leading-relaxed">{opt}</Label>
                   </div>
                 ))}
                 {q.allow_freetext !== false && (
                   <div className="flex items-start gap-2">
-                    <RadioGroupItem value="__freetext__" id={`q${qi}-free`} className="mt-1" />
-                    <div className="flex-1 space-y-1">
+                    <RadioGroupItem value="__freetext__" id={`q${qi}-free`} className="mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-1">
                       <Label htmlFor={`q${qi}-free`} className="text-xs cursor-pointer">{isSv ? "Eget svar" : "Custom answer"}</Label>
                       {answers[qi] === "__freetext__" && (
                         <Input
