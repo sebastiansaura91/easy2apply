@@ -19,7 +19,11 @@ serve(async (req) => {
     const lang = locale === "en" ? "en" : "sv";
     const systemPrompt = lang === "sv" ? SYSTEM_PROMPT_SV : SYSTEM_PROMPT_EN;
 
-    let userPrompt = `## CV DATA (JSON)\n\`\`\`json\n${JSON.stringify(resume_content_json, null, 2)}\n\`\`\`\n\n`;
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+    let userPrompt = `## TODAY'S DATE\n${todayStr}\n\n`;
+    userPrompt += `## CV DATA (JSON)\n\`\`\`json\n${JSON.stringify(resume_content_json, null, 2)}\n\`\`\`\n\n`;
     userPrompt += `## RENDERED PLAIN TEXT (what ATS sees)\n\`\`\`\n${renderedText}\n\`\`\`\n\n`;
     userPrompt += `## BULLETS WITH IDS\n\`\`\`json\n${JSON.stringify(bulletList, null, 2)}\n\`\`\`\n\n`;
     if (job_posting_text) userPrompt += `## JOB POSTING\n\`\`\`\n${job_posting_text}\n\`\`\`\n\n`;
@@ -202,6 +206,7 @@ const SCORING_MODEL = `
 - Standard headings recognized: 0–8
 - Contact info in body flow (name + email required): 0–8
 - Date consistency (YYYY-MM or similar): 0–6
+  IMPORTANT: Use TODAY'S DATE (provided in the user prompt) to determine if dates are in the future. Only flag dates that are actually after today's date.
 - Language consistency: 0–4
 - No parser noise (emojis, symbol rows, pipes): 0–4
 
