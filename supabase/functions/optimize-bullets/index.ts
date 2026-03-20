@@ -337,7 +337,7 @@ const RESULT_SCHEMA = {
             },
           },
         },
-        required: ["id", "original", "detected_language", "bullet_score", "ats_risk_level", "issues", "suggestions"],
+        required: ["id", "original", "detected_language", "bullet_score", "bullet_type", "clarifying_questions", "ats_risk_level", "issues", "suggestions"],
         additionalProperties: false,
       },
     },
