@@ -31,6 +31,27 @@ export default function ApplyWizard() {
   const [parsedCV, setParsedCV] = useState<CVContent | null>(flow.parsedCV);
   const [matchResult, setMatchResult] = useState<AtsCheckResult | null>(null);
   const [matching, setMatching] = useState(false);
+  const [creatingForFix, setCreatingForFix] = useState(false);
+
+  const openEditorToFix = async () => {
+    if (!user || !parsedCV) return;
+    // If we already have a resume ID, navigate directly
+    if (flow.resumeId) {
+      navigate(`/editor/${flow.resumeId}`);
+      return;
+    }
+    // Otherwise create the resume first
+    setCreatingForFix(true);
+    const id = uuidv4();
+    const title = jobAnalysis ? `CV — ${jobAnalysis.job_title}` : "New CV";
+    const { error } = await supabase.from("resumes").insert({
+      id, user_id: user.id, title, language: "en", template_id: "default", content_json: parsedCV as any,
+    });
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); setCreatingForFix(false); return; }
+    flow.setResumeId(id);
+    setCreatingForFix(false);
+    navigate(`/editor/${id}`);
+  };
 
   const analyzeJob = async () => {
     if (!jobText.trim()) return;
