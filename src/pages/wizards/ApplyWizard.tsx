@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { CVPicker } from "@/components/shared/CVPicker";
-import { Shield, ArrowLeft, ArrowRight, Loader2, Briefcase, Target, Users, Award, CheckCircle2, AlertTriangle, Eye, FileText, Plus } from "lucide-react";
+import { Shield, ArrowLeft, ArrowRight, Loader2, Briefcase, Target, Users, Award, CheckCircle2, AlertTriangle, Eye, FileText, Plus, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
 
