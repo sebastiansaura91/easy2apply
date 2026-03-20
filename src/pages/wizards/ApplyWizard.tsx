@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { CVPicker } from "@/components/shared/CVPicker";
-import { Shield, ArrowLeft, ArrowRight, Loader2, Briefcase, Target, Users, Award, CheckCircle2, AlertTriangle, Eye, FileText, Plus } from "lucide-react";
+import { Shield, ArrowLeft, ArrowRight, Loader2, Briefcase, Target, Users, Award, CheckCircle2, AlertTriangle, Eye, FileText, Plus, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
 
@@ -31,6 +31,27 @@ export default function ApplyWizard() {
   const [parsedCV, setParsedCV] = useState<CVContent | null>(flow.parsedCV);
   const [matchResult, setMatchResult] = useState<AtsCheckResult | null>(null);
   const [matching, setMatching] = useState(false);
+  const [creatingForFix, setCreatingForFix] = useState(false);
+
+  const openEditorToFix = async () => {
+    if (!user || !parsedCV) return;
+    // If we already have a resume ID, navigate directly
+    if (flow.resumeId) {
+      navigate(`/editor/${flow.resumeId}`);
+      return;
+    }
+    // Otherwise create the resume first
+    setCreatingForFix(true);
+    const id = uuidv4();
+    const title = jobAnalysis ? `CV — ${jobAnalysis.job_title}` : "New CV";
+    const { error } = await supabase.from("resumes").insert({
+      id, user_id: user.id, title, language: "en", template_id: "default", content_json: parsedCV as any,
+    });
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); setCreatingForFix(false); return; }
+    flow.setResumeId(id);
+    setCreatingForFix(false);
+    navigate(`/editor/${id}`);
+  };
 
   const analyzeJob = async () => {
     if (!jobText.trim()) return;
@@ -307,6 +328,16 @@ export default function ApplyWizard() {
                       <p className="text-xs font-semibold">{issue.title}</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">{issue.why_it_matters}</p>
                       <p className="text-[10px] font-medium text-primary mt-1">→ {issue.fix}</p>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="h-7 text-[10px] gap-1.5 mt-2"
+                        onClick={openEditorToFix}
+                        disabled={creatingForFix}
+                      >
+                        <Wrench className="h-3 w-3" />
+                        {creatingForFix ? "Opening..." : "Fix this in editor"}
+                      </Button>
                     </CardContent></Card>
                   ))}
                 </div>
