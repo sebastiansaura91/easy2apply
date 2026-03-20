@@ -9,7 +9,10 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { CVContent } from "@/types/cv";
-import { BulletOptimizerResult, BulletAnalysis, BulletSuggestion } from "@/types/bullet-optimizer";
+import { BulletOptimizerResult, BulletAnalysis, BulletSuggestion, ClarifyingQuestion } from "@/types/bullet-optimizer";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
