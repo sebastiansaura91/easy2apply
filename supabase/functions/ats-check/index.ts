@@ -202,6 +202,20 @@ function buildRenderedText(cv: any): string {
 const SCORING_MODEL = `
 ## SCORING MODEL (0–100)
 
+### SENIORITY CLASSIFICATION (use when job posting is provided)
+Determine seniority strictly from the job TITLE:
+- "Director", "Head of", "VP", "Vice President", "C-level" (CEO, CFO, CTO, COO, etc.) → Upper Management
+- "Manager", "Chef" (Swedish for manager) → Management
+- "Lead", "Principal", "Staff", "Specialist", "Senior" → Senior
+- "Mid-level", no explicit seniority qualifier → Mid-level
+- "Junior", "Graduate", "Trainee", "Intern" → Junior
+
+This seniority level MUST influence your evaluation:
+- **Upper Management / Management**: Expect strategic framing, decision-purpose bullets, stakeholder scope, business outcomes. Penalize tactical/operational-only bullets heavily.
+- **Senior**: Expect outcome-first bullets with method specificity. Some strategic framing expected.
+- **Mid-level**: Accept activity-based bullets if they show scope and method. Outcome signals are a plus, not required.
+- **Junior**: Accept learning-oriented and task-based bullets. Don't penalize lack of strategic framing.
+
 ### A) Parse Safety (0–30)
 - Standard headings recognized: 0–8
 - Contact info in body flow (name + email required): 0–8
@@ -233,8 +247,9 @@ If job posting provided:
 If NO job posting: score out of 15 max, rest N/A.
 
 ### D) Evidence & Credibility (0–15)
+Adjust expectations based on seniority level (see above).
 - Decision-purpose or outcome signal: 0–5
-  Penalize bullets that describe activity without consequence.
+  Penalize bullets that describe activity without consequence (especially for Management/Upper Management roles).
   Feedback: "This explains activity, but not why it mattered."
 - Method/tool specificity: 0–4
 - Strong verb start (outcome-first for senior roles): 0–3
