@@ -9,11 +9,18 @@ export interface BulletSuggestion {
   };
 }
 
+export interface ClarifyingQuestion {
+  question: string;
+  options: string[];
+}
+
 export interface BulletAnalysis {
   id: string;
   original: string;
   detected_language: "sv" | "en" | "mixed";
   bullet_score: number;
+  bullet_type: "outcome" | "support" | "context";
+  clarifying_questions: ClarifyingQuestion[];
   ats_risk_level: "low" | "medium" | "high";
   issues: string[];
   suggestions: BulletSuggestion[];

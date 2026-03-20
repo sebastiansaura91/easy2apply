@@ -180,11 +180,25 @@ function buildRenderedText(cv: any): string {
 const HARD_RULES = `
 ## HARD RULES
 - NEVER fabricate numbers, tools, responsibilities, team sizes, P&L, or outcomes.
-- If metrics are missing, use placeholder: "[FYLL I: % / SEK / timmar / volym / NPS / churn / ARPU / konvertering]" (Swedish) or "[FILL IN: % / $ / hours / volume / NPS / churn / ARPU / conversion]" (English).
+- If metrics are missing AND the bullet is outcome-driven, use placeholder: "[FYLL I: % / SEK / timmar / volym / NPS / churn / ARPU / konvertering]" (Swedish) or "[FILL IN: % / $ / hours / volume / NPS / churn / ARPU / conversion]" (English).
 - If scope is unclear, use neutral phrasing: "contributed to", "drove part of", "coordinated" — never overclaim.
 - Every issue MUST cite the bullet text as evidence.
 - Suggestions must be small, controlled improvements — not total rewrites.
 - Blocklist words (flag as buzzwords): "results-oriented", "driven", "passionate", "team player", "innovative", "responsible for", "strategic thinker", "resultatorienterad", "driven", "passionerad", "lagspelare", "innovativ", "ansvarig för", "strategisk tänkare"
+`;
+
+const BULLET_TYPE_RULES = `
+## BULLET TYPE CLASSIFICATION
+Classify each bullet as one of:
+- "outcome" — The bullet describes a result, decision, achievement, or measurable impact. These SHOULD have metrics or outcome signals.
+- "support" — The bullet describes enabling work, support functions, coordination, context-setting, or process maintenance. Examples: "Supported the sales team with...", "Coordinated onboarding for...", "Maintained compliance documentation..."
+- "context" — The bullet provides organizational context, scope framing, or role description. Examples: "Reported to the VP of Engineering", "Part of a cross-functional team of 12..."
+
+IMPORTANT SCORING ADJUSTMENT:
+- "support" and "context" bullets should NOT be penalized for lacking metrics or outcome signals.
+- For support bullets: focus on CLARITY, SCOPE, and METHOD rather than forcing outcome/impact.
+- Do NOT add [FILL IN] placeholders for metrics on support/context bullets unless the user explicitly describes an outcome.
+- A well-written support bullet that clearly explains WHAT was supported, HOW, and for WHOM can score 7-8/10 without any numbers.
 `;
 
 const SCORING_RULES = `
@@ -192,7 +206,7 @@ const SCORING_RULES = `
 - Structure (0–3): strong verb start + clear object + readable length
   - SENIOR RULE: +1 bonus if bullet begins with Outcome/Decision-Purpose (what it enabled) rather than a generic activity verb. Penalize generic activity-first bullets (Developed/Worked/Responsible) unless the activity is unusually specific.
 - Concreteness (0–3): specific activity + named tools/methods/processes
-- Evidence/Impact (0–2): outcome signal or mechanism described (numbers NOT required)
+- Evidence/Impact (0–2): outcome signal or mechanism described (numbers NOT required — especially for support/context bullets)
 - Keyword alignment (0–2): relevant industry/role terms in context (if job posting provided)
 
 ## ATS RISK LEVELS
@@ -207,7 +221,7 @@ Default pattern for senior-level bullets:
 1. Start with Outcome or Decision-Purpose (what it enabled/supported/improved)
 2. Then: method/how (modeling, analysis, workshops, tools)
 3. Then: scope (business area/region/stakeholders)
-4. End with result metric ONLY if provided; otherwise use placeholder.
+4. End with result metric ONLY if provided; otherwise use placeholder ONLY for outcome-type bullets.
 
 If bullet starts with a generic activity verb (Developed, Worked, Responsible, Managed, Handled, Led):
 - Rewrite suggestion MUST reframe into outcome-first phrasing.
@@ -215,14 +229,33 @@ If bullet starts with a generic activity verb (Developed, Worked, Responsible, M
 
 Anti-hallucination for outcomes:
 - If no measurable outcome is provided, do NOT fabricate it.
-- Use placeholders: "[FILL IN: ROI / savings / margin / approval / time-to-decision]" (EN) or "[FYLL I: ROI / besparing / marginal / godkännande / tid-till-beslut]" (SV)
+- For outcome-type bullets: use placeholders: "[FILL IN: ROI / savings / margin / approval / time-to-decision]" (EN) or "[FYLL I: ROI / besparing / marginal / godkännande / tid-till-beslut]" (SV)
+- For support/context-type bullets: do NOT add metric placeholders. Instead, focus on making scope/method/stakeholders clearer.
+`;
+
+const CLARIFYING_QUESTIONS_RULE = `
+## CLARIFYING QUESTIONS (MANDATORY)
+For EACH bullet, generate 1-3 short clarifying questions that would help improve the bullet.
+Questions should:
+- Focus on WHAT the person actually did (not generic "add metrics")
+- Ask about decision-making, scope, stakeholders, and method
+- Be multiple-choice when possible (provide 2-3 options)
+- Be contextual to the bullet content — not generic
+
+Examples:
+- "What was the purpose of this work? a) Cost reduction b) Revenue growth c) Risk mitigation d) Other"
+- "Who used the output? a) Executive team b) Clients c) Internal team d) External stakeholders"
+- "What tools/methods did you use?"
+- "How large was the scope? (team size, budget, geographic reach)"
+
+Do NOT ask "What was the measurable outcome?" for support/context bullets.
 `;
 
 const SUGGESTION_TYPES = `
 ## SUGGESTION TYPES (choose 2–4 most relevant per bullet)
 A) "stronger_verb_start" — Replace with a stronger, more distinct verb. For senior roles, reframe generic activity verbs into outcome/decision-purpose verbs (enabled, supported, improved, drove, accelerated).
 B) "add_how" — Add method/tools/process details
-C) "add_outcome" — Add outcome signal with placeholder if needed
+C) "add_outcome" — Add outcome signal with placeholder if needed (ONLY for outcome-type bullets)
 D) "split" — Split long bullet into 2 shorter ones
 E) "keyword_alignment" — Insert 1 relevant keyword from job posting naturally
 F) "language_fix" — Translate bullet to match system language
@@ -230,21 +263,25 @@ F) "language_fix" — Translate bullet to match system language
 
 const SYSTEM_PROMPT_SV = `Du är en expert-CV-coach och ATS-specialist. Analysera VARJE bullet och ge konkreta förbättringsförslag.
 
+${BULLET_TYPE_RULES}
 ${SCORING_RULES}
 ${SENIOR_BULLET_RULE}
+${CLARIFYING_QUESTIONS_RULE}
 ${SUGGESTION_TYPES}
 ${HARD_RULES}
 
-ALL output MUST be in Swedish. Var saklig, konkret och floskelfri. Ge alltid 2–4 förslag per bullet. Prioritera outcome-first-struktur för seniora roller.`;
+ALL output MUST be in Swedish. Var saklig, konkret och floskelfri. Ge alltid 2–4 förslag per bullet. Prioritera outcome-first-struktur för seniora roller. Ställ alltid förtydligande frågor.`;
 
 const SYSTEM_PROMPT_EN = `You are an expert CV coach and ATS specialist. Analyze EVERY bullet and provide concrete improvement suggestions.
 
+${BULLET_TYPE_RULES}
 ${SCORING_RULES}
 ${SENIOR_BULLET_RULE}
+${CLARIFYING_QUESTIONS_RULE}
 ${SUGGESTION_TYPES}
 ${HARD_RULES}
 
-ALL output MUST be in English. Be factual, concrete, and buzzword-free. Always give 2–4 suggestions per bullet. Prioritize outcome-first structure for senior roles.`;
+ALL output MUST be in English. Be factual, concrete, and buzzword-free. Always give 2–4 suggestions per bullet. Prioritize outcome-first structure for senior roles. Always include clarifying questions.`;
 
 // --- Output schema ---
 const RESULT_SCHEMA = {
@@ -260,6 +297,20 @@ const RESULT_SCHEMA = {
           original: { type: "string" },
           detected_language: { type: "string", enum: ["sv", "en", "mixed"] },
           bullet_score: { type: "number", description: "0-10" },
+          bullet_type: { type: "string", enum: ["outcome", "support", "context"], description: "Classification of bullet purpose" },
+          clarifying_questions: {
+            type: "array",
+            description: "1-3 contextual questions to help improve the bullet",
+            items: {
+              type: "object",
+              properties: {
+                question: { type: "string" },
+                options: { type: "array", items: { type: "string" }, description: "2-4 multiple choice options, or empty for free text" },
+              },
+              required: ["question", "options"],
+              additionalProperties: false,
+            },
+          },
           ats_risk_level: { type: "string", enum: ["low", "medium", "high"] },
           issues: { type: "array", items: { type: "string" } },
           suggestions: {
@@ -286,7 +337,7 @@ const RESULT_SCHEMA = {
             },
           },
         },
-        required: ["id", "original", "detected_language", "bullet_score", "ats_risk_level", "issues", "suggestions"],
+        required: ["id", "original", "detected_language", "bullet_score", "bullet_type", "clarifying_questions", "ats_risk_level", "issues", "suggestions"],
         additionalProperties: false,
       },
     },
