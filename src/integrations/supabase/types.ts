@@ -40,6 +40,7 @@ export type Database = {
       }
       job_postings: {
         Row: {
+          analysis_json: Json | null
           created_at: string
           id: string
           text: string
@@ -47,6 +48,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          analysis_json?: Json | null
           created_at?: string
           id?: string
           text: string
@@ -54,6 +56,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          analysis_json?: Json | null
           created_at?: string
           id?: string
           text?: string

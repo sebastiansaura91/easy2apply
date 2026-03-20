@@ -1,0 +1,1 @@
+ALTER TABLE public.job_postings ADD COLUMN analysis_json jsonb DEFAULT NULL;
