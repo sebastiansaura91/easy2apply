@@ -328,6 +328,16 @@ export default function ApplyWizard() {
                       <p className="text-xs font-semibold">{issue.title}</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">{issue.why_it_matters}</p>
                       <p className="text-[10px] font-medium text-primary mt-1">→ {issue.fix}</p>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="h-7 text-[10px] gap-1.5 mt-2"
+                        onClick={openEditorToFix}
+                        disabled={creatingForFix}
+                      >
+                        <Wrench className="h-3 w-3" />
+                        {creatingForFix ? "Opening..." : "Fix this in editor"}
+                      </Button>
                     </CardContent></Card>
                   ))}
                 </div>
