@@ -56,7 +56,7 @@ Always base seniority on the title, NOT on the job description content.`,
               properties: {
                 job_title: { type: "string", description: "The job title" },
                 company_name: { type: "string", description: "Company name (or 'Unknown' if not found)" },
-                seniority_level: { type: "string", description: "e.g. Junior, Mid-level, Senior, Lead, Director, VP, C-level" },
+                seniority_level: { type: "string", enum: ["Junior", "Mid-level", "Senior", "Management", "Upper Management"], description: "Determined strictly from job title keywords" },
                 key_requirements: { type: "array", items: { type: "string" }, description: "Must-have requirements and skills (max 10)" },
                 nice_to_have: { type: "array", items: { type: "string" }, description: "Nice-to-have skills (max 5)" },
                 core_responsibilities: { type: "array", items: { type: "string" }, description: "Main responsibilities (max 6)" },
