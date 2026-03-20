@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { CVContent } from "@/types/cv";
-import { AtsCheckResult } from "@/types/ats-check";
+import { AtsCheckResult, FirstScanIssue } from "@/types/ats-check";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,9 +11,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { runAtsCheck } from "@/components/cv-editor/AtsCheck";
 import { detectCvLanguages } from "@/lib/language-detection";
 import { findCvIssues, analyzeAllBullets, CvIssue } from "@/lib/cv-quality";
+import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 import {
   CheckCircle2, AlertTriangle, AlertOctagon, Loader2, ChevronDown, ChevronRight,
-  Languages, Target, Eye, Zap, ArrowRight, Sparkles,
+  Languages, Target, Eye, Zap, ArrowRight, Sparkles, Wrench,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,6 +25,9 @@ interface Props {
   jobPostingText?: string;
   onApplyBullet?: (bulletPath: string, newText: string) => void;
   onNavigateToSection?: (sectionType: string) => void;
+  onUpdateProfile?: (text: string) => void;
+  onUpdateExperienceBullets?: (expIdx: number, bullets: string[]) => void;
+  onUpdateSkills?: (skills: string[]) => void;
 }
 
 function severityIcon(severity: CvIssue["severity"]) {
@@ -42,13 +46,17 @@ function severityBorder(severity: CvIssue["severity"]) {
   }
 }
 
-export function InsightsPanel({ cv, cvLanguage, t, jobPostingText, onApplyBullet, onNavigateToSection }: Props) {
+export function InsightsPanel({
+  cv, cvLanguage, t, jobPostingText, onApplyBullet, onNavigateToSection,
+  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills,
+}: Props) {
   const { toast } = useToast();
   const [deepResult, setDeepResult] = useState<AtsCheckResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [jobText, setJobText] = useState(jobPostingText || "");
   const [showJob, setShowJob] = useState(false);
   const [bulletsOpen, setBulletsOpen] = useState(false);
+  const [fixingIssue, setFixingIssue] = useState<FirstScanIssue | null>(null);
   const isSv = cvLanguage === "sv";
 
   // ── Real-time issues (client-side, instant) ──
@@ -94,6 +102,27 @@ export function InsightsPanel({ cv, cvLanguage, t, jobPostingText, onApplyBullet
   };
 
   const scoreColor = (s: number) => s >= 80 ? "text-green-600" : s >= 60 ? "text-warning" : "text-destructive";
+
+  const canFix = !!onUpdateProfile && !!onUpdateExperienceBullets && !!onUpdateSkills;
+
+  // ── Fix issue wizard overlay ──
+  if (fixingIssue && canFix) {
+    return (
+      <div className="p-4">
+        <FixIssueWizard
+          issue={fixingIssue}
+          cv={cv}
+          cvLanguage={cvLanguage}
+          jobPostingText={jobText || jobPostingText}
+          onApplyToProfile={onUpdateProfile}
+          onApplyToExperience={onUpdateExperienceBullets}
+          onApplyToSkills={onUpdateSkills}
+          onClose={() => setFixingIssue(null)}
+          onNavigateToSection={onNavigateToSection}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 space-y-4">
@@ -231,7 +260,7 @@ export function InsightsPanel({ cv, cvLanguage, t, jobPostingText, onApplyBullet
             ))}
           </div>
 
-          {/* Top issues — prominent like reference image */}
+          {/* Top issues — NOW WITH FIX BUTTONS */}
           {deepResult.first_scan_issues.length > 0 && (
             <div className="space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
@@ -239,12 +268,23 @@ export function InsightsPanel({ cv, cvLanguage, t, jobPostingText, onApplyBullet
                 {isSv ? "Vad en rekryterare märker" : "Top issues a recruiter would notice"}
               </p>
               {deepResult.first_scan_issues.map((issue, i) => (
-                <div key={i} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-1.5">
+                <div key={i} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-2">
                   <p className="text-xs font-bold">{issue.title}</p>
                   <p className="text-[10px] text-muted-foreground leading-relaxed">{issue.why_it_matters}</p>
                   <p className="text-[10px] font-medium text-primary flex items-center gap-1">
                     <ArrowRight className="h-2.5 w-2.5" /> {issue.fix}
                   </p>
+                  {canFix && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-full h-7 text-[10px] gap-1.5 mt-1"
+                      onClick={() => setFixingIssue(issue)}
+                    >
+                      <Wrench className="h-3 w-3" />
+                      {isSv ? "Fixa detta" : "Fix this issue"}
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

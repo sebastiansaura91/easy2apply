@@ -262,6 +262,15 @@ const CVEditor = () => {
                 jobPostingText={flow.jobPostingText || undefined}
                 onApplyBullet={handleApplyBullet}
                 onNavigateToSection={scrollToSection}
+                onUpdateProfile={(text) => updateCv("profile", text)}
+                onUpdateExperienceBullets={(expIdx, bullets) => {
+                  const updated = [...cv.experience];
+                  if (updated[expIdx]) {
+                    updated[expIdx] = { ...updated[expIdx], bullets };
+                    updateCv("experience", updated);
+                  }
+                }}
+                onUpdateSkills={(skills) => updateCv("skills", [...new Set([...cv.skills, ...skills])])}
               />
             </ScrollArea>
           </aside>
