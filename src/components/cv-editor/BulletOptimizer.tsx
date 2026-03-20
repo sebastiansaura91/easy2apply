@@ -6,6 +6,7 @@ import {
   Zap,
   Sparkles,
   MessageCircle,
+  HelpCircle,
 } from "lucide-react";
 import { CVContent } from "@/types/cv";
 import { BulletOptimizerResult, BulletAnalysis, BulletSuggestion } from "@/types/bullet-optimizer";
