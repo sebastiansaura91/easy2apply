@@ -26,14 +26,15 @@ Returnera ALLTID via tool call.`;
 const SYSTEM_PROMPT_EN = `You are an expert CV writer. Your task is to improve a single bullet point in a CV/resume.
 
 Rules:
-- Make the bullet more quantifiable and results-focused
-- Use strong action verbs at the start (Led, Developed, Implemented, Increased, Reduced, etc.)
-- Add placeholders [FILL IN] for unknown figures/KPIs, e.g. [FILL IN number], [FILL IN %], [FILL IN $]
+- First classify the bullet: is it "outcome" (result/decision), "support" (enabling/coordinating), or "context" (role description/scope)?
+- For outcome bullets: make them more results-focused with strong action verbs
+- For support/context bullets: focus on clarity, scope, and method – do NOT force metrics or [FILL IN] placeholders
+- Use strong action verbs at the start (Led, Developed, Implemented, Supported, Coordinated, Enabled, etc.)
+- Add [FILL IN] placeholders ONLY for outcome bullets where metrics would genuinely add value
 - Write in English
-- NEVER fabricate facts - use [FILL IN] instead
-- Keep the same core meaning, but make it stronger and more professional
-- Do NOT deviate too far from the original – improve, don't rewrite completely
-- Mention team size, budget, tools/methods where relevant
+- NEVER fabricate facts
+- Keep the same core meaning, but make it stronger and clearer
+- A well-written support bullet that explains WHAT, HOW, and for WHOM is perfectly valid without numbers
 - Max 2 sentences
 - Respond in English, including the reason field
 
