@@ -297,6 +297,20 @@ const RESULT_SCHEMA = {
           original: { type: "string" },
           detected_language: { type: "string", enum: ["sv", "en", "mixed"] },
           bullet_score: { type: "number", description: "0-10" },
+          bullet_type: { type: "string", enum: ["outcome", "support", "context"], description: "Classification of bullet purpose" },
+          clarifying_questions: {
+            type: "array",
+            description: "1-3 contextual questions to help improve the bullet",
+            items: {
+              type: "object",
+              properties: {
+                question: { type: "string" },
+                options: { type: "array", items: { type: "string" }, description: "2-4 multiple choice options, or empty for free text" },
+              },
+              required: ["question", "options"],
+              additionalProperties: false,
+            },
+          },
           ats_risk_level: { type: "string", enum: ["low", "medium", "high"] },
           issues: { type: "array", items: { type: "string" } },
           suggestions: {
