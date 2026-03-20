@@ -54,6 +54,21 @@ function suggestionTypeLabel(type: string, lang: "sv" | "en"): string {
 
 /* ── Bullet Row ── */
 
+function bulletTypeBadge(type: string, lang: "sv" | "en") {
+  switch (type) {
+    case "outcome": return <Badge variant="outline" className="text-[9px] h-4 border-green-500/50 text-green-600">
+      {lang === "sv" ? "Resultat" : "Outcome"}
+    </Badge>;
+    case "support": return <Badge variant="outline" className="text-[9px] h-4 border-blue-500/50 text-blue-600">
+      {lang === "sv" ? "Stöd" : "Support"}
+    </Badge>;
+    case "context": return <Badge variant="outline" className="text-[9px] h-4 border-muted-foreground/50 text-muted-foreground">
+      {lang === "sv" ? "Kontext" : "Context"}
+    </Badge>;
+    default: return null;
+  }
+}
+
 function BulletRow({
   bullet,
   lang,
@@ -66,16 +81,21 @@ function BulletRow({
   onCoach: (bulletId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [showQuestions, setShowQuestions] = useState(false);
+  const [qAnswers, setQAnswers] = useState<Record<number, string>>({});
   const idParts = bullet.id.match(/^(\w+)\[(\d+)\]\.bullets\[(\d+)\]$/);
   const sectionLabel = idParts ? `${idParts[1]}[${idParts[2]}]` : bullet.id;
+
+  const hasQuestions = bullet.clarifying_questions && bullet.clarifying_questions.length > 0;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
         <button className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {open ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
             {scoreBadge(bullet.bullet_score)}
+            {bulletTypeBadge(bullet.bullet_type, lang)}
             {riskBadge(bullet.ats_risk_level, lang)}
             <span className="text-[10px] text-muted-foreground flex-shrink-0">{sectionLabel}</span>
           </div>
@@ -90,6 +110,55 @@ function BulletRow({
                 {issue}
               </Badge>
             ))}
+          </div>
+        )}
+
+        {/* Clarifying questions section */}
+        {hasQuestions && (
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5 text-[10px] h-7"
+              onClick={() => setShowQuestions(!showQuestions)}
+            >
+              <HelpCircle className="h-3 w-3" />
+              {showQuestions
+                ? (lang === "sv" ? "Dölj frågor" : "Hide questions")
+                : (lang === "sv" ? "Besvara frågor för bättre förslag" : "Answer questions for better suggestions")}
+            </Button>
+
+            {showQuestions && (
+              <div className="space-y-3 p-2 rounded-lg border border-primary/20 bg-primary/5">
+                {bullet.clarifying_questions.map((q, qi) => (
+                  <div key={qi} className="space-y-1.5">
+                    <p className="text-[10px] font-semibold break-words">{q.question}</p>
+                    {q.options.length > 0 ? (
+                      <RadioGroup value={qAnswers[qi] || ""} onValueChange={v => setQAnswers(prev => ({ ...prev, [qi]: v }))}>
+                        {q.options.map((opt, oi) => (
+                          <div key={oi} className="flex items-start gap-2">
+                            <RadioGroupItem value={opt} id={`b-${bullet.id}-q${qi}-o${oi}`} className="mt-0.5 flex-shrink-0" />
+                            <Label htmlFor={`b-${bullet.id}-q${qi}-o${oi}`} className="text-[10px] cursor-pointer break-words leading-relaxed">{opt}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    ) : (
+                      <Input
+                        value={qAnswers[qi] || ""}
+                        onChange={e => setQAnswers(prev => ({ ...prev, [qi]: e.target.value }))}
+                        placeholder={lang === "sv" ? "Ditt svar..." : "Your answer..."}
+                        className="h-7 text-[10px]"
+                      />
+                    )}
+                  </div>
+                ))}
+                <p className="text-[9px] text-muted-foreground italic">
+                  {lang === "sv"
+                    ? "Svaren hjälper dig formulera bättre bullets — använd Coach-chatten nedan för att generera nya förslag baserat på svaren."
+                    : "Answers help you write better bullets — use the Coach chat below to generate new suggestions based on your answers."}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
