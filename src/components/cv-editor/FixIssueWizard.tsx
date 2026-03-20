@@ -246,7 +246,7 @@ export function FixIssueWizard({
                 {q.options.map((opt, oi) => (
                   <div key={oi} className="flex items-start gap-2">
                     <RadioGroupItem value={opt} id={`q${qi}-o${oi}`} className="mt-0.5 flex-shrink-0" />
-                    <Label htmlFor={`q${qi}-o${oi}`} className="text-xs cursor-pointer break-words leading-relaxed">{opt}</Label>
+                    <Label htmlFor={`q${qi}-o${oi}`} className="flex-1 min-w-0 whitespace-normal text-xs cursor-pointer break-words leading-relaxed">{opt}</Label>
                   </div>
                 ))}
                 {q.allow_freetext !== false && (
