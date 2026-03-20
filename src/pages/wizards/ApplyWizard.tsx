@@ -36,12 +36,45 @@ export default function ApplyWizard() {
     if (!jobText.trim()) return;
     setAnalyzing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("analyze-job-posting", { body: { job_posting_text: jobText.trim() } });
+      // Check for cached analysis first
+      const trimmed = jobText.trim();
+      if (user) {
+        const { data: cached } = await supabase
+          .from("job_postings")
+          .select("analysis_json")
+          .eq("user_id", user.id)
+          .eq("text", trimmed)
+          .not("analysis_json", "is", null)
+          .limit(1)
+          .maybeSingle();
+
+        if (cached?.analysis_json) {
+          const analysis = cached.analysis_json as unknown as import("@/contexts/FlowContext").JobAnalysis;
+          setJobAnalysis(analysis);
+          flow.setJobPostingText(trimmed);
+          flow.setJobAnalysis(analysis);
+          setStep(1);
+          return;
+        }
+      }
+
+      const { data, error } = await supabase.functions.invoke("analyze-job-posting", { body: { job_posting_text: trimmed } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setJobAnalysis(data);
-      flow.setJobPostingText(jobText);
+      flow.setJobPostingText(trimmed);
       flow.setJobAnalysis(data);
+
+      // Cache the result
+      if (user) {
+        await supabase.from("job_postings").insert({
+          user_id: user.id,
+          title: data.job_title || "Untitled",
+          text: trimmed,
+          analysis_json: data as any,
+        });
+      }
+
       setStep(1);
     } catch (e: any) {
       toast({ title: "Analysis failed", description: e.message, variant: "destructive" });
