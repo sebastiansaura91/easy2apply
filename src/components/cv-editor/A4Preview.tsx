@@ -14,13 +14,15 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
         switch (section.type) {
           case "contact":
             return (
-              <div key={section.id}>
+              <div key={section.id} style={{ marginBottom: "8pt" }}>
                 <h1>{cv.contact.name || "Ditt Namn"}</h1>
-                <p className="contact-line">
-                  {[cv.contact.email, cv.contact.phone, cv.contact.city, cv.contact.linkedin, cv.contact.website]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
+                <div className="contact-line" style={{ display: "flex", flexDirection: "column", gap: "1pt", marginTop: "4pt" }}>
+                  {cv.contact.email && <span>{cv.contact.email}</span>}
+                  {cv.contact.phone && <span>{cv.contact.phone}</span>}
+                  {cv.contact.linkedin && <span>{cv.contact.linkedin}</span>}
+                  {cv.contact.website && <span>{cv.contact.website}</span>}
+                  {cv.contact.city && <span>{cv.contact.city}</span>}
+                </div>
               </div>
             );
           case "profile":

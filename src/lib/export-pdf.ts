@@ -145,26 +145,21 @@ export async function exportToPdf(
   for (const section of enabledSections) {
     switch (section.type) {
       case "contact": {
-        // Name centered
-        checkPage(12);
+        checkPage(20);
         drawCenteredText(cv.contact.name || "Ditt Namn", {
           fontSize: 18,
           fontStyle: "bold",
         });
-        y += 1;
-        // Contact line
-        const contactParts = [
+        y += 2;
+        const contactFields = [
           cv.contact.email,
           cv.contact.phone,
-          cv.contact.city,
           cv.contact.linkedin,
           cv.contact.website,
+          cv.contact.city,
         ].filter(Boolean);
-        if (contactParts.length > 0) {
-          drawCenteredText(contactParts.join("  ·  "), {
-            fontSize: 9,
-            color: colors.gray,
-          });
+        for (const field of contactFields) {
+          drawCenteredText(field, { fontSize: 9, color: colors.gray });
         }
         y += 2;
         break;
