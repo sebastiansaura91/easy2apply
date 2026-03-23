@@ -356,7 +356,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="top">
-                            <p className="text-xs">Förbättra med AI</p>
+                            <p className="text-xs">{isSv ? "Förbättra med AI" : "Improve with AI"}</p>
                           </TooltipContent>
                         </Tooltip>
                         <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
