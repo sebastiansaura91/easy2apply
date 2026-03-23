@@ -261,8 +261,8 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="max-w-xs space-y-1 p-3">
-                        <p className="font-semibold text-xs mb-1.5">Tips för starka punkter:</p>
-                        {bulletTips.map((tip, i) => (
+                        <p className="font-semibold text-xs mb-1.5">{isSv ? "Tips för starka punkter:" : "Tips for strong bullets:"}</p>
+                        {(isSv ? bulletTipsSv : bulletTipsEn).map((tip, i) => (
                           <p key={i} className="text-xs leading-relaxed">{tip}</p>
                         ))}
                       </TooltipContent>
