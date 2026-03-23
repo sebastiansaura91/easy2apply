@@ -45,19 +45,20 @@ interface SectionFormProps {
   cvLanguage?: "sv" | "en";
 }
 
-export function ContactForm({ cv, updateCv, t }: SectionFormProps) {
+export function ContactForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
+  const isSv = cvLanguage !== "en";
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">{t("sectionContact")}</CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-3">
-        <Input placeholder={t("contactName")} value={cv.contact.name} onChange={(e) => updateCv("contact", { ...cv.contact, name: e.target.value })} />
-        <Input placeholder={t("contactEmail")} value={cv.contact.email} onChange={(e) => updateCv("contact", { ...cv.contact, email: e.target.value })} />
-        <Input placeholder={t("contactPhone")} value={cv.contact.phone} onChange={(e) => updateCv("contact", { ...cv.contact, phone: e.target.value })} />
-        <Input placeholder={t("contactCity")} value={cv.contact.city} onChange={(e) => updateCv("contact", { ...cv.contact, city: e.target.value })} />
-        <Input placeholder={t("contactLinkedin")} value={cv.contact.linkedin} onChange={(e) => updateCv("contact", { ...cv.contact, linkedin: e.target.value })} />
-        <Input placeholder={t("contactWebsite")} value={cv.contact.website} onChange={(e) => updateCv("contact", { ...cv.contact, website: e.target.value })} />
+        <Input placeholder={isSv ? "Namn" : "Name"} value={cv.contact.name} onChange={(e) => updateCv("contact", { ...cv.contact, name: e.target.value })} />
+        <Input placeholder={isSv ? "E-post" : "Email"} value={cv.contact.email} onChange={(e) => updateCv("contact", { ...cv.contact, email: e.target.value })} />
+        <Input placeholder={isSv ? "Telefon" : "Phone"} value={cv.contact.phone} onChange={(e) => updateCv("contact", { ...cv.contact, phone: e.target.value })} />
+        <Input placeholder={isSv ? "Stad" : "City"} value={cv.contact.city} onChange={(e) => updateCv("contact", { ...cv.contact, city: e.target.value })} />
+        <Input placeholder="LinkedIn" value={cv.contact.linkedin} onChange={(e) => updateCv("contact", { ...cv.contact, linkedin: e.target.value })} />
+        <Input placeholder={isSv ? "Webbplats" : "Website"} value={cv.contact.website} onChange={(e) => updateCv("contact", { ...cv.contact, website: e.target.value })} />
       </CardContent>
     </Card>
   );
@@ -238,23 +239,23 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                 </Button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input placeholder={t("expTitle")} value={exp.title} onChange={(e) => updateExperience(idx, { title: e.target.value })} />
-                <Input placeholder={t("expCompany")} value={exp.company} onChange={(e) => updateExperience(idx, { company: e.target.value })} />
-                <Input placeholder={t("expLocation")} value={exp.location} onChange={(e) => updateExperience(idx, { location: e.target.value })} />
+                <Input placeholder={isSv ? "Titel" : "Title"} value={exp.title} onChange={(e) => updateExperience(idx, { title: e.target.value })} />
+                <Input placeholder={isSv ? "Företag" : "Company"} value={exp.company} onChange={(e) => updateExperience(idx, { company: e.target.value })} />
+                <Input placeholder={isSv ? "Plats" : "Location"} value={exp.location} onChange={(e) => updateExperience(idx, { location: e.target.value })} />
                 <div />
-                <Input type="month" placeholder={t("expStartDate")} value={exp.startDate} onChange={(e) => updateExperience(idx, { startDate: e.target.value })} />
+                <Input type="month" placeholder={isSv ? "Startdatum" : "Start date"} value={exp.startDate} onChange={(e) => updateExperience(idx, { startDate: e.target.value })} />
                 {!exp.isPresent && (
-                  <Input type="month" placeholder={t("expEndDate")} value={exp.endDate} onChange={(e) => updateExperience(idx, { endDate: e.target.value })} />
+                  <Input type="month" placeholder={isSv ? "Slutdatum" : "End date"} value={exp.endDate} onChange={(e) => updateExperience(idx, { endDate: e.target.value })} />
                 )}
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox checked={exp.isPresent} onCheckedChange={(v) => updateExperience(idx, { isPresent: !!v, endDate: "" })} />
-                <span className="text-sm">{t("expPresent")}</span>
+                <span className="text-sm">{isSv ? "Nuvarande" : "Present"}</span>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium">{t("expBullets")}</span>
+                    <span className="text-sm font-medium">{isSv ? "Punkter" : "Bullets"}</span>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="inline-flex items-center cursor-help">
@@ -521,7 +522,8 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
   );
 }
 
-export function EducationForm({ cv, updateCv, t }: SectionFormProps) {
+export function EducationForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
+  const isSv = cvLanguage !== "en";
   const addEducation = () => {
     updateCv("education", [...cv.education, { id: uuidv4(), degree: "", school: "", field: "", startDate: "", endDate: "" }]);
   };
@@ -553,9 +555,9 @@ export function EducationForm({ cv, updateCv, t }: SectionFormProps) {
               </Button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Input placeholder={t("eduDegree")} value={edu.degree} onChange={(e) => updateEducation(idx, { degree: e.target.value })} />
-              <Input placeholder={t("eduSchool")} value={edu.school} onChange={(e) => updateEducation(idx, { school: e.target.value })} />
-              <Input placeholder={t("eduField")} value={edu.field} onChange={(e) => updateEducation(idx, { field: e.target.value })} />
+              <Input placeholder={isSv ? "Examen" : "Degree"} value={edu.degree} onChange={(e) => updateEducation(idx, { degree: e.target.value })} />
+              <Input placeholder={isSv ? "Skola" : "School"} value={edu.school} onChange={(e) => updateEducation(idx, { school: e.target.value })} />
+              <Input placeholder={isSv ? "Inriktning" : "Field of study"} value={edu.field} onChange={(e) => updateEducation(idx, { field: e.target.value })} />
               <div />
               <Input type="month" value={edu.startDate} onChange={(e) => updateEducation(idx, { startDate: e.target.value })} />
               <Input type="month" value={edu.endDate} onChange={(e) => updateEducation(idx, { endDate: e.target.value })} />
