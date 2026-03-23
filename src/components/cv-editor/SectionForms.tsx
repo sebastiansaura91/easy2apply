@@ -63,7 +63,7 @@ export function ContactForm({ cv, updateCv, t }: SectionFormProps) {
   );
 }
 
-export function ProfileForm({ cv, updateCv, t }: SectionFormProps) {
+export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
