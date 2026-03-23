@@ -58,7 +58,7 @@ export function ContactForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
         <Input placeholder={isSv ? "Telefon" : "Phone"} value={cv.contact.phone} onChange={(e) => updateCv("contact", { ...cv.contact, phone: e.target.value })} />
         <Input placeholder={isSv ? "Stad" : "City"} value={cv.contact.city} onChange={(e) => updateCv("contact", { ...cv.contact, city: e.target.value })} />
         <Input placeholder="LinkedIn" value={cv.contact.linkedin} onChange={(e) => updateCv("contact", { ...cv.contact, linkedin: e.target.value })} />
-        <Input placeholder={t("contactWebsite")} value={cv.contact.website} onChange={(e) => updateCv("contact", { ...cv.contact, website: e.target.value })} />
+        <Input placeholder={isSv ? "Webbplats" : "Website"} value={cv.contact.website} onChange={(e) => updateCv("contact", { ...cv.contact, website: e.target.value })} />
       </CardContent>
     </Card>
   );
