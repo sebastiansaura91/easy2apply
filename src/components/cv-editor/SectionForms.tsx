@@ -388,7 +388,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           <div className="flex gap-2 justify-end">
                             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => rejectPreview(idx, bIdx)}>
                               <Undo2 className="h-3 w-3 mr-1" />
-                              Behåll original
+                              {isSv ? "Behåll original" : "Keep original"}
                             </Button>
                             <Button size="sm" className="h-7 text-xs" onClick={() => acceptPreview(idx, bIdx)}>
                               <Check className="h-3 w-3 mr-1" />
