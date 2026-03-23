@@ -45,18 +45,19 @@ interface SectionFormProps {
   cvLanguage?: "sv" | "en";
 }
 
-export function ContactForm({ cv, updateCv, t }: SectionFormProps) {
+export function ContactForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
+  const isSv = cvLanguage !== "en";
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">{t("sectionContact")}</CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-3">
-        <Input placeholder={t("contactName")} value={cv.contact.name} onChange={(e) => updateCv("contact", { ...cv.contact, name: e.target.value })} />
-        <Input placeholder={t("contactEmail")} value={cv.contact.email} onChange={(e) => updateCv("contact", { ...cv.contact, email: e.target.value })} />
-        <Input placeholder={t("contactPhone")} value={cv.contact.phone} onChange={(e) => updateCv("contact", { ...cv.contact, phone: e.target.value })} />
-        <Input placeholder={t("contactCity")} value={cv.contact.city} onChange={(e) => updateCv("contact", { ...cv.contact, city: e.target.value })} />
-        <Input placeholder={t("contactLinkedin")} value={cv.contact.linkedin} onChange={(e) => updateCv("contact", { ...cv.contact, linkedin: e.target.value })} />
+        <Input placeholder={isSv ? "Namn" : "Name"} value={cv.contact.name} onChange={(e) => updateCv("contact", { ...cv.contact, name: e.target.value })} />
+        <Input placeholder={isSv ? "E-post" : "Email"} value={cv.contact.email} onChange={(e) => updateCv("contact", { ...cv.contact, email: e.target.value })} />
+        <Input placeholder={isSv ? "Telefon" : "Phone"} value={cv.contact.phone} onChange={(e) => updateCv("contact", { ...cv.contact, phone: e.target.value })} />
+        <Input placeholder={isSv ? "Stad" : "City"} value={cv.contact.city} onChange={(e) => updateCv("contact", { ...cv.contact, city: e.target.value })} />
+        <Input placeholder="LinkedIn" value={cv.contact.linkedin} onChange={(e) => updateCv("contact", { ...cv.contact, linkedin: e.target.value })} />
         <Input placeholder={t("contactWebsite")} value={cv.contact.website} onChange={(e) => updateCv("contact", { ...cv.contact, website: e.target.value })} />
       </CardContent>
     </Card>
