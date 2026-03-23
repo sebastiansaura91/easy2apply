@@ -601,7 +601,8 @@ export function SkillsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   );
 }
 
-export function CertificationsForm({ cv, updateCv, t }: SectionFormProps) {
+export function CertificationsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
+  const isSv = cvLanguage !== "en";
   const addCertification = () => {
     updateCv("certifications", [...cv.certifications, { id: uuidv4(), name: "", issuer: "", date: "" }]);
   };
