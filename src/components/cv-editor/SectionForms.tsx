@@ -521,7 +521,8 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
   );
 }
 
-export function EducationForm({ cv, updateCv, t }: SectionFormProps) {
+export function EducationForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
+  const isSv = cvLanguage !== "en";
   const addEducation = () => {
     updateCv("education", [...cv.education, { id: uuidv4(), degree: "", school: "", field: "", startDate: "", endDate: "" }]);
   };
@@ -553,9 +554,9 @@ export function EducationForm({ cv, updateCv, t }: SectionFormProps) {
               </Button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Input placeholder={t("eduDegree")} value={edu.degree} onChange={(e) => updateEducation(idx, { degree: e.target.value })} />
-              <Input placeholder={t("eduSchool")} value={edu.school} onChange={(e) => updateEducation(idx, { school: e.target.value })} />
-              <Input placeholder={t("eduField")} value={edu.field} onChange={(e) => updateEducation(idx, { field: e.target.value })} />
+              <Input placeholder={isSv ? "Examen" : "Degree"} value={edu.degree} onChange={(e) => updateEducation(idx, { degree: e.target.value })} />
+              <Input placeholder={isSv ? "Skola" : "School"} value={edu.school} onChange={(e) => updateEducation(idx, { school: e.target.value })} />
+              <Input placeholder={isSv ? "Inriktning" : "Field of study"} value={edu.field} onChange={(e) => updateEducation(idx, { field: e.target.value })} />
               <div />
               <Input type="month" value={edu.startDate} onChange={(e) => updateEducation(idx, { startDate: e.target.value })} />
               <Input type="month" value={edu.endDate} onChange={(e) => updateEducation(idx, { endDate: e.target.value })} />
