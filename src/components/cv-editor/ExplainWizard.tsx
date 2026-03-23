@@ -69,7 +69,33 @@ export function ExplainWizard({ open, onClose, jobTitle, company, language = "sv
 
   const isSv = language === "sv";
   const steps = isSv ? STEPS_SV : STEPS_EN;
-  const areas = isSv ? WORK_AREAS_SV : WORK_AREAS_EN;
+  const baseAreas = isSv ? WORK_AREAS_SV : WORK_AREAS_EN;
+
+  // Sort areas by relevance to role title
+  const areas = useMemo(() => {
+    if (!jobTitle) return baseAreas;
+    const title = jobTitle.toLowerCase();
+    const keywords: Record<string, string[]> = {
+      strategy: ["strategy", "strateg", "business development", "affärsutveckl"],
+      pricing: ["pricing", "pris", "commercial", "kommers", "revenue"],
+      operations: ["operations", "process", "supply chain", "logist", "drift"],
+      crm: ["crm", "system", "salesforce", "hubspot"],
+      analytics: ["analy", "data", "insight", "bi ", "business intelligence"],
+      leadership: ["lead", "head", "chief", "director", "vp", "manager", "chef", "ledare"],
+      sales: ["sales", "account", "försäljn", "sälj", "key account", "business develop"],
+      marketing: ["marketing", "marknad", "brand", "kommunikat", "content", "digital"],
+      finance: ["finance", "ekonom", "controller", "cfo", "budget", "accounting"],
+      project: ["project", "projekt", "program", "pmo", "scrum"],
+      tech: ["tech", "engineer", "develop", "it ", "software", "devops", "cto"],
+      hr: ["hr", "people", "talent", "recruit", "organisation"],
+    };
+    const scored = baseAreas.map(area => {
+      const areaKeys = keywords[area.id] || [];
+      const match = areaKeys.some(k => title.includes(k));
+      return { ...area, score: match ? 1 : 0 };
+    });
+    return scored.sort((a, b) => b.score - a.score);
+  }, [jobTitle, baseAreas]);
 
   const toggleArea = (id: string) => {
     setSelectedAreas(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
