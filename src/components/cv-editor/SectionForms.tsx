@@ -508,10 +508,10 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
               ))}
             </div>
             <div className="flex justify-between pt-2 border-t border-border">
-              <Button variant="ghost" onClick={() => setAllPreviews(null)}>Avbryt</Button>
+              <Button variant="ghost" onClick={() => setAllPreviews(null)}>{isSv ? "Avbryt" : "Cancel"}</Button>
               <Button onClick={acceptAllPreviews}>
                 <Check className="h-4 w-4 mr-1" />
-                Acceptera alla ({allPreviews.items.length})
+                {isSv ? "Acceptera alla" : "Accept all"} ({allPreviews.items.length})
               </Button>
             </div>
           </DialogContent>
