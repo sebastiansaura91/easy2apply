@@ -264,6 +264,20 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           variant="outline"
                           size="sm"
                           className="h-7 text-xs gap-1"
+                          onClick={() => setExplainExpIdx(idx)}
+                        >
+                          <MessageSquarePlus className="h-3 w-3" />
+                          {cvLanguage === "en" ? "Explain what you did" : "Förklara vad du gjorde"}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p className="text-xs">{cvLanguage === "en" ? "Answer questions to generate bullets" : "Svara på frågor för att generera bullets"}</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
                           onClick={() => improveAllBullets(idx)}
                           disabled={improvingAll === idx}
                         >
