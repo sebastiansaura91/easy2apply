@@ -419,6 +419,23 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
         />
       )}
 
+      {/* Explain Wizard */}
+      {explainExpIdx !== null && (
+        <ExplainWizard
+          open={true}
+          onClose={() => setExplainExpIdx(null)}
+          jobTitle={cv.experience[explainExpIdx]?.title || ""}
+          company={cv.experience[explainExpIdx]?.company || ""}
+          language={cvLanguage}
+          onAcceptBullets={(bullets) => {
+            const exp = cv.experience[explainExpIdx];
+            const existingNonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
+            updateExperience(explainExpIdx, { bullets: [...existingNonEmpty, ...bullets] });
+            toast({ title: `✨ ${bullets.length} bullets tillagda`, description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare." });
+          }}
+        />
+      )}
+
       {/* Improve All Preview Dialog */}
       {allPreviews && (
         <Dialog open={true} onOpenChange={() => setAllPreviews(null)}>
