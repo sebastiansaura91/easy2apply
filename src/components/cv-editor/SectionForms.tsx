@@ -239,18 +239,18 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                 </Button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input placeholder={t("expTitle")} value={exp.title} onChange={(e) => updateExperience(idx, { title: e.target.value })} />
-                <Input placeholder={t("expCompany")} value={exp.company} onChange={(e) => updateExperience(idx, { company: e.target.value })} />
-                <Input placeholder={t("expLocation")} value={exp.location} onChange={(e) => updateExperience(idx, { location: e.target.value })} />
+                <Input placeholder={isSv ? "Titel" : "Title"} value={exp.title} onChange={(e) => updateExperience(idx, { title: e.target.value })} />
+                <Input placeholder={isSv ? "Företag" : "Company"} value={exp.company} onChange={(e) => updateExperience(idx, { company: e.target.value })} />
+                <Input placeholder={isSv ? "Plats" : "Location"} value={exp.location} onChange={(e) => updateExperience(idx, { location: e.target.value })} />
                 <div />
-                <Input type="month" placeholder={t("expStartDate")} value={exp.startDate} onChange={(e) => updateExperience(idx, { startDate: e.target.value })} />
+                <Input type="month" placeholder={isSv ? "Startdatum" : "Start date"} value={exp.startDate} onChange={(e) => updateExperience(idx, { startDate: e.target.value })} />
                 {!exp.isPresent && (
-                  <Input type="month" placeholder={t("expEndDate")} value={exp.endDate} onChange={(e) => updateExperience(idx, { endDate: e.target.value })} />
+                  <Input type="month" placeholder={isSv ? "Slutdatum" : "End date"} value={exp.endDate} onChange={(e) => updateExperience(idx, { endDate: e.target.value })} />
                 )}
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox checked={exp.isPresent} onCheckedChange={(v) => updateExperience(idx, { isPresent: !!v, endDate: "" })} />
-                <span className="text-sm">{t("expPresent")}</span>
+                <span className="text-sm">{isSv ? "Nuvarande" : "Present"}</span>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
