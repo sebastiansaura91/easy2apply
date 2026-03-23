@@ -18,7 +18,7 @@ import { BulletWizard } from "./BulletWizard";
 import { ExplainWizard } from "./ExplainWizard";
 import { analyzeBullet } from "@/lib/cv-quality";
 
-const bulletTips = [
+const bulletTipsSv = [
   "💡 Kvantifiera resultat: \"Ökade försäljningen med 25% på 6 månader\"",
   "📊 Använd KPI:er: omsättning, NPS, konverteringsgrad, kostnadsbesparingar",
   "👥 Personalansvar? Ange antal: \"Ledde ett team på 8 personer\"",
@@ -26,6 +26,16 @@ const bulletTips = [
   "🔧 Nämn verktyg och metoder: Agile, SAP, Power BI, etc.",
   "📈 Visa förändring: \"Från X till Y\" visar tydlig påverkan",
   "⏱️ Tidsramar stärker trovärdigheten: \"på 3 månader\", \"under Q2 2024\"",
+];
+
+const bulletTipsEn = [
+  "💡 Quantify results: \"Increased sales by 25% in 6 months\"",
+  "📊 Use KPIs: revenue, NPS, conversion rate, cost savings",
+  "👥 People management? State numbers: \"Led a team of 8\"",
+  "🎯 Mention specific projects and your role: \"Project lead for ERP implementation\"",
+  "🔧 Mention tools and methods: Agile, SAP, Power BI, etc.",
+  "📈 Show change: \"From X to Y\" shows clear impact",
+  "⏱️ Timeframes add credibility: \"in 3 months\", \"during Q2 2024\"",
 ];
 
 interface SectionFormProps {
