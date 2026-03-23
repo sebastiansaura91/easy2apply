@@ -310,7 +310,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           {isSv ? "Skapa bullets" : "Create bullets"}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent><p className="text-xs">Generera nya bullets med AI-wizard</p></TooltipContent>
+                      <TooltipContent><p className="text-xs">{isSv ? "Generera nya bullets med AI-wizard" : "Generate new bullets with AI wizard"}</p></TooltipContent>
                     </Tooltip>
                   </div>
                 </div>
