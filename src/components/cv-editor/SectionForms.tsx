@@ -591,7 +591,7 @@ export function SkillsForm({ cv, updateCv, t }: SectionFormProps) {
           ))}
         </div>
         <div className="flex gap-2">
-          <Input placeholder="Ny kompetens..." value={newSkill} onChange={(e) => setNewSkill(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSkill())} />
+          <Input placeholder={isSv ? "Ny kompetens..." : "New skill..."} value={newSkill} onChange={(e) => setNewSkill(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSkill())} />
           <Button variant="outline" size="sm" onClick={addSkill}>
             <Plus className="h-4 w-4" />
           </Button>
