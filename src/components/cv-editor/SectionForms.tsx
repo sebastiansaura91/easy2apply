@@ -293,7 +293,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           disabled={improvingAll === idx}
                         >
                           {improvingAll === idx ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                          Förbättra alla
+                          {isSv ? "Förbättra alla" : "Improve all"}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent><p className="text-xs">Förbättra alla punkter med AI</p></TooltipContent>
