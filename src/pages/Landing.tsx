@@ -16,7 +16,7 @@ const fade = {
 const Landing = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const handleCTA = () => navigate(user ? "/dashboard" : "/onboarding");
+  const handleCTA = () => navigate("/onboarding");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
