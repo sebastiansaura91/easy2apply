@@ -736,8 +736,8 @@ export function ProjectsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) 
                 <Trash2 className="h-3 w-3" />
               </Button>
             </div>
-            <Input placeholder="Projektnamn" value={proj.name} onChange={(e) => updateCv("projects", cv.projects.map((p, i) => i === idx ? { ...p, name: e.target.value } : p))} />
-            <Textarea placeholder="Beskrivning" rows={2} value={proj.description} onChange={(e) => updateCv("projects", cv.projects.map((p, i) => i === idx ? { ...p, description: e.target.value } : p))} />
+            <Input placeholder={isSv ? "Projektnamn" : "Project name"} value={proj.name} onChange={(e) => updateCv("projects", cv.projects.map((p, i) => i === idx ? { ...p, name: e.target.value } : p))} />
+            <Textarea placeholder={isSv ? "Beskrivning" : "Description"} rows={2} value={proj.description} onChange={(e) => updateCv("projects", cv.projects.map((p, i) => i === idx ? { ...p, description: e.target.value } : p))} />
             <div className="space-y-2">
               {proj.bullets.map((bullet, bIdx) => (
                 <div key={bIdx} className="flex gap-2">
