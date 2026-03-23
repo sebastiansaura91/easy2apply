@@ -699,7 +699,7 @@ export function LanguagesForm({ cv, updateCv, t, cvLanguage }: SectionFormProps)
   );
 }
 
-export function OtherForm({ cv, updateCv, t }: SectionFormProps) {
+export function OtherForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
