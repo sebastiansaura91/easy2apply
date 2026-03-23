@@ -619,9 +619,9 @@ export function CertificationsForm({ cv, updateCv, t, cvLanguage }: SectionFormP
       <CardContent className="space-y-3">
         {cv.certifications.map((cert, idx) => (
           <div key={cert.id} className="flex gap-2 items-center">
-            <Input placeholder="Certifiering" value={cert.name} onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))} />
-            <Input placeholder="Utfärdare" value={cert.issuer} className="w-32" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, issuer: e.target.value } : c))} />
-            <Input placeholder="År" value={cert.date} className="w-20" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, date: e.target.value } : c))} />
+            <Input placeholder={isSv ? "Certifiering" : "Certification"} value={cert.name} onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))} />
+            <Input placeholder={isSv ? "Utfärdare" : "Issuer"} value={cert.issuer} className="w-32" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, issuer: e.target.value } : c))} />
+            <Input placeholder={isSv ? "År" : "Year"} value={cert.date} className="w-20" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, date: e.target.value } : c))} />
             <Button variant="ghost" size="icon" onClick={() => updateCv("certifications", cv.certifications.filter((_, i) => i !== idx))}>
               <Trash2 className="h-3 w-3" />
             </Button>
