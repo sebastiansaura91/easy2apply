@@ -70,7 +70,7 @@ export function ProfileForm({ cv, updateCv, t }: SectionFormProps) {
         <CardTitle className="text-base">{t("sectionProfile")}</CardTitle>
       </CardHeader>
       <CardContent>
-        <Textarea rows={4} value={cv.profile} onChange={(e) => updateCv("profile", e.target.value)} placeholder="Skriv en kort professionell sammanfattning..." />
+        <Textarea rows={4} value={cv.profile} onChange={(e) => updateCv("profile", e.target.value)} placeholder={cvLanguage === "en" ? "Write a short professional summary..." : "Skriv en kort professionell sammanfattning..."} />
       </CardContent>
     </Card>
   );
