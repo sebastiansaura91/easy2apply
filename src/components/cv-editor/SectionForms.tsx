@@ -497,7 +497,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                   <div className="flex gap-2 justify-end">
                     <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => rejectSingleFromAll(i)}>
                       <X className="h-3 w-3 mr-1" />
-                      Skippa
+                      {isSv ? "Skippa" : "Skip"}
                     </Button>
                     <Button size="sm" className="h-6 text-xs" onClick={() => acceptSingleFromAll(i)}>
                       <Check className="h-3 w-3 mr-1" />
