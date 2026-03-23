@@ -471,7 +471,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                Förhandsgranskning – {allPreviews.items.length} förbättringar
+                {isSv ? "Förhandsgranskning" : "Preview"} – {allPreviews.items.length} {isSv ? "förbättringar" : "improvements"}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
