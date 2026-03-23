@@ -6,7 +6,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ArrowRight, Loader2, Sparkles, Check, Pencil } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, ArrowRight, Loader2, Sparkles, Check, Pencil, Eye, Plus, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,7 +17,8 @@ interface ExplainWizardProps {
   jobTitle: string;
   company: string;
   language?: "sv" | "en";
-  onAcceptBullets: (bullets: string[]) => void;
+  existingBullets: string[];
+  onAcceptBullets: (bullets: string[], previousBullets: string[]) => void;
 }
 
 const WORK_AREAS_SV = [
@@ -56,10 +58,10 @@ interface ContextAnswers {
   workType: string;
 }
 
-const STEPS_SV = ["Välj arbetsområden", "Beskriv din roll", "Genererar...", "Förslag"];
-const STEPS_EN = ["Select work areas", "Describe your role", "Generating...", "Suggestions"];
+const STEPS_SV = ["Välj arbetsområden", "Beskriv din roll", "Genererar...", "Välj bullets", "Granska & bekräfta"];
+const STEPS_EN = ["Select work areas", "Describe your role", "Generating...", "Select bullets", "Review & confirm"];
 
-export function ExplainWizard({ open, onClose, jobTitle, company, language = "sv", onAcceptBullets }: ExplainWizardProps) {
+export function ExplainWizard({ open, onClose, jobTitle, company, language = "sv", existingBullets, onAcceptBullets }: ExplainWizardProps) {
   const [step, setStep] = useState(0);
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [answers, setAnswers] = useState<ContextAnswers>({ decisionLevel: "", scope: "", stakeholders: "", workType: "" });
@@ -127,15 +129,17 @@ export function ExplainWizard({ open, onClose, jobTitle, company, language = "sv
     }
   };
 
-  const handleAccept = () => {
-    const accepted = suggestions.filter(s => s.selected).map(s => s.text);
+  const selectedSuggestions = suggestions.filter(s => s.selected);
+  const currentBulletsNonEmpty = existingBullets.filter(b => b.trim().length > 0);
+
+  const handleConfirm = () => {
+    const accepted = selectedSuggestions.map(s => s.text);
     if (accepted.length === 0) {
       toast({ title: isSv ? "Välj minst en punkt" : "Select at least one bullet", variant: "destructive" });
       return;
     }
-    onAcceptBullets(accepted);
+    onAcceptBullets(accepted, [...existingBullets]);
     onClose();
-    // Reset
     setStep(0);
     setSelectedAreas([]);
     setAnswers({ decisionLevel: "", scope: "", stakeholders: "", workType: "" });
@@ -144,6 +148,7 @@ export function ExplainWizard({ open, onClose, jobTitle, company, language = "sv
 
   const canProceedStep0 = selectedAreas.length > 0;
   const canProceedStep1 = answers.decisionLevel && answers.scope;
+  const totalSteps = 5;
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -159,8 +164,8 @@ export function ExplainWizard({ open, onClose, jobTitle, company, language = "sv
         </SheetHeader>
 
         <div className="mt-4 mb-6">
-          <Progress value={((step + 1) / 4) * 100} className="h-1.5" />
-          <p className="text-xs text-muted-foreground mt-1.5">{steps[Math.min(step, 3)]}</p>
+          <Progress value={((step + 1) / totalSteps) * 100} className="h-1.5" />
+          <p className="text-xs text-muted-foreground mt-1.5">{steps[Math.min(step, totalSteps - 1)]}</p>
         </div>
 
         {/* Step 0: Select work areas */}
@@ -309,13 +314,13 @@ export function ExplainWizard({ open, onClose, jobTitle, company, language = "sv
           </div>
         )}
 
-        {/* Step 3: Results */}
+        {/* Step 3: Select bullets */}
         {step === 3 && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {isSv
-                ? "Här är förslag baserade på dina svar. Välj de du vill lägga till och redigera vid behov."
-                : "Here are suggestions based on your answers. Select the ones to add and edit as needed."}
+                ? "Välj de bullets du vill lägga till och redigera vid behov."
+                : "Select the bullets you want to add and edit as needed."}
             </p>
             <div className="space-y-3">
               {suggestions.map((s, i) => (
@@ -362,11 +367,79 @@ export function ExplainWizard({ open, onClose, jobTitle, company, language = "sv
               <Button variant="outline" onClick={() => setStep(1)}>
                 <ArrowLeft className="mr-1 h-4 w-4" /> {isSv ? "Ändra svar" : "Change answers"}
               </Button>
-              <Button onClick={handleAccept}>
+              <Button onClick={() => setStep(4)} disabled={selectedSuggestions.length === 0}>
+                <Eye className="mr-1 h-4 w-4" />
+                {isSv ? "Förhandsgranska" : "Preview"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Review & confirm */}
+        {step === 4 && (
+          <div className="space-y-5">
+            <p className="text-sm text-muted-foreground">
+              {isSv
+                ? "Granska hur dina bullets kommer se ut. Du kan ångra ändringen efteråt."
+                : "Review how your bullets will look. You can undo the change afterwards."}
+            </p>
+
+            {/* Current bullets */}
+            {currentBulletsNonEmpty.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    {isSv ? "Befintliga bullets" : "Current bullets"}
+                  </h4>
+                  <Badge variant="secondary" className="text-[10px]">{currentBulletsNonEmpty.length}</Badge>
+                </div>
+                <div className="space-y-1.5">
+                  {currentBulletsNonEmpty.map((b, i) => (
+                    <div key={i} className="text-sm text-muted-foreground pl-3 border-l-2 border-border py-1">
+                      {b}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* New bullets to add */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-medium text-primary uppercase tracking-wide">
+                  <Plus className="h-3 w-3 inline mr-1" />
+                  {isSv ? "Nya bullets som läggs till" : "New bullets to add"}
+                </h4>
+                <Badge variant="default" className="text-[10px]">{selectedSuggestions.length}</Badge>
+              </div>
+              <div className="space-y-1.5">
+                {selectedSuggestions.map((s, i) => (
+                  <div key={i} className="text-sm pl-3 border-l-2 border-primary py-1 bg-primary/5 rounded-r">
+                    {s.text}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Undo info */}
+            <div className="flex items-start gap-2 p-3 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30">
+              <Undo2 className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                {isSv
+                  ? "Du kan ångra denna ändring direkt efter – en \"Ångra\"-knapp visas."
+                  : "You can undo this change right after – an \"Undo\" button will appear."}
+              </p>
+            </div>
+
+            <div className="flex justify-between pt-2">
+              <Button variant="outline" onClick={() => setStep(3)}>
+                <ArrowLeft className="mr-1 h-4 w-4" /> {isSv ? "Tillbaka" : "Back"}
+              </Button>
+              <Button onClick={handleConfirm}>
                 <Check className="mr-1 h-4 w-4" />
                 {isSv
-                  ? `Lägg till ${suggestions.filter(s => s.selected).length} bullets`
-                  : `Add ${suggestions.filter(s => s.selected).length} bullets`}
+                  ? `Bekräfta & lägg till ${selectedSuggestions.length} bullets`
+                  : `Confirm & add ${selectedSuggestions.length} bullets`}
               </Button>
             </div>
           </div>
