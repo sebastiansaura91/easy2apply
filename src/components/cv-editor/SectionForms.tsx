@@ -255,7 +255,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium">{t("expBullets")}</span>
+                    <span className="text-sm font-medium">{isSv ? "Punkter" : "Bullets"}</span>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="inline-flex items-center cursor-help">
