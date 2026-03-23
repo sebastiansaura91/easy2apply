@@ -569,7 +569,7 @@ export function EducationForm({ cv, updateCv, t }: SectionFormProps) {
 
 export function SkillsForm({ cv, updateCv, t }: SectionFormProps) {
   const [newSkill, setNewSkill] = useState("");
-
+  const isSv = cvLanguage !== "en";
   const addSkill = () => {
     if (!newSkill.trim()) return;
     updateCv("skills", [...cv.skills, newSkill.trim()]);
