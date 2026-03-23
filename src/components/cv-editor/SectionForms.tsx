@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ToastAction } from "@/components/ui/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2, Check, Undo2, MessageSquarePlus } from "lucide-react";
@@ -427,11 +428,27 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
           jobTitle={cv.experience[explainExpIdx]?.title || ""}
           company={cv.experience[explainExpIdx]?.company || ""}
           language={cvLanguage}
-          onAcceptBullets={(bullets) => {
-            const exp = cv.experience[explainExpIdx];
+          existingBullets={cv.experience[explainExpIdx]?.bullets || []}
+          onAcceptBullets={(bullets, previousBullets) => {
+            const idx = explainExpIdx;
+            const exp = cv.experience[idx];
             const existingNonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
-            updateExperience(explainExpIdx, { bullets: [...existingNonEmpty, ...bullets] });
-            toast({ title: `✨ ${bullets.length} bullets tillagda`, description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare." });
+            updateExperience(idx, { bullets: [...existingNonEmpty, ...bullets] });
+            toast({
+              title: `✨ ${bullets.length} bullets tillagda`,
+              description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare.",
+              action: (
+                <ToastAction
+                  altText={cvLanguage === "en" ? "Undo" : "Ångra"}
+                  onClick={() => {
+                    updateExperience(idx, { bullets: previousBullets });
+                    toast({ title: cvLanguage === "en" ? "Reverted" : "Ångrade ändringen" });
+                  }}
+                >
+                  {cvLanguage === "en" ? "Undo" : "Ångra"}
+                </ToastAction>
+              ),
+            });
           }}
         />
       )}
