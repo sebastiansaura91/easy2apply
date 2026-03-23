@@ -425,7 +425,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
             const exp = cv.experience[wizardExpIdx];
             const existingNonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
             updateExperience(wizardExpIdx, { bullets: [...existingNonEmpty, ...bullets] });
-            toast({ title: `✨ ${bullets.length} bullets tillagda`, description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare." });
+            toast({ title: `✨ ${bullets.length} ${cvLanguage === "en" ? "bullets added" : "bullets tillagda"}`, description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare." });
           }}
         />
       )}
