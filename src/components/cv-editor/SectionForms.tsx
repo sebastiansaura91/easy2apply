@@ -712,7 +712,8 @@ export function OtherForm({ cv, updateCv, t }: SectionFormProps) {
   );
 }
 
-export function ProjectsForm({ cv, updateCv, t }: SectionFormProps) {
+export function ProjectsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
+  const isSv = cvLanguage !== "en";
   const addProject = () => {
     updateCv("projects", [...cv.projects, { id: uuidv4(), name: "", description: "", bullets: [""] }]);
   };
