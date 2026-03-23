@@ -501,7 +501,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                     </Button>
                     <Button size="sm" className="h-6 text-xs" onClick={() => acceptSingleFromAll(i)}>
                       <Check className="h-3 w-3 mr-1" />
-                      Acceptera
+                       {isSv ? "Acceptera" : "Accept"}
                     </Button>
                   </div>
                 </div>
