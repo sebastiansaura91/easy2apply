@@ -438,17 +438,15 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
               title: `✨ ${bullets.length} bullets tillagda`,
               description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare.",
               action: (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
+                <ToastAction
+                  altText={cvLanguage === "en" ? "Undo" : "Ångra"}
                   onClick={() => {
                     updateExperience(idx, { bullets: previousBullets });
                     toast({ title: cvLanguage === "en" ? "Reverted" : "Ångrade ändringen" });
                   }}
                 >
                   {cvLanguage === "en" ? "Undo" : "Ångra"}
-                </Button>
+                </ToastAction>
               ),
             });
           }}
