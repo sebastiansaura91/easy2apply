@@ -8,12 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2, Check, Undo2 } from "lucide-react";
+import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2, Check, Undo2, MessageSquarePlus } from "lucide-react";
 import { CVContent, ExperienceItem, EducationItem } from "@/types/cv";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BulletWizard } from "./BulletWizard";
+import { ExplainWizard } from "./ExplainWizard";
 import { analyzeBullet } from "@/lib/cv-quality";
 
 const bulletTips = [
@@ -68,6 +69,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
   const [improvingKey, setImprovingKey] = useState<string | null>(null);
   const [improvingAll, setImprovingAll] = useState<number | null>(null);
   const [wizardExpIdx, setWizardExpIdx] = useState<number | null>(null);
+  const [explainExpIdx, setExplainExpIdx] = useState<number | null>(null);
   // Preview state: { expIdx-bulletIdx: { original, improved, reason } }
   const [previews, setPreviews] = useState<Record<string, { original: string; improved: string; reason: string }>>({});
   // "Improve all" preview: expIdx -> array of previews
@@ -262,6 +264,20 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           variant="outline"
                           size="sm"
                           className="h-7 text-xs gap-1"
+                          onClick={() => setExplainExpIdx(idx)}
+                        >
+                          <MessageSquarePlus className="h-3 w-3" />
+                          {cvLanguage === "en" ? "Explain what you did" : "Förklara vad du gjorde"}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p className="text-xs">{cvLanguage === "en" ? "Answer questions to generate bullets" : "Svara på frågor för att generera bullets"}</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
                           onClick={() => improveAllBullets(idx)}
                           disabled={improvingAll === idx}
                         >
@@ -398,6 +414,23 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
             const exp = cv.experience[wizardExpIdx];
             const existingNonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
             updateExperience(wizardExpIdx, { bullets: [...existingNonEmpty, ...bullets] });
+            toast({ title: `✨ ${bullets.length} bullets tillagda`, description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare." });
+          }}
+        />
+      )}
+
+      {/* Explain Wizard */}
+      {explainExpIdx !== null && (
+        <ExplainWizard
+          open={true}
+          onClose={() => setExplainExpIdx(null)}
+          jobTitle={cv.experience[explainExpIdx]?.title || ""}
+          company={cv.experience[explainExpIdx]?.company || ""}
+          language={cvLanguage}
+          onAcceptBullets={(bullets) => {
+            const exp = cv.experience[explainExpIdx];
+            const existingNonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
+            updateExperience(explainExpIdx, { bullets: [...existingNonEmpty, ...bullets] });
             toast({ title: `✨ ${bullets.length} bullets tillagda`, description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare." });
           }}
         />

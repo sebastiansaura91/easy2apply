@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.generate-fix-questions]
 verify_jwt = false
+
+[functions.explain-role]
+verify_jwt = false
