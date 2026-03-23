@@ -69,6 +69,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
   const [improvingKey, setImprovingKey] = useState<string | null>(null);
   const [improvingAll, setImprovingAll] = useState<number | null>(null);
   const [wizardExpIdx, setWizardExpIdx] = useState<number | null>(null);
+  const [explainExpIdx, setExplainExpIdx] = useState<number | null>(null);
   // Preview state: { expIdx-bulletIdx: { original, improved, reason } }
   const [previews, setPreviews] = useState<Record<string, { original: string; improved: string; reason: string }>>({});
   // "Improve all" preview: expIdx -> array of previews
