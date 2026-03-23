@@ -307,7 +307,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           onClick={() => setWizardExpIdx(idx)}
                         >
                           <Wand2 className="h-3 w-3" />
-                          Skapa bullets
+                          {isSv ? "Skapa bullets" : "Create bullets"}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent><p className="text-xs">Generera nya bullets med AI-wizard</p></TooltipContent>
