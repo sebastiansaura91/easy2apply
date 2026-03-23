@@ -18,7 +18,7 @@ import { BulletWizard } from "./BulletWizard";
 import { ExplainWizard } from "./ExplainWizard";
 import { analyzeBullet } from "@/lib/cv-quality";
 
-const bulletTips = [
+const bulletTipsSv = [
   "💡 Kvantifiera resultat: \"Ökade försäljningen med 25% på 6 månader\"",
   "📊 Använd KPI:er: omsättning, NPS, konverteringsgrad, kostnadsbesparingar",
   "👥 Personalansvar? Ange antal: \"Ledde ett team på 8 personer\"",
@@ -26,6 +26,16 @@ const bulletTips = [
   "🔧 Nämn verktyg och metoder: Agile, SAP, Power BI, etc.",
   "📈 Visa förändring: \"Från X till Y\" visar tydlig påverkan",
   "⏱️ Tidsramar stärker trovärdigheten: \"på 3 månader\", \"under Q2 2024\"",
+];
+
+const bulletTipsEn = [
+  "💡 Quantify results: \"Increased sales by 25% in 6 months\"",
+  "📊 Use KPIs: revenue, NPS, conversion rate, cost savings",
+  "👥 People management? State numbers: \"Led a team of 8\"",
+  "🎯 Mention specific projects and your role: \"Project lead for ERP implementation\"",
+  "🔧 Mention tools and methods: Agile, SAP, Power BI, etc.",
+  "📈 Show change: \"From X to Y\" shows clear impact",
+  "⏱️ Timeframes add credibility: \"in 3 months\", \"during Q2 2024\"",
 ];
 
 interface SectionFormProps {
@@ -53,20 +63,21 @@ export function ContactForm({ cv, updateCv, t }: SectionFormProps) {
   );
 }
 
-export function ProfileForm({ cv, updateCv, t }: SectionFormProps) {
+export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">{t("sectionProfile")}</CardTitle>
       </CardHeader>
       <CardContent>
-        <Textarea rows={4} value={cv.profile} onChange={(e) => updateCv("profile", e.target.value)} placeholder="Skriv en kort professionell sammanfattning..." />
+        <Textarea rows={4} value={cv.profile} onChange={(e) => updateCv("profile", e.target.value)} placeholder={cvLanguage === "en" ? "Write a short professional summary..." : "Skriv en kort professionell sammanfattning..."} />
       </CardContent>
     </Card>
   );
 }
 
 export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
+  const isSv = cvLanguage !== "en";
   const [improvingKey, setImprovingKey] = useState<string | null>(null);
   const [improvingAll, setImprovingAll] = useState<number | null>(null);
   const [wizardExpIdx, setWizardExpIdx] = useState<number | null>(null);
@@ -251,8 +262,8 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="max-w-xs space-y-1 p-3">
-                        <p className="font-semibold text-xs mb-1.5">Tips för starka punkter:</p>
-                        {bulletTips.map((tip, i) => (
+                        <p className="font-semibold text-xs mb-1.5">{isSv ? "Tips för starka punkter:" : "Tips for strong bullets:"}</p>
+                        {(isSv ? bulletTipsSv : bulletTipsEn).map((tip, i) => (
                           <p key={i} className="text-xs leading-relaxed">{tip}</p>
                         ))}
                       </TooltipContent>
@@ -283,10 +294,10 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           disabled={improvingAll === idx}
                         >
                           {improvingAll === idx ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                          Förbättra alla
+                          {isSv ? "Förbättra alla" : "Improve all"}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent><p className="text-xs">Förbättra alla punkter med AI</p></TooltipContent>
+                      <TooltipContent><p className="text-xs">{isSv ? "Förbättra alla punkter med AI" : "Improve all bullets with AI"}</p></TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -297,10 +308,10 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           onClick={() => setWizardExpIdx(idx)}
                         >
                           <Wand2 className="h-3 w-3" />
-                          Skapa bullets
+                          {isSv ? "Skapa bullets" : "Create bullets"}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent><p className="text-xs">Generera nya bullets med AI-wizard</p></TooltipContent>
+                      <TooltipContent><p className="text-xs">{isSv ? "Generera nya bullets med AI-wizard" : "Generate new bullets with AI wizard"}</p></TooltipContent>
                     </Tooltip>
                   </div>
                 </div>
@@ -346,7 +357,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="top">
-                            <p className="text-xs">Förbättra med AI</p>
+                            <p className="text-xs">{isSv ? "Förbättra med AI" : "Improve with AI"}</p>
                           </TooltipContent>
                         </Tooltip>
                         <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
@@ -378,11 +389,11 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           <div className="flex gap-2 justify-end">
                             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => rejectPreview(idx, bIdx)}>
                               <Undo2 className="h-3 w-3 mr-1" />
-                              Behåll original
+                              {isSv ? "Behåll original" : "Keep original"}
                             </Button>
                             <Button size="sm" className="h-7 text-xs" onClick={() => acceptPreview(idx, bIdx)}>
                               <Check className="h-3 w-3 mr-1" />
-                              Acceptera
+                               {isSv ? "Acceptera" : "Accept"}
                             </Button>
                           </div>
                         </div>
@@ -415,7 +426,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
             const exp = cv.experience[wizardExpIdx];
             const existingNonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
             updateExperience(wizardExpIdx, { bullets: [...existingNonEmpty, ...bullets] });
-            toast({ title: `✨ ${bullets.length} bullets tillagda`, description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare." });
+            toast({ title: `✨ ${bullets.length} ${cvLanguage === "en" ? "bullets added" : "bullets tillagda"}`, description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare." });
           }}
         />
       )}
@@ -460,7 +471,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                Förhandsgranskning – {allPreviews.items.length} förbättringar
+                {isSv ? "Förhandsgranskning" : "Preview"} – {allPreviews.items.length} {isSv ? "förbättringar" : "improvements"}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
@@ -486,21 +497,21 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                   <div className="flex gap-2 justify-end">
                     <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => rejectSingleFromAll(i)}>
                       <X className="h-3 w-3 mr-1" />
-                      Skippa
+                      {isSv ? "Skippa" : "Skip"}
                     </Button>
                     <Button size="sm" className="h-6 text-xs" onClick={() => acceptSingleFromAll(i)}>
                       <Check className="h-3 w-3 mr-1" />
-                      Acceptera
+                       {isSv ? "Acceptera" : "Accept"}
                     </Button>
                   </div>
                 </div>
               ))}
             </div>
             <div className="flex justify-between pt-2 border-t border-border">
-              <Button variant="ghost" onClick={() => setAllPreviews(null)}>Avbryt</Button>
+              <Button variant="ghost" onClick={() => setAllPreviews(null)}>{isSv ? "Avbryt" : "Cancel"}</Button>
               <Button onClick={acceptAllPreviews}>
                 <Check className="h-4 w-4 mr-1" />
-                Acceptera alla ({allPreviews.items.length})
+                {isSv ? "Acceptera alla" : "Accept all"} ({allPreviews.items.length})
               </Button>
             </div>
           </DialogContent>
@@ -556,9 +567,9 @@ export function EducationForm({ cv, updateCv, t }: SectionFormProps) {
   );
 }
 
-export function SkillsForm({ cv, updateCv, t }: SectionFormProps) {
+export function SkillsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   const [newSkill, setNewSkill] = useState("");
-
+  const isSv = cvLanguage !== "en";
   const addSkill = () => {
     if (!newSkill.trim()) return;
     updateCv("skills", [...cv.skills, newSkill.trim()]);
@@ -580,7 +591,7 @@ export function SkillsForm({ cv, updateCv, t }: SectionFormProps) {
           ))}
         </div>
         <div className="flex gap-2">
-          <Input placeholder="Ny kompetens..." value={newSkill} onChange={(e) => setNewSkill(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSkill())} />
+          <Input placeholder={isSv ? "Ny kompetens..." : "New skill..."} value={newSkill} onChange={(e) => setNewSkill(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSkill())} />
           <Button variant="outline" size="sm" onClick={addSkill}>
             <Plus className="h-4 w-4" />
           </Button>
@@ -590,7 +601,8 @@ export function SkillsForm({ cv, updateCv, t }: SectionFormProps) {
   );
 }
 
-export function CertificationsForm({ cv, updateCv, t }: SectionFormProps) {
+export function CertificationsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
+  const isSv = cvLanguage !== "en";
   const addCertification = () => {
     updateCv("certifications", [...cv.certifications, { id: uuidv4(), name: "", issuer: "", date: "" }]);
   };
@@ -607,9 +619,9 @@ export function CertificationsForm({ cv, updateCv, t }: SectionFormProps) {
       <CardContent className="space-y-3">
         {cv.certifications.map((cert, idx) => (
           <div key={cert.id} className="flex gap-2 items-center">
-            <Input placeholder="Certifiering" value={cert.name} onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))} />
-            <Input placeholder="Utfärdare" value={cert.issuer} className="w-32" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, issuer: e.target.value } : c))} />
-            <Input placeholder="År" value={cert.date} className="w-20" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, date: e.target.value } : c))} />
+            <Input placeholder={isSv ? "Certifiering" : "Certification"} value={cert.name} onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))} />
+            <Input placeholder={isSv ? "Utfärdare" : "Issuer"} value={cert.issuer} className="w-32" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, issuer: e.target.value } : c))} />
+            <Input placeholder={isSv ? "År" : "Year"} value={cert.date} className="w-20" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, date: e.target.value } : c))} />
             <Button variant="ghost" size="icon" onClick={() => updateCv("certifications", cv.certifications.filter((_, i) => i !== idx))}>
               <Trash2 className="h-3 w-3" />
             </Button>
@@ -687,7 +699,7 @@ export function LanguagesForm({ cv, updateCv, t, cvLanguage }: SectionFormProps)
   );
 }
 
-export function OtherForm({ cv, updateCv, t }: SectionFormProps) {
+export function OtherForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -700,7 +712,8 @@ export function OtherForm({ cv, updateCv, t }: SectionFormProps) {
   );
 }
 
-export function ProjectsForm({ cv, updateCv, t }: SectionFormProps) {
+export function ProjectsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
+  const isSv = cvLanguage !== "en";
   const addProject = () => {
     updateCv("projects", [...cv.projects, { id: uuidv4(), name: "", description: "", bullets: [""] }]);
   };
@@ -723,8 +736,8 @@ export function ProjectsForm({ cv, updateCv, t }: SectionFormProps) {
                 <Trash2 className="h-3 w-3" />
               </Button>
             </div>
-            <Input placeholder="Projektnamn" value={proj.name} onChange={(e) => updateCv("projects", cv.projects.map((p, i) => i === idx ? { ...p, name: e.target.value } : p))} />
-            <Textarea placeholder="Beskrivning" rows={2} value={proj.description} onChange={(e) => updateCv("projects", cv.projects.map((p, i) => i === idx ? { ...p, description: e.target.value } : p))} />
+            <Input placeholder={isSv ? "Projektnamn" : "Project name"} value={proj.name} onChange={(e) => updateCv("projects", cv.projects.map((p, i) => i === idx ? { ...p, name: e.target.value } : p))} />
+            <Textarea placeholder={isSv ? "Beskrivning" : "Description"} rows={2} value={proj.description} onChange={(e) => updateCv("projects", cv.projects.map((p, i) => i === idx ? { ...p, description: e.target.value } : p))} />
             <div className="space-y-2">
               {proj.bullets.map((bullet, bIdx) => (
                 <div key={bIdx} className="flex gap-2">
