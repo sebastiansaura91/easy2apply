@@ -296,7 +296,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           {isSv ? "Förbättra alla" : "Improve all"}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent><p className="text-xs">Förbättra alla punkter med AI</p></TooltipContent>
+                      <TooltipContent><p className="text-xs">{isSv ? "Förbättra alla punkter med AI" : "Improve all bullets with AI"}</p></TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
