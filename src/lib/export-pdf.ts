@@ -152,14 +152,14 @@ export async function exportToPdf(
         });
         y += 2;
         const contactFields = [
-          cv.contact.email,
-          cv.contact.phone,
-          cv.contact.linkedin,
-          cv.contact.website,
-          cv.contact.city,
+          cv.contact.email ? `Email: ${cv.contact.email}` : null,
+          cv.contact.phone ? `${t("contactPhone")}: ${cv.contact.phone}` : null,
+          cv.contact.linkedin ? `LinkedIn: ${cv.contact.linkedin}` : null,
+          cv.contact.website ? `${t("contactWebsite")}: ${cv.contact.website}` : null,
+          cv.contact.city ? `${t("contactAddress")}: ${cv.contact.city}` : null,
         ].filter(Boolean);
         for (const field of contactFields) {
-          drawCenteredText(field, { fontSize: 9, color: colors.gray });
+          drawCenteredText(field!, { fontSize: 9, color: colors.gray });
         }
         y += 2;
         break;
