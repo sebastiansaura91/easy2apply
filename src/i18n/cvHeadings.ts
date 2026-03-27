@@ -11,6 +11,9 @@ export const cvHeadings: Record<string, Record<string, string>> = {
     sectionLanguages: "Språk",
     sectionOther: "Övrigt",
     present: "Nuvarande",
+    contactPhone: "Telefon",
+    contactAddress: "Adress",
+    contactWebsite: "Webbplats",
   },
   en: {
     sectionContact: "Contact Information",
@@ -23,5 +26,8 @@ export const cvHeadings: Record<string, Record<string, string>> = {
     sectionLanguages: "Languages",
     sectionOther: "Other",
     present: "Present",
+    contactPhone: "Phone",
+    contactAddress: "Address",
+    contactWebsite: "Website",
   },
 };
