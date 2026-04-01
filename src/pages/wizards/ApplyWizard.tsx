@@ -146,7 +146,7 @@ export default function ApplyWizard() {
     const id = uuidv4();
     const title = jobAnalysis ? `CV — ${jobAnalysis.job_title}` : "New CV";
     const { error } = await supabase.from("resumes").insert({
-      id, user_id: user.id, title, language: "en", template_id: "default", content_json: emptyCV as any,
+      id, user_id: user.id, title, language: cvLanguage, template_id: "default", content_json: emptyCV as any,
     });
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     flow.setResumeId(id);
