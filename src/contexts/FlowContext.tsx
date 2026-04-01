@@ -12,6 +12,7 @@ export interface JobAnalysis {
   core_responsibilities: string[];
   key_phrases: string[];
   industry: string;
+  detected_language?: string;
 }
 
 interface FlowState {
