@@ -118,7 +118,7 @@ export default function ApplyWizard() {
     setMatching(true);
     try {
       const { data, error } = await supabase.functions.invoke("ats-check", {
-        body: { resume_content_json: parsedCV, job_posting_text: jobText.trim(), locale: "en" },
+        body: { resume_content_json: parsedCV, job_posting_text: jobText.trim(), locale: cvLanguage },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
