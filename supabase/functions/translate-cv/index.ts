@@ -29,6 +29,8 @@ REGLER:
 - Översätt kompetensbeskrivningar naturligt
 - Använd professionellt CV-språk
 - Inga floskler eller tillagda formuleringar
+- ÄNDRA INTE innehållet – lägg inte till, ta bort eller omformulera meningar. Översätt ORDAGRANT.
+- Kontrollera stavning noggrant på svenska
 - Returnera ENBART via tool call`
       : `You are a professional CV translator. Translate the entire CV to English.
 
@@ -42,6 +44,8 @@ RULES:
 - Translate skill descriptions naturally
 - Use professional CV language
 - No buzzwords or added phrasing
+- DO NOT change the content – do not add, remove or rephrase sentences. Translate VERBATIM.
+- Spell-check the English output carefully
 - Return ONLY via tool call`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
