@@ -75,6 +75,8 @@ export default function ApplyWizard() {
           setJobAnalysis(analysis);
           flow.setJobPostingText(trimmed);
           flow.setJobAnalysis(analysis);
+          if (analysis.detected_language === "sv") setCvLanguage("sv");
+          else setCvLanguage("en");
           setStep(1);
           return;
         }
