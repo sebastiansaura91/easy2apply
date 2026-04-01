@@ -88,6 +88,8 @@ export default function ApplyWizard() {
       setJobAnalysis(data);
       flow.setJobPostingText(trimmed);
       flow.setJobAnalysis(data);
+      if (data.detected_language === "sv") setCvLanguage("sv");
+      else setCvLanguage("en");
 
       // Cache the result
       if (user) {
