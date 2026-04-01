@@ -207,6 +207,45 @@ export default function ApplyWizard() {
                 <p className="text-sm text-muted-foreground mt-1">Here's what we found in the posting.</p>
               </div>
 
+              {/* Language suggestion */}
+              <Card className={`border-primary/30 bg-primary/5`}>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Languages className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium">
+                        {jobAnalysis.detected_language === "sv"
+                          ? "Jobbannonsen är på svenska"
+                          : "The job posting is in English"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {cvLanguage === "sv"
+                          ? "Ditt CV kommer skapas på svenska"
+                          : "Your CV will be created in English"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={cvLanguage === "sv" ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setCvLanguage("sv")}
+                    >
+                      Svenska
+                    </Button>
+                    <Button
+                      variant={cvLanguage === "en" ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setCvLanguage("en")}
+                    >
+                      English
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="grid sm:grid-cols-2 gap-4">
                 <Card><CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2"><Briefcase className="h-4 w-4 text-primary" /><span className="text-xs font-semibold uppercase text-muted-foreground">Role</span></div>
