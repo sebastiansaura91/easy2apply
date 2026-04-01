@@ -30,6 +30,9 @@ serve(async (req) => {
             role: "system",
             content: `You are a job posting analyst. Extract structured information from job postings. Be precise and concise. Return results via the analyze_job_posting tool.
 
+## LANGUAGE DETECTION (MANDATORY)
+Detect the primary language of the job posting text. Use ISO 639-1 codes: "sv" for Swedish, "en" for English, etc.
+
 ## SENIORITY LEVEL RULES (MANDATORY)
 Determine seniority strictly from the job TITLE using these rules:
 - "Director", "Head of", "VP", "Vice President", "C-level" (CEO, CFO, CTO, COO, etc.) → "Upper Management"
@@ -62,8 +65,9 @@ Always base seniority on the title, NOT on the job description content.`,
                 core_responsibilities: { type: "array", items: { type: "string" }, description: "Main responsibilities (max 6)" },
                 key_phrases: { type: "array", items: { type: "string" }, description: "Important phrases from the posting that a CV should echo (max 8)" },
                 industry: { type: "string", description: "Industry or sector" },
+                detected_language: { type: "string", description: "ISO 639-1 language code of the job posting (e.g. 'sv' for Swedish, 'en' for English)" },
               },
-              required: ["job_title", "company_name", "seniority_level", "key_requirements", "nice_to_have", "core_responsibilities", "key_phrases", "industry"],
+              required: ["job_title", "company_name", "seniority_level", "key_requirements", "nice_to_have", "core_responsibilities", "key_phrases", "industry", "detected_language"],
               additionalProperties: false,
             },
           },

@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { CVPicker } from "@/components/shared/CVPicker";
-import { Shield, ArrowLeft, ArrowRight, Loader2, Briefcase, Target, Users, Award, CheckCircle2, AlertTriangle, Eye, FileText, Plus, Wrench } from "lucide-react";
+import { Shield, ArrowLeft, ArrowRight, Loader2, Briefcase, Target, Users, Award, CheckCircle2, AlertTriangle, Eye, FileText, Plus, Wrench, Languages } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
 
@@ -32,6 +32,7 @@ export default function ApplyWizard() {
   const [matchResult, setMatchResult] = useState<AtsCheckResult | null>(null);
   const [matching, setMatching] = useState(false);
   const [creatingForFix, setCreatingForFix] = useState(false);
+  const [cvLanguage, setCvLanguage] = useState<"sv" | "en">("en");
 
   const openEditorToFix = async () => {
     if (!user || !parsedCV) return;
@@ -45,7 +46,7 @@ export default function ApplyWizard() {
     const id = uuidv4();
     const title = jobAnalysis ? `CV — ${jobAnalysis.job_title}` : "New CV";
     const { error } = await supabase.from("resumes").insert({
-      id, user_id: user.id, title, language: "en", template_id: "default", content_json: parsedCV as any,
+      id, user_id: user.id, title, language: cvLanguage, template_id: "default", content_json: parsedCV as any,
     });
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); setCreatingForFix(false); return; }
     flow.setResumeId(id);
@@ -74,6 +75,8 @@ export default function ApplyWizard() {
           setJobAnalysis(analysis);
           flow.setJobPostingText(trimmed);
           flow.setJobAnalysis(analysis);
+          if (analysis.detected_language === "sv") setCvLanguage("sv");
+          else setCvLanguage("en");
           setStep(1);
           return;
         }
@@ -85,6 +88,8 @@ export default function ApplyWizard() {
       setJobAnalysis(data);
       flow.setJobPostingText(trimmed);
       flow.setJobAnalysis(data);
+      if (data.detected_language === "sv") setCvLanguage("sv");
+      else setCvLanguage("en");
 
       // Cache the result
       if (user) {
@@ -113,7 +118,7 @@ export default function ApplyWizard() {
     setMatching(true);
     try {
       const { data, error } = await supabase.functions.invoke("ats-check", {
-        body: { resume_content_json: parsedCV, job_posting_text: jobText.trim(), locale: "en" },
+        body: { resume_content_json: parsedCV, job_posting_text: jobText.trim(), locale: cvLanguage },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -129,7 +134,7 @@ export default function ApplyWizard() {
     const id = uuidv4();
     const title = jobAnalysis ? `CV — ${jobAnalysis.job_title}` : "New CV";
     const { error } = await supabase.from("resumes").insert({
-      id, user_id: user.id, title, language: "en", template_id: "default", content_json: parsedCV as any,
+      id, user_id: user.id, title, language: cvLanguage, template_id: "default", content_json: parsedCV as any,
     });
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     flow.setResumeId(id);
@@ -141,7 +146,7 @@ export default function ApplyWizard() {
     const id = uuidv4();
     const title = jobAnalysis ? `CV — ${jobAnalysis.job_title}` : "New CV";
     const { error } = await supabase.from("resumes").insert({
-      id, user_id: user.id, title, language: "en", template_id: "default", content_json: emptyCV as any,
+      id, user_id: user.id, title, language: cvLanguage, template_id: "default", content_json: emptyCV as any,
     });
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     flow.setResumeId(id);
@@ -201,6 +206,45 @@ export default function ApplyWizard() {
                 <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Job Analysis</h2>
                 <p className="text-sm text-muted-foreground mt-1">Here's what we found in the posting.</p>
               </div>
+
+              {/* Language suggestion */}
+              <Card className={`border-primary/30 bg-primary/5`}>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Languages className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium">
+                        {jobAnalysis.detected_language === "sv"
+                          ? "Jobbannonsen är på svenska"
+                          : "The job posting is in English"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {cvLanguage === "sv"
+                          ? "Ditt CV kommer skapas på svenska"
+                          : "Your CV will be created in English"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={cvLanguage === "sv" ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setCvLanguage("sv")}
+                    >
+                      Svenska
+                    </Button>
+                    <Button
+                      variant={cvLanguage === "en" ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setCvLanguage("en")}
+                    >
+                      English
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <Card><CardContent className="p-4">
