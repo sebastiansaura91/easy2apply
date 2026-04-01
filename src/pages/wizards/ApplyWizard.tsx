@@ -32,6 +32,7 @@ export default function ApplyWizard() {
   const [matchResult, setMatchResult] = useState<AtsCheckResult | null>(null);
   const [matching, setMatching] = useState(false);
   const [creatingForFix, setCreatingForFix] = useState(false);
+  const [cvLanguage, setCvLanguage] = useState<"sv" | "en">("en");
 
   const openEditorToFix = async () => {
     if (!user || !parsedCV) return;
