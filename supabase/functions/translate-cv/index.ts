@@ -22,34 +22,48 @@ serve(async (req) => {
 REGLER:
 - Behåll EXAKT samma JSON-struktur
 - Behåll alla datum oförändrade (YYYY-MM format)
-- Behåll tekniska termer, verktygsnamn och proper nouns på originalspråk (t.ex. Salesforce, Power BI, Agile, Scrum)
-- Behåll personnamn, företagsnamn och platsnamn oförändrade
+- Behåll tekniska termer, verktygsnamn, ramverk och proper nouns på originalspråk (t.ex. Salesforce, Power BI, Agile, Scrum, SAFe)
+- Behåll personnamn, företagsnamn, utmärkelser och platsnamn oförändrade
 - Behåll [FYLL I]-platshållare oförändrade
 - Översätt rolltitlar till svenska motsvarigheter
 - Översätt kompetensbeskrivningar naturligt
 - Använd professionellt, idiomatiskt CV-språk – INTE ordagranna översättningar
-- Översätt KONTEXTUELLT: "Owns commercial responsibility" → "Ansvarar för den kommersiella verksamheten", INTE "Äger kommersiellt ansvar"
 - Bullet points ska låta naturliga på svenska, som om de var skrivna av en svensk professionell
 - Inga floskler eller tillagda formuleringar
 - ÄNDRA INTE den faktiska innebörden – bevara samma ansvarsområden, resultat och siffror
 - Lägg inte till, ta bort eller hitta på information
 - Kontrollera stavning noggrant på svenska
+
+VANLIGA FELÖVERSÄTTNINGAR ATT UNDVIKA (engelska → fel svenska → rätt svenska):
+- "Owns commercial responsibility" → FEL: "Äger kommersiellt ansvar" → RÄTT: "Ansvarar för den kommersiella verksamheten"
+- "Is Business Owner in a SAFe setup" → FEL: "Är affärsägare i en SAFe-uppsättning" → RÄTT: "Är Business Owner i en SAFe-organisation" (behåll rollnamn som Business Owner, Product Owner, Scrum Master etc.)
+- "Was awarded Hemfrid's Project of the Year 2023" → FEL: "Tilldelades Hemfrids Projekt of the Year 2023" → RÄTT: "Tilldelades Hemfrids Årets Projekt 2023" (översätt utmärkelsenamn konsekvent)
+- "Led the integration of 22 acquisitions" → FEL: "Styrde integrationen av 22 förvärv" → RÄTT: "Ledde integrationen av 22 förvärv"
+- "Restructured the booking process to guarantee 100% availability" → FEL: "Omstrukturerade bokningsprocessen för att garantera 100% tillgänglighet" → RÄTT: "Omarbetade bokningsflödet för att säkerställa 100% tillgänglighet" (använd naturliga svenska verb)
+
+JOBBTITLAR:
+- Behåll jobbtitlar på ORIGINALSPRÅKET – översätt INTE titlar som redan står i CV:t
+- Om en titel är på engelska (t.ex. "Product Manager"), behåll den på engelska
+- Översätt bara titlar om de behöver gå från engelska till svenska eller vice versa i kontexten
+
 - Returnera ENBART via tool call`
       : `You are a professional CV translator with expertise in business English. Translate the entire CV to idiomatic, natural English.
 
 RULES:
 - Keep EXACTLY the same JSON structure
 - Keep all dates unchanged (YYYY-MM format)
-- Keep technical terms, tool names and proper nouns in original language (e.g. Salesforce, Power BI, Agile, Scrum)
-- Keep person names, company names and place names unchanged
+- Keep technical terms, tool names, frameworks and proper nouns in original language (e.g. Salesforce, Power BI, Agile, Scrum, SAFe)
+- Keep person names, company names, awards and place names unchanged
 - Keep [FILL IN] / [FYLL I] placeholders unchanged (convert [FYLL I] to [FILL IN])
-- Translate job titles to English equivalents
+- Do NOT translate job titles – keep them in the original language as written in the CV
 - Translate skill descriptions naturally
 - Use professional, idiomatic CV language – NOT word-for-word literal translations
 - Translate CONTEXTUALLY: bullet points should read as if written by a native English speaker
 - No buzzwords or added phrasing
 - DO NOT change the actual meaning – preserve the same responsibilities, results and figures
 - Do not add, remove or fabricate information
+- Keep role names like Business Owner, Product Owner, Scrum Master in their original form
+- Spell-check the English output carefully
 - Spell-check the English output carefully
 - Return ONLY via tool call`;
 
