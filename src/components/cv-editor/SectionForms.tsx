@@ -101,6 +101,38 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
     updateCv("experience", cv.experience.filter((_, i) => i !== idx));
   };
 
+  // Today's month for max= constraint on date inputs (no future dates)
+  const todayMonth = new Date().toISOString().slice(0, 7);
+
+  // Detect overlapping periods at the same company so we can warn inline
+  const overlapByIdx = useMemo(() => {
+    const flagged = new Set<number>();
+    const byCompany = new Map<string, { idx: number; start: string; end: string }[]>();
+    cv.experience.forEach((exp, i) => {
+      const key = (exp.company || "").trim().toLowerCase();
+      if (!key) return;
+      if (!byCompany.has(key)) byCompany.set(key, []);
+      byCompany.get(key)!.push({
+        idx: i,
+        start: exp.startDate || "",
+        end: exp.isPresent ? "9999-99" : (exp.endDate || ""),
+      });
+    });
+    for (const items of byCompany.values()) {
+      if (items.length < 2) continue;
+      const sorted = [...items].sort((a, b) => a.start.localeCompare(b.start));
+      for (let j = 0; j < sorted.length - 1; j++) {
+        const a = sorted[j];
+        const b = sorted[j + 1];
+        if (a.end && b.start && a.end > b.start) {
+          flagged.add(a.idx);
+          flagged.add(b.idx);
+        }
+      }
+    }
+    return flagged;
+  }, [cv.experience]);
+
   const improveBullet = async (expIdx: number, bulletIdx: number) => {
     const exp = cv.experience[expIdx];
     const bullet = exp.bullets[bulletIdx];
@@ -238,14 +270,35 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
+              {overlapByIdx.has(idx) && (
+                <div className="rounded-md border border-warning/40 bg-warning/5 px-2.5 py-1.5 text-[11px] text-warning">
+                  {isSv
+                    ? `Datumen överlappar en annan roll hos ${exp.company || "samma företag"}. Sätt slutdatum innan nästa roll börjar.`
+                    : `Dates overlap with another role at ${exp.company || "the same company"}. Set an end date before the next role starts.`}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Input placeholder={isSv ? "Titel" : "Title"} value={exp.title} onChange={(e) => updateExperience(idx, { title: e.target.value })} />
                 <Input placeholder={isSv ? "Företag" : "Company"} value={exp.company} onChange={(e) => updateExperience(idx, { company: e.target.value })} />
                 <Input placeholder={isSv ? "Plats" : "Location"} value={exp.location} onChange={(e) => updateExperience(idx, { location: e.target.value })} />
                 <div />
-                <Input type="month" placeholder={isSv ? "Startdatum" : "Start date"} value={exp.startDate} onChange={(e) => updateExperience(idx, { startDate: e.target.value })} />
+                <Input type="month" max={todayMonth} placeholder={isSv ? "Startdatum" : "Start date"} value={exp.startDate} onChange={(e) => {
+                  const v = e.target.value;
+                  if (v && v > todayMonth) {
+                    toast({ title: isSv ? "Framtida datum tillåts inte" : "Future dates not allowed", description: isSv ? "Använd dagens månad eller tidigare." : "Use today's month or earlier.", variant: "destructive" });
+                    return;
+                  }
+                  updateExperience(idx, { startDate: v });
+                }} />
                 {!exp.isPresent && (
-                  <Input type="month" placeholder={isSv ? "Slutdatum" : "End date"} value={exp.endDate} onChange={(e) => updateExperience(idx, { endDate: e.target.value })} />
+                  <Input type="month" max={todayMonth} placeholder={isSv ? "Slutdatum" : "End date"} value={exp.endDate} onChange={(e) => {
+                    const v = e.target.value;
+                    if (v && v > todayMonth) {
+                      toast({ title: isSv ? "Framtida datum tillåts inte" : "Future dates not allowed", description: isSv ? "Markera som 'Nuvarande' istället." : "Mark as 'Present' instead.", variant: "destructive" });
+                      return;
+                    }
+                    updateExperience(idx, { endDate: v });
+                  }} />
                 )}
               </div>
               <div className="flex items-center gap-2">
