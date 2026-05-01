@@ -141,6 +141,71 @@ export function findCvIssues(cv: CVContent, lang: "sv" | "en"): CvIssue[] {
     }
   });
 
+  // Future dates on experience
+  const todayMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const currentYear = new Date().getFullYear();
+  cv.experience.forEach((exp, i) => {
+    if (exp.startDate && exp.startDate > todayMonth) {
+      issues.push({ id: `exp-${i}-future-start`, severity: "error", section: "experience", title: isSv ? `"${exp.title || `Roll ${i+1}`}" har framtida startdatum` : `"${exp.title || `Role ${i+1}`}" has future start date`, description: isSv ? "Startdatum ligger i framtiden, vilket flaggas som fel av rekryterare." : "Start date is in the future, which is flagged as an error by recruiters.", fix: isSv ? "Justera startdatum till nutid eller tidigare" : "Adjust start date to today or earlier" });
+    }
+    if (!exp.isPresent && exp.endDate && exp.endDate > todayMonth) {
+      issues.push({ id: `exp-${i}-future-end`, severity: "error", section: "experience", title: isSv ? `"${exp.title || `Roll ${i+1}`}" har framtida slutdatum` : `"${exp.title || `Role ${i+1}`}" has future end date`, description: isSv ? "Slutdatum ligger i framtiden." : "End date is in the future.", fix: isSv ? "Markera som 'Nuvarande' eller välj ett datum i nutid/dåtid" : "Mark as 'Present' or pick a date in the past/today" });
+    }
+  });
+
+  // Overlapping employment periods at the SAME company
+  const byCompany = new Map<string, { idx: number; exp: typeof cv.experience[number] }[]>();
+  cv.experience.forEach((exp, i) => {
+    const key = (exp.company || "").trim().toLowerCase();
+    if (!key) return;
+    if (!byCompany.has(key)) byCompany.set(key, []);
+    byCompany.get(key)!.push({ idx: i, exp });
+  });
+  for (const [, items] of byCompany) {
+    if (items.length < 2) continue;
+    // Sort by start
+    const sorted = [...items].sort((a, b) => (a.exp.startDate || "").localeCompare(b.exp.startDate || ""));
+    for (let j = 0; j < sorted.length - 1; j++) {
+      const a = sorted[j];
+      const b = sorted[j + 1];
+      const aEnd = a.exp.isPresent ? "9999-99" : (a.exp.endDate || "");
+      const bStart = b.exp.startDate || "";
+      if (aEnd && bStart && aEnd > bStart) {
+        const company = a.exp.company;
+        issues.push({
+          id: `exp-overlap-${a.idx}-${b.idx}`,
+          severity: "warning",
+          section: "experience",
+          title: isSv ? `Överlappande datum hos ${company}` : `Overlapping dates at ${company}`,
+          description: isSv
+            ? `"${a.exp.title}" och "${b.exp.title}" har överlappande perioder. Det förvirrar rekryteraren och tolkas som fel.`
+            : `"${a.exp.title}" and "${b.exp.title}" overlap in time. This confuses recruiters and is read as an error.`,
+          fix: isSv
+            ? "Sätt slutdatum på den tidigare rollen innan den senare börjar, eller förklara att rollerna var parallella i punkterna."
+            : "Set the end date of the earlier role before the next one starts, or clarify that the roles were concurrent in the bullets.",
+        });
+      }
+    }
+  }
+
+  // Future-dated certifications
+  cv.certifications.forEach((cert, i) => {
+    const yearMatch = (cert.date || "").match(/\b(20\d{2})\b/);
+    if (yearMatch) {
+      const yr = parseInt(yearMatch[1], 10);
+      if (yr > currentYear) {
+        issues.push({
+          id: `cert-${i}-future`,
+          severity: "error",
+          section: "certifications",
+          title: isSv ? `"${cert.name || `Certifiering ${i+1}`}" är daterad i framtiden` : `"${cert.name || `Certification ${i+1}`}" is dated in the future`,
+          description: isSv ? "Framtida datum på certifieringar uppfattas som ett misstag." : "Future-dated certifications read as a mistake.",
+          fix: isSv ? "Använd det år certifieringen faktiskt erhölls (max innevarande år)." : "Use the year the certification was actually obtained (max current year).",
+        });
+      }
+    }
+  });
+
   // Bullet quality
   const bulletAnalysis = analyzeAllBullets(cv, lang);
   const weakBullets = bulletAnalysis.filter(b => b.score === "weak");
