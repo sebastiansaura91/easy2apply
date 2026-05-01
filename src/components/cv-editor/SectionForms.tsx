@@ -658,6 +658,8 @@ export function SkillsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
 
 export function CertificationsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   const isSv = cvLanguage !== "en";
+  const { toast } = useToast();
+  const currentYear = new Date().getFullYear();
   const addCertification = () => {
     updateCv("certifications", [...cv.certifications, { id: uuidv4(), name: "", issuer: "", date: "" }]);
   };
@@ -673,14 +675,43 @@ export function CertificationsForm({ cv, updateCv, t, cvLanguage }: SectionFormP
       </CardHeader>
       <CardContent className="space-y-3">
         {cv.certifications.map((cert, idx) => (
-          <div key={cert.id} className="flex gap-2 items-center">
-            <Input placeholder={isSv ? "Certifiering" : "Certification"} value={cert.name} onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))} />
-            <Input placeholder={isSv ? "Utfärdare" : "Issuer"} value={cert.issuer} className="w-32" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, issuer: e.target.value } : c))} />
-            <Input placeholder={isSv ? "År" : "Year"} value={cert.date} className="w-20" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, date: e.target.value } : c))} />
-            <Button variant="ghost" size="icon" onClick={() => updateCv("certifications", cv.certifications.filter((_, i) => i !== idx))}>
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
+          (() => {
+            const yrMatch = (cert.date || "").match(/\b(20\d{2})\b/);
+            const isFuture = !!(yrMatch && parseInt(yrMatch[1], 10) > currentYear);
+            return (
+              <div key={cert.id} className="space-y-1">
+                <div className="flex gap-2 items-center">
+                  <Input placeholder={isSv ? "Certifiering" : "Certification"} value={cert.name} onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))} />
+                  <Input placeholder={isSv ? "Utfärdare" : "Issuer"} value={cert.issuer} className="w-32" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, issuer: e.target.value } : c))} />
+                  <Input
+                    type="number"
+                    min={1970}
+                    max={currentYear}
+                    placeholder={isSv ? "År" : "Year"}
+                    value={cert.date}
+                    className={`w-24 ${isFuture ? "border-destructive" : ""}`}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const n = parseInt(v, 10);
+                      if (v && !isNaN(n) && n > currentYear) {
+                        toast({ title: isSv ? "Framtida år tillåts inte" : "Future year not allowed", description: isSv ? `Ange max ${currentYear}.` : `Max ${currentYear}.`, variant: "destructive" });
+                        return;
+                      }
+                      updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, date: v } : c));
+                    }}
+                  />
+                  <Button variant="ghost" size="icon" onClick={() => updateCv("certifications", cv.certifications.filter((_, i) => i !== idx))}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+                {isFuture && (
+                  <p className="text-[11px] text-destructive pl-1">
+                    {isSv ? `Året får inte ligga i framtiden (max ${currentYear}).` : `Year cannot be in the future (max ${currentYear}).`}
+                  </p>
+                )}
+              </div>
+            );
+          })()
         ))}
       </CardContent>
     </Card>
