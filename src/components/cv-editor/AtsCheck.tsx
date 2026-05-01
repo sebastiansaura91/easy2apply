@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -14,6 +14,7 @@ import {
   FileSearch,
   Languages,
   XCircle,
+  RefreshCw,
 } from "lucide-react";
 import { CVContent } from "@/types/cv";
 import { AtsCheckResult, ScanabilityItem, ParseCheckItem, BulletFeedback } from "@/types/ats-check";
@@ -150,8 +151,16 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
   const [parseOpen, setParseOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [bulletsOpen, setBulletsOpen] = useState(false);
+  // Snapshot of the CV at the moment of the last successful analysis.
+  // We use it to detect whether the user has made edits since then.
+  const [analyzedSnapshot, setAnalyzedSnapshot] = useState<string | null>(null);
+  const [analyzedAt, setAnalyzedAt] = useState<Date | null>(null);
   const { toast } = useToast();
   const isSv = cvLanguage !== "en";
+
+  // Stable serialization for change detection (ignore key order)
+  const cvSignature = JSON.stringify(cv);
+  const isStale = !!result && analyzedSnapshot !== null && analyzedSnapshot !== cvSignature;
 
   const runCheck = async () => {
     setLoading(true);
@@ -165,7 +174,21 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setResult(data as AtsCheckResult);
+      const prevScore = result?.overall_score;
+      const newResult = data as AtsCheckResult;
+      setResult(newResult);
+      setAnalyzedSnapshot(cvSignature);
+      setAnalyzedAt(new Date());
+      if (typeof prevScore === "number") {
+        const delta = Math.round(newResult.overall_score - prevScore);
+        const sign = delta > 0 ? "+" : "";
+        toast({
+          title: isSv ? "Ny analys klar" : "Re-analysis complete",
+          description: isSv
+            ? `Score: ${Math.round(newResult.overall_score)} (${sign}${delta} jämfört med förra)`
+            : `Score: ${Math.round(newResult.overall_score)} (${sign}${delta} vs previous)`,
+        });
+      }
     } catch (err: any) {
       toast({ title: isSv ? "ATS-kontroll misslyckades" : "ATS check failed", description: err.message, variant: "destructive" });
     } finally {
@@ -218,6 +241,33 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
 
   return (
     <div className="space-y-4">
+      {/* Re-analyze bar */}
+      <div className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${isStale ? "border-primary/40 bg-primary/5" : "border-border bg-muted/30"}`}>
+        <div className="min-w-0 flex-1">
+          {isStale ? (
+            <p className="text-[11px] font-medium text-primary">
+              {isSv ? "CV:t har ändrats sedan förra analysen — kör om för aktuellt resultat." : "CV has changed since last analysis — re-run for an up-to-date result."}
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              {analyzedAt
+                ? (isSv ? `Analyserat ${analyzedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : `Analyzed ${analyzedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`)
+                : (isSv ? "Senaste analys" : "Latest analysis")}
+            </p>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant={isStale ? "default" : "outline"}
+          onClick={runCheck}
+          disabled={loading}
+          className="h-7 gap-1.5 text-xs"
+        >
+          {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+          {loading ? (isSv ? "Analyserar..." : "Analyzing...") : (isSv ? "Analysera om" : "Re-analyze")}
+        </Button>
+      </div>
+
       {/* ── 1. Score + Summary ── */}
       <div className="flex items-center gap-4">
         <ScoreRing score={result.overall_score} grade={result.grade} />
