@@ -60,6 +60,14 @@ export function InsightsPanel({
   const [analyzedSnapshot, setAnalyzedSnapshot] = useState<string | null>(null);
   const [analyzedAt, setAnalyzedAt] = useState<Date | null>(null);
   const [lastDelta, setLastDelta] = useState<number | null>(null);
+  const [autoFixingIdx, setAutoFixingIdx] = useState<number | null>(null);
+  const [autoFixPreview, setAutoFixPreview] = useState<{
+    issueIdx: number;
+    target: "profile" | "experience" | "skills";
+    targetIdx?: number;
+    text: string;
+    explanation: string;
+  } | null>(null);
   const isSv = cvLanguage === "sv";
 
   // ── Real-time issues (client-side, instant) ──
@@ -128,6 +136,72 @@ export function InsightsPanel({
   const scoreColor = (s: number) => s >= 80 ? "text-green-600" : s >= 60 ? "text-warning" : "text-destructive";
 
   const canFix = !!onUpdateProfile && !!onUpdateExperienceBullets && !!onUpdateSkills;
+
+  // ── Heuristic: infer target section from issue text ──
+  const inferTarget = (issue: FirstScanIssue): { target: "profile" | "experience" | "skills"; targetIdx?: number } => {
+    const haystack = `${issue.title} ${issue.why_it_matters} ${issue.fix}`.toLowerCase();
+    const skillsKw = ["skill", "kompeten", "färdighet", "keyword", "nyckelord", "tech stack", "teknik"];
+    const expKw = ["bullet", "punkt", "experience", "erfarenhet", "role", "roll", "achievement", "resultat", "outcome", "metric", "mätbar", "quantif", "siffr"];
+    const profileKw = ["profile", "profil", "summary", "sammanfattning", "headline", "rubrik", "objective"];
+    if (skillsKw.some(k => haystack.includes(k))) return { target: "skills" };
+    if (profileKw.some(k => haystack.includes(k))) return { target: "profile" };
+    if (expKw.some(k => haystack.includes(k)) && cv.experience.length > 0) return { target: "experience", targetIdx: 0 };
+    // Default: profile if exists, else first experience, else skills
+    if (cv.profile || cv.experience.length === 0) return { target: "profile" };
+    return { target: "experience", targetIdx: 0 };
+  };
+
+  const runAutoFix = async (issue: FirstScanIssue, issueIdx: number) => {
+    if (!canFix) return;
+    setAutoFixingIdx(issueIdx);
+    setAutoFixPreview(null);
+    const { target, targetIdx } = inferTarget(issue);
+    try {
+      const { data, error } = await supabase.functions.invoke("fix-issue", {
+        body: {
+          issue, cv, job_posting_text: jobText || jobPostingText,
+          answers: [],
+          target_section: target,
+          target_index: targetIdx,
+          locale: cvLanguage,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setAutoFixPreview({
+        issueIdx,
+        target,
+        targetIdx,
+        text: data.suggestion_text,
+        explanation: data.explanation,
+      });
+    } catch (e: any) {
+      toast({ title: isSv ? "Auto-fix misslyckades" : "Auto-fix failed", description: e.message, variant: "destructive" });
+    } finally {
+      setAutoFixingIdx(null);
+    }
+  };
+
+  const applyAutoFix = () => {
+    if (!autoFixPreview) return;
+    const { target, targetIdx, text } = autoFixPreview;
+    if (target === "profile") {
+      onUpdateProfile?.(text);
+      onNavigateToSection?.("profile");
+    } else if (target === "experience" && targetIdx !== undefined) {
+      const newBullets = text.split("\n").map(b => b.replace(/^[•\-–]\s*/, "").trim()).filter(b => b.length > 0);
+      const existing = cv.experience[targetIdx]?.bullets || [];
+      const merged = [...existing, ...newBullets.filter(nb => !existing.includes(nb))];
+      onUpdateExperienceBullets?.(targetIdx, merged);
+      onNavigateToSection?.("experience");
+    } else if (target === "skills") {
+      const newSkills = text.split(/[,\n]/).map(s => s.trim()).filter(s => s.length > 0);
+      onUpdateSkills?.(newSkills);
+      onNavigateToSection?.("skills");
+    }
+    toast({ title: isSv ? "✅ Fix applicerad" : "✅ Fix applied" });
+    setAutoFixPreview(null);
+  };
 
   // ── Fix issue wizard overlay ──
   if (fixingIssue && canFix) {
@@ -329,15 +403,63 @@ export function InsightsPanel({
                     <ArrowRight className="h-2.5 w-2.5" /> {issue.fix}
                   </p>
                   {canFix && (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="w-full h-7 text-[10px] gap-1.5 mt-1"
-                      onClick={() => setFixingIssue(issue)}
-                    >
-                      <Wrench className="h-3 w-3" />
-                      {isSv ? "Fixa detta" : "Fix this issue"}
-                    </Button>
+                    <>
+                      {autoFixPreview?.issueIdx === i ? (
+                        <div className="space-y-2 mt-1 rounded-md border border-primary/30 bg-background p-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-semibold uppercase tracking-wider text-primary flex items-center gap-1">
+                              <Sparkles className="h-2.5 w-2.5" />
+                              {isSv ? "Förslag" : "Suggestion"} →{" "}
+                              {autoFixPreview.target === "profile" ? (isSv ? "Profil" : "Profile")
+                                : autoFixPreview.target === "skills" ? (isSv ? "Kompetenser" : "Skills")
+                                : (cv.experience[autoFixPreview.targetIdx ?? 0]?.title || "Experience")}
+                            </span>
+                          </div>
+                          <Textarea
+                            value={autoFixPreview.text}
+                            onChange={e => setAutoFixPreview(p => p ? { ...p, text: e.target.value } : p)}
+                            rows={4}
+                            className="text-[10px] leading-relaxed"
+                          />
+                          <p className="text-[9px] text-muted-foreground italic">{autoFixPreview.explanation}</p>
+                          <div className="flex gap-1.5">
+                            <Button size="sm" className="flex-1 h-7 text-[10px] gap-1" onClick={applyAutoFix}>
+                              <CheckCircle2 className="h-3 w-3" />
+                              {isSv ? "Applicera" : "Apply"}
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => setAutoFixPreview(null)}>
+                              {isSv ? "Avbryt" : "Cancel"}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1.5 mt-1">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="flex-1 h-7 text-[10px] gap-1.5"
+                            disabled={autoFixingIdx !== null}
+                            onClick={() => runAutoFix(issue, i)}
+                          >
+                            {autoFixingIdx === i
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <Zap className="h-3 w-3" />}
+                            {autoFixingIdx === i
+                              ? (isSv ? "Fixar..." : "Fixing...")
+                              : (isSv ? "Auto-fixa" : "Auto-fix")}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[10px] gap-1"
+                            onClick={() => setFixingIssue(issue)}
+                          >
+                            <Wrench className="h-3 w-3" />
+                            {isSv ? "Anpassa" : "Refine"}
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}
