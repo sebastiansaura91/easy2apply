@@ -15,11 +15,11 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
           case "contact":
             return (
               <div key={section.id} style={{ marginBottom: "8pt" }}>
-                <h1>{cv.contact.name || "Ditt Namn"}</h1>
+                <h1>{cv.contact.name || t("yourName")}</h1>
                 <div className="contact-line" style={{ display: "flex", flexDirection: "column", gap: "1pt", marginTop: "4pt" }}>
-                  {cv.contact.email && <span>Email: {cv.contact.email}</span>}
+                  {cv.contact.email && <span>{t("contactEmail")}: {cv.contact.email}</span>}
                   {cv.contact.phone && <span>{t("contactPhone")}: {cv.contact.phone}</span>}
-                  {cv.contact.linkedin && <span>LinkedIn: {cv.contact.linkedin}</span>}
+                  {cv.contact.linkedin && <span>{t("contactLinkedin")}: {cv.contact.linkedin}</span>}
                   {cv.contact.website && <span>{t("contactWebsite")}: {cv.contact.website}</span>}
                   {cv.contact.city && <span>{t("contactAddress")}: {cv.contact.city}</span>}
                 </div>

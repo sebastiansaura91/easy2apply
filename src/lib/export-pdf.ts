@@ -146,15 +146,15 @@ export async function exportToPdf(
     switch (section.type) {
       case "contact": {
         checkPage(20);
-        drawCenteredText(cv.contact.name || "Ditt Namn", {
+        drawCenteredText(cv.contact.name || t("yourName"), {
           fontSize: 18,
           fontStyle: "bold",
         });
         y += 2;
         const contactFields = [
-          cv.contact.email ? `Email: ${cv.contact.email}` : null,
+          cv.contact.email ? `${t("contactEmail")}: ${cv.contact.email}` : null,
           cv.contact.phone ? `${t("contactPhone")}: ${cv.contact.phone}` : null,
-          cv.contact.linkedin ? `LinkedIn: ${cv.contact.linkedin}` : null,
+          cv.contact.linkedin ? `${t("contactLinkedin")}: ${cv.contact.linkedin}` : null,
           cv.contact.website ? `${t("contactWebsite")}: ${cv.contact.website}` : null,
           cv.contact.city ? `${t("contactAddress")}: ${cv.contact.city}` : null,
         ].filter(Boolean);
