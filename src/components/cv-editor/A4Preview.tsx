@@ -14,15 +14,20 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
         switch (section.type) {
           case "contact":
             return (
-              <div key={section.id} style={{ marginBottom: "8pt" }}>
-                <h1>{cv.contact.name || t("yourName")}</h1>
-                <div className="contact-line" style={{ display: "flex", flexDirection: "column", gap: "1pt", marginTop: "4pt" }}>
-                  {cv.contact.email && <span>{t("contactEmail")}: {cv.contact.email}</span>}
-                  {cv.contact.phone && <span>{t("contactPhone")}: {cv.contact.phone}</span>}
-                  {cv.contact.linkedin && <span>{t("contactLinkedin")}: {cv.contact.linkedin}</span>}
-                  {cv.contact.website && <span>{t("contactWebsite")}: {cv.contact.website}</span>}
-                  {cv.contact.city && <span>{t("contactAddress")}: {cv.contact.city}</span>}
-                </div>
+              <div key={section.id} style={{ marginBottom: "10pt" }}>
+                {/* Name + contact rendered as body flow text (not header) so ATS + recruiters parse it on the first scan line. */}
+                <p style={{ fontSize: "16pt", fontWeight: 700, margin: 0, lineHeight: 1.1 }}>
+                  {cv.contact.name || t("yourName")}
+                </p>
+                <p style={{ margin: "4pt 0 0 0", fontSize: "9.5pt", lineHeight: 1.4 }}>
+                  {[
+                    cv.contact.email && `${t("contactEmail")}: ${cv.contact.email}`,
+                    cv.contact.phone && `${t("contactPhone")}: ${cv.contact.phone}`,
+                    cv.contact.city && `${t("contactAddress")}: ${cv.contact.city}`,
+                    cv.contact.linkedin && `${t("contactLinkedin")}: ${cv.contact.linkedin}`,
+                    cv.contact.website && `${t("contactWebsite")}: ${cv.contact.website}`,
+                  ].filter(Boolean).join(" · ")}
+                </p>
               </div>
             );
           case "profile":

@@ -101,6 +101,38 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
     updateCv("experience", cv.experience.filter((_, i) => i !== idx));
   };
 
+  // Today's month for max= constraint on date inputs (no future dates)
+  const todayMonth = new Date().toISOString().slice(0, 7);
+
+  // Detect overlapping periods at the same company so we can warn inline
+  const overlapByIdx = useMemo(() => {
+    const flagged = new Set<number>();
+    const byCompany = new Map<string, { idx: number; start: string; end: string }[]>();
+    cv.experience.forEach((exp, i) => {
+      const key = (exp.company || "").trim().toLowerCase();
+      if (!key) return;
+      if (!byCompany.has(key)) byCompany.set(key, []);
+      byCompany.get(key)!.push({
+        idx: i,
+        start: exp.startDate || "",
+        end: exp.isPresent ? "9999-99" : (exp.endDate || ""),
+      });
+    });
+    for (const items of byCompany.values()) {
+      if (items.length < 2) continue;
+      const sorted = [...items].sort((a, b) => a.start.localeCompare(b.start));
+      for (let j = 0; j < sorted.length - 1; j++) {
+        const a = sorted[j];
+        const b = sorted[j + 1];
+        if (a.end && b.start && a.end > b.start) {
+          flagged.add(a.idx);
+          flagged.add(b.idx);
+        }
+      }
+    }
+    return flagged;
+  }, [cv.experience]);
+
   const improveBullet = async (expIdx: number, bulletIdx: number) => {
     const exp = cv.experience[expIdx];
     const bullet = exp.bullets[bulletIdx];
@@ -238,14 +270,35 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
+              {overlapByIdx.has(idx) && (
+                <div className="rounded-md border border-warning/40 bg-warning/5 px-2.5 py-1.5 text-[11px] text-warning">
+                  {isSv
+                    ? `Datumen överlappar en annan roll hos ${exp.company || "samma företag"}. Sätt slutdatum innan nästa roll börjar.`
+                    : `Dates overlap with another role at ${exp.company || "the same company"}. Set an end date before the next role starts.`}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Input placeholder={isSv ? "Titel" : "Title"} value={exp.title} onChange={(e) => updateExperience(idx, { title: e.target.value })} />
                 <Input placeholder={isSv ? "Företag" : "Company"} value={exp.company} onChange={(e) => updateExperience(idx, { company: e.target.value })} />
                 <Input placeholder={isSv ? "Plats" : "Location"} value={exp.location} onChange={(e) => updateExperience(idx, { location: e.target.value })} />
                 <div />
-                <Input type="month" placeholder={isSv ? "Startdatum" : "Start date"} value={exp.startDate} onChange={(e) => updateExperience(idx, { startDate: e.target.value })} />
+                <Input type="month" max={todayMonth} placeholder={isSv ? "Startdatum" : "Start date"} value={exp.startDate} onChange={(e) => {
+                  const v = e.target.value;
+                  if (v && v > todayMonth) {
+                    toast({ title: isSv ? "Framtida datum tillåts inte" : "Future dates not allowed", description: isSv ? "Använd dagens månad eller tidigare." : "Use today's month or earlier.", variant: "destructive" });
+                    return;
+                  }
+                  updateExperience(idx, { startDate: v });
+                }} />
                 {!exp.isPresent && (
-                  <Input type="month" placeholder={isSv ? "Slutdatum" : "End date"} value={exp.endDate} onChange={(e) => updateExperience(idx, { endDate: e.target.value })} />
+                  <Input type="month" max={todayMonth} placeholder={isSv ? "Slutdatum" : "End date"} value={exp.endDate} onChange={(e) => {
+                    const v = e.target.value;
+                    if (v && v > todayMonth) {
+                      toast({ title: isSv ? "Framtida datum tillåts inte" : "Future dates not allowed", description: isSv ? "Markera som 'Nuvarande' istället." : "Mark as 'Present' instead.", variant: "destructive" });
+                      return;
+                    }
+                    updateExperience(idx, { endDate: v });
+                  }} />
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -605,6 +658,8 @@ export function SkillsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
 
 export function CertificationsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   const isSv = cvLanguage !== "en";
+  const { toast } = useToast();
+  const currentYear = new Date().getFullYear();
   const addCertification = () => {
     updateCv("certifications", [...cv.certifications, { id: uuidv4(), name: "", issuer: "", date: "" }]);
   };
@@ -620,14 +675,43 @@ export function CertificationsForm({ cv, updateCv, t, cvLanguage }: SectionFormP
       </CardHeader>
       <CardContent className="space-y-3">
         {cv.certifications.map((cert, idx) => (
-          <div key={cert.id} className="flex gap-2 items-center">
-            <Input placeholder={isSv ? "Certifiering" : "Certification"} value={cert.name} onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))} />
-            <Input placeholder={isSv ? "Utfärdare" : "Issuer"} value={cert.issuer} className="w-32" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, issuer: e.target.value } : c))} />
-            <Input placeholder={isSv ? "År" : "Year"} value={cert.date} className="w-20" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, date: e.target.value } : c))} />
-            <Button variant="ghost" size="icon" onClick={() => updateCv("certifications", cv.certifications.filter((_, i) => i !== idx))}>
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
+          (() => {
+            const yrMatch = (cert.date || "").match(/\b(20\d{2})\b/);
+            const isFuture = !!(yrMatch && parseInt(yrMatch[1], 10) > currentYear);
+            return (
+              <div key={cert.id} className="space-y-1">
+                <div className="flex gap-2 items-center">
+                  <Input placeholder={isSv ? "Certifiering" : "Certification"} value={cert.name} onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, name: e.target.value } : c))} />
+                  <Input placeholder={isSv ? "Utfärdare" : "Issuer"} value={cert.issuer} className="w-32" onChange={(e) => updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, issuer: e.target.value } : c))} />
+                  <Input
+                    type="number"
+                    min={1970}
+                    max={currentYear}
+                    placeholder={isSv ? "År" : "Year"}
+                    value={cert.date}
+                    className={`w-24 ${isFuture ? "border-destructive" : ""}`}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const n = parseInt(v, 10);
+                      if (v && !isNaN(n) && n > currentYear) {
+                        toast({ title: isSv ? "Framtida år tillåts inte" : "Future year not allowed", description: isSv ? `Ange max ${currentYear}.` : `Max ${currentYear}.`, variant: "destructive" });
+                        return;
+                      }
+                      updateCv("certifications", cv.certifications.map((c, i) => i === idx ? { ...c, date: v } : c));
+                    }}
+                  />
+                  <Button variant="ghost" size="icon" onClick={() => updateCv("certifications", cv.certifications.filter((_, i) => i !== idx))}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+                {isFuture && (
+                  <p className="text-[11px] text-destructive pl-1">
+                    {isSv ? `Året får inte ligga i framtiden (max ${currentYear}).` : `Year cannot be in the future (max ${currentYear}).`}
+                  </p>
+                )}
+              </div>
+            );
+          })()
         ))}
       </CardContent>
     </Card>
