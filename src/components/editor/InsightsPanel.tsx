@@ -60,6 +60,14 @@ export function InsightsPanel({
   const [analyzedSnapshot, setAnalyzedSnapshot] = useState<string | null>(null);
   const [analyzedAt, setAnalyzedAt] = useState<Date | null>(null);
   const [lastDelta, setLastDelta] = useState<number | null>(null);
+  const [autoFixingIdx, setAutoFixingIdx] = useState<number | null>(null);
+  const [autoFixPreview, setAutoFixPreview] = useState<{
+    issueIdx: number;
+    target: "profile" | "experience" | "skills";
+    targetIdx?: number;
+    text: string;
+    explanation: string;
+  } | null>(null);
   const isSv = cvLanguage === "sv";
 
   // ── Real-time issues (client-side, instant) ──
@@ -128,6 +136,72 @@ export function InsightsPanel({
   const scoreColor = (s: number) => s >= 80 ? "text-green-600" : s >= 60 ? "text-warning" : "text-destructive";
 
   const canFix = !!onUpdateProfile && !!onUpdateExperienceBullets && !!onUpdateSkills;
+
+  // ── Heuristic: infer target section from issue text ──
+  const inferTarget = (issue: FirstScanIssue): { target: "profile" | "experience" | "skills"; targetIdx?: number } => {
+    const haystack = `${issue.title} ${issue.why_it_matters} ${issue.fix}`.toLowerCase();
+    const skillsKw = ["skill", "kompeten", "färdighet", "keyword", "nyckelord", "tech stack", "teknik"];
+    const expKw = ["bullet", "punkt", "experience", "erfarenhet", "role", "roll", "achievement", "resultat", "outcome", "metric", "mätbar", "quantif", "siffr"];
+    const profileKw = ["profile", "profil", "summary", "sammanfattning", "headline", "rubrik", "objective"];
+    if (skillsKw.some(k => haystack.includes(k))) return { target: "skills" };
+    if (profileKw.some(k => haystack.includes(k))) return { target: "profile" };
+    if (expKw.some(k => haystack.includes(k)) && cv.experience.length > 0) return { target: "experience", targetIdx: 0 };
+    // Default: profile if exists, else first experience, else skills
+    if (cv.profile || cv.experience.length === 0) return { target: "profile" };
+    return { target: "experience", targetIdx: 0 };
+  };
+
+  const runAutoFix = async (issue: FirstScanIssue, issueIdx: number) => {
+    if (!canFix) return;
+    setAutoFixingIdx(issueIdx);
+    setAutoFixPreview(null);
+    const { target, targetIdx } = inferTarget(issue);
+    try {
+      const { data, error } = await supabase.functions.invoke("fix-issue", {
+        body: {
+          issue, cv, job_posting_text: jobText || jobPostingText,
+          answers: [],
+          target_section: target,
+          target_index: targetIdx,
+          locale: cvLanguage,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setAutoFixPreview({
+        issueIdx,
+        target,
+        targetIdx,
+        text: data.suggestion_text,
+        explanation: data.explanation,
+      });
+    } catch (e: any) {
+      toast({ title: isSv ? "Auto-fix misslyckades" : "Auto-fix failed", description: e.message, variant: "destructive" });
+    } finally {
+      setAutoFixingIdx(null);
+    }
+  };
+
+  const applyAutoFix = () => {
+    if (!autoFixPreview) return;
+    const { target, targetIdx, text } = autoFixPreview;
+    if (target === "profile") {
+      onUpdateProfile?.(text);
+      onNavigateToSection?.("profile");
+    } else if (target === "experience" && targetIdx !== undefined) {
+      const newBullets = text.split("\n").map(b => b.replace(/^[•\-–]\s*/, "").trim()).filter(b => b.length > 0);
+      const existing = cv.experience[targetIdx]?.bullets || [];
+      const merged = [...existing, ...newBullets.filter(nb => !existing.includes(nb))];
+      onUpdateExperienceBullets?.(targetIdx, merged);
+      onNavigateToSection?.("experience");
+    } else if (target === "skills") {
+      const newSkills = text.split(/[,\n]/).map(s => s.trim()).filter(s => s.length > 0);
+      onUpdateSkills?.(newSkills);
+      onNavigateToSection?.("skills");
+    }
+    toast({ title: isSv ? "✅ Fix applicerad" : "✅ Fix applied" });
+    setAutoFixPreview(null);
+  };
 
   // ── Fix issue wizard overlay ──
   if (fixingIssue && canFix) {
