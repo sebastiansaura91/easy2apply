@@ -14,7 +14,7 @@ import { findCvIssues, analyzeAllBullets, CvIssue } from "@/lib/cv-quality";
 import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 import {
   CheckCircle2, AlertTriangle, AlertOctagon, Loader2, ChevronDown, ChevronRight,
-  Languages, Target, Eye, Zap, ArrowRight, Sparkles, Wrench,
+  Languages, Target, Eye, Zap, ArrowRight, Sparkles, Wrench, RefreshCw, TrendingUp, TrendingDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -57,6 +57,9 @@ export function InsightsPanel({
   const [showJob, setShowJob] = useState(false);
   const [bulletsOpen, setBulletsOpen] = useState(false);
   const [fixingIssue, setFixingIssue] = useState<FirstScanIssue | null>(null);
+  const [analyzedSnapshot, setAnalyzedSnapshot] = useState<string | null>(null);
+  const [analyzedAt, setAnalyzedAt] = useState<Date | null>(null);
+  const [lastDelta, setLastDelta] = useState<number | null>(null);
   const isSv = cvLanguage === "sv";
 
   // ── Real-time issues (client-side, instant) ──
@@ -87,15 +90,36 @@ export function InsightsPanel({
   const healthColor = healthScore >= 80 ? "text-green-600" : healthScore >= 60 ? "text-warning" : "text-destructive";
   const healthLabel = healthScore >= 80 ? (isSv ? "Bra grund" : "Good foundation") : healthScore >= 60 ? (isSv ? "Behöver justeringar" : "Needs adjustments") : (isSv ? "Kräver uppmärksamhet" : "Needs attention");
 
+  // Stale detection — has the CV changed since last analysis?
+  const cvSignature = useMemo(() => JSON.stringify(cv) + "|" + jobText.trim(), [cv, jobText]);
+  const isStale = !!deepResult && analyzedSnapshot !== null && analyzedSnapshot !== cvSignature;
+
   const runDeep = async () => {
     setLoading(true);
+    const prevScore = deepResult?.overall_score ?? null;
     try {
       const { data, error } = await supabase.functions.invoke("ats-check", {
         body: { resume_content_json: cv, job_posting_text: jobText.trim() || undefined, locale: cvLanguage },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setDeepResult(data as AtsCheckResult);
+      const newResult = data as AtsCheckResult;
+      setDeepResult(newResult);
+      setAnalyzedSnapshot(cvSignature);
+      setAnalyzedAt(new Date());
+      if (prevScore !== null) {
+        const delta = Math.round(newResult.overall_score - prevScore);
+        setLastDelta(delta);
+        const sign = delta > 0 ? "+" : "";
+        toast({
+          title: isSv ? "Analys uppdaterad" : "Analysis updated",
+          description: delta === 0
+            ? (isSv ? "Inget poängskifte" : "No score change")
+            : `${sign}${delta} ${isSv ? "jämfört med förra" : "vs previous"}`,
+        });
+      } else {
+        setLastDelta(null);
+      }
     } catch (e: any) {
       toast({ title: "Analysis failed", description: e.message, variant: "destructive" });
     } finally { setLoading(false); }
@@ -230,14 +254,44 @@ export function InsightsPanel({
       </Collapsible>
 
       {/* ── Deep analysis CTA ── */}
-      <Button onClick={runDeep} disabled={loading} className="w-full text-xs h-9" variant={deepResult ? "outline" : "default"}>
-        {loading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Eye className="h-3.5 w-3.5 mr-1.5" />}
+      <Button
+        onClick={runDeep}
+        disabled={loading}
+        className="w-full text-xs h-9"
+        variant={deepResult ? (isStale ? "default" : "outline") : "default"}
+      >
+        {loading
+          ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+          : deepResult
+            ? <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isStale ? "animate-pulse" : ""}`} />
+            : <Eye className="h-3.5 w-3.5 mr-1.5" />}
         {loading
           ? (isSv ? "Analyserar..." : "Analyzing...")
           : deepResult
-            ? (isSv ? "Kör djupanalys igen" : "Re-run deep analysis")
+            ? (isStale
+                ? (isSv ? "Analysera om — du har gjort ändringar" : "Re-analyze — you've made changes")
+                : (isSv ? "Kör djupanalys igen" : "Re-run deep analysis"))
             : (isSv ? "Se hur ditt CV presterar" : "See how your CV performs")}
       </Button>
+
+      {/* ── Re-analyze status bar ── */}
+      {deepResult && analyzedAt && !loading && (
+        <div className={`flex items-center justify-between text-[10px] px-2 py-1.5 rounded-md ${
+          isStale ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"
+        }`}>
+          <span className="flex items-center gap-1">
+            {isStale
+              ? (isSv ? "Resultat är inaktuella" : "Results are out of date")
+              : (isSv ? `Analyserad ${analyzedAt.toLocaleTimeString()}` : `Analyzed ${analyzedAt.toLocaleTimeString()}`)}
+          </span>
+          {lastDelta !== null && lastDelta !== 0 && (
+            <span className={`flex items-center gap-0.5 font-semibold ${lastDelta > 0 ? "text-green-600" : "text-destructive"}`}>
+              {lastDelta > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              {lastDelta > 0 ? "+" : ""}{lastDelta}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ── Deep results ── */}
       {deepResult && (
