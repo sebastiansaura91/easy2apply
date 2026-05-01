@@ -403,15 +403,63 @@ export function InsightsPanel({
                     <ArrowRight className="h-2.5 w-2.5" /> {issue.fix}
                   </p>
                   {canFix && (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="w-full h-7 text-[10px] gap-1.5 mt-1"
-                      onClick={() => setFixingIssue(issue)}
-                    >
-                      <Wrench className="h-3 w-3" />
-                      {isSv ? "Fixa detta" : "Fix this issue"}
-                    </Button>
+                    <>
+                      {autoFixPreview?.issueIdx === i ? (
+                        <div className="space-y-2 mt-1 rounded-md border border-primary/30 bg-background p-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-semibold uppercase tracking-wider text-primary flex items-center gap-1">
+                              <Sparkles className="h-2.5 w-2.5" />
+                              {isSv ? "Förslag" : "Suggestion"} →{" "}
+                              {autoFixPreview.target === "profile" ? (isSv ? "Profil" : "Profile")
+                                : autoFixPreview.target === "skills" ? (isSv ? "Kompetenser" : "Skills")
+                                : (cv.experience[autoFixPreview.targetIdx ?? 0]?.title || "Experience")}
+                            </span>
+                          </div>
+                          <Textarea
+                            value={autoFixPreview.text}
+                            onChange={e => setAutoFixPreview(p => p ? { ...p, text: e.target.value } : p)}
+                            rows={4}
+                            className="text-[10px] leading-relaxed"
+                          />
+                          <p className="text-[9px] text-muted-foreground italic">{autoFixPreview.explanation}</p>
+                          <div className="flex gap-1.5">
+                            <Button size="sm" className="flex-1 h-7 text-[10px] gap-1" onClick={applyAutoFix}>
+                              <CheckCircle2 className="h-3 w-3" />
+                              {isSv ? "Applicera" : "Apply"}
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => setAutoFixPreview(null)}>
+                              {isSv ? "Avbryt" : "Cancel"}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1.5 mt-1">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="flex-1 h-7 text-[10px] gap-1.5"
+                            disabled={autoFixingIdx !== null}
+                            onClick={() => runAutoFix(issue, i)}
+                          >
+                            {autoFixingIdx === i
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <Zap className="h-3 w-3" />}
+                            {autoFixingIdx === i
+                              ? (isSv ? "Fixar..." : "Fixing...")
+                              : (isSv ? "Auto-fixa" : "Auto-fix")}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[10px] gap-1"
+                            onClick={() => setFixingIssue(issue)}
+                          >
+                            <Wrench className="h-3 w-3" />
+                            {isSv ? "Anpassa" : "Refine"}
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}
