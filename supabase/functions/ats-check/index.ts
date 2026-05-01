@@ -14,7 +14,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const renderedText = buildRenderedText(resume_content_json);
+    const renderedText = buildRenderedText(resume_content_json, locale === "en" ? "en" : "sv");
     const bulletList = extractBullets(resume_content_json);
     const lang = locale === "en" ? "en" : "sv";
     const systemPrompt = lang === "sv" ? SYSTEM_PROMPT_SV : SYSTEM_PROMPT_EN;
@@ -125,7 +125,10 @@ function extractBullets(cv: any): { id: string; text: string }[] {
 }
 
 // --- Build plain text ---
-function buildRenderedText(cv: any): string {
+function buildRenderedText(cv: any, lang: "sv" | "en" = "sv"): string {
+  const H = lang === "en"
+    ? { profile: "PROFILE", experience: "EXPERIENCE", present: "Present", education: "EDUCATION", skills: "SKILLS", certifications: "CERTIFICATIONS", projects: "PROJECTS", languages: "LANGUAGES", other: "OTHER" }
+    : { profile: "PROFIL", experience: "ARBETSLIVSERFARENHET", present: "Nuvarande", education: "UTBILDNING", skills: "KOMPETENSER", certifications: "CERTIFIERINGAR", projects: "PROJEKT", languages: "SPRÅK", other: "ÖVRIGT" };
   const lines: string[] = [];
   if (cv?.contact) {
     const c = cv.contact;
@@ -138,14 +141,14 @@ function buildRenderedText(cv: any): string {
   for (const section of sections) {
     switch (section.type) {
       case "profile":
-        if (cv.profile) lines.push("PROFIL", cv.profile, "");
+        if (cv.profile) lines.push(H.profile, cv.profile, "");
         break;
       case "experience":
         if (cv.experience?.length) {
-          lines.push("ARBETSLIVSERFARENHET");
+          lines.push(H.experience);
           for (const exp of cv.experience) {
             lines.push(`${exp.title}${exp.company ? ", " + exp.company : ""}${exp.location ? " – " + exp.location : ""}`);
-            lines.push(`${exp.startDate} – ${exp.isPresent ? "Nuvarande" : exp.endDate}`);
+            lines.push(`${exp.startDate} – ${exp.isPresent ? H.present : exp.endDate}`);
             for (const b of exp.bullets || []) if (b.trim()) lines.push(`• ${b}`);
             lines.push("");
           }
@@ -153,7 +156,7 @@ function buildRenderedText(cv: any): string {
         break;
       case "education":
         if (cv.education?.length) {
-          lines.push("UTBILDNING");
+          lines.push(H.education);
           for (const edu of cv.education) {
             lines.push(`${edu.degree}${edu.field ? ", " + edu.field : ""}`);
             lines.push(`${edu.school} · ${edu.startDate} – ${edu.endDate}`);
@@ -162,18 +165,18 @@ function buildRenderedText(cv: any): string {
         }
         break;
       case "skills":
-        if (cv.skills?.length) lines.push("KOMPETENSER", cv.skills.join(", "), "");
+        if (cv.skills?.length) lines.push(H.skills, cv.skills.join(", "), "");
         break;
       case "certifications":
         if (cv.certifications?.length) {
-          lines.push("CERTIFIERINGAR");
+          lines.push(H.certifications);
           for (const cert of cv.certifications) lines.push(`${cert.name} – ${cert.issuer} (${cert.date})`);
           lines.push("");
         }
         break;
       case "projects":
         if (cv.projects?.length) {
-          lines.push("PROJEKT");
+          lines.push(H.projects);
           for (const p of cv.projects) {
             lines.push(p.name);
             if (p.description) lines.push(p.description);
@@ -184,13 +187,13 @@ function buildRenderedText(cv: any): string {
         break;
       case "languages":
         if (cv.languages?.length) {
-          lines.push("SPRÅK");
+          lines.push(H.languages);
           for (const l of cv.languages) lines.push(`${l.language} – ${l.level}`);
           lines.push("");
         }
         break;
       case "other":
-        if (cv.other) lines.push("ÖVRIGT", cv.other, "");
+        if (cv.other) lines.push(H.other, cv.other, "");
         break;
     }
   }
