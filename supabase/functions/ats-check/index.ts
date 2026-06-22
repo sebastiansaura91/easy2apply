@@ -122,6 +122,22 @@ serve(async (req) => {
 });
 
 // --- Extract bullets ---
+function collectDates(cv: any): Date[] {
+  const out: Date[] = [];
+  const push = (s: any) => {
+    if (typeof s !== "string") return;
+    const m = s.match(/(\d{4})[-/\s]?(\d{1,2})?/);
+    if (!m) return;
+    const y = parseInt(m[1], 10);
+    const mo = m[2] ? Math.min(12, Math.max(1, parseInt(m[2], 10))) : 1;
+    if (y >= 1900 && y <= 2100) out.push(new Date(y, mo - 1, 1));
+  };
+  for (const e of cv?.experience || []) { push(e?.startDate); if (!e?.isPresent) push(e?.endDate); }
+  for (const e of cv?.education || []) { push(e?.startDate); if (!e?.isPresent) push(e?.endDate); }
+  for (const e of cv?.projects || []) { push(e?.startDate); if (!e?.isPresent) push(e?.endDate); }
+  return out;
+}
+
 function extractBullets(cv: any): { id: string; text: string }[] {
   const bullets: { id: string; text: string }[] = [];
   for (let i = 0; i < (cv.experience?.length || 0); i++) {
