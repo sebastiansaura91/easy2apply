@@ -22,7 +22,15 @@ serve(async (req) => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-    let userPrompt = `## TODAY'S DATE\n${todayStr}\n\n`;
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth() + 1;
+    let userPrompt = `## TODAY'S DATE\n${todayStr} (year=${todayYear}, month=${todayMonth})\n\n`;
+    userPrompt += `## DATE RULES (STRICT)\n`;
+    userPrompt += `- A date is "in the future" ONLY if it is strictly after ${todayStr}.\n`;
+    userPrompt += `- Any date with a year < ${todayYear} is in the PAST. Never flag it as future.\n`;
+    userPrompt += `- A date in year ${todayYear} is in the future only if its month > ${todayMonth}.\n`;
+    userPrompt += `- "Present"/"Pågående"/"Nuvarande" combined with a past start date is NORMAL (current employment). Do NOT flag this as a future employment date.\n`;
+    userPrompt += `- Before raising any "future date" issue, recompute: is the start date strictly after ${todayStr}? If not, do NOT include the issue.\n\n`;
     userPrompt += `## CV DATA (JSON)\n\`\`\`json\n${JSON.stringify(resume_content_json, null, 2)}\n\`\`\`\n\n`;
     userPrompt += `## RENDERED PLAIN TEXT (what ATS sees)\n\`\`\`\n${renderedText}\n\`\`\`\n\n`;
     userPrompt += `## BULLETS WITH IDS\n\`\`\`json\n${JSON.stringify(bulletList, null, 2)}\n\`\`\`\n\n`;
@@ -92,6 +100,15 @@ serve(async (req) => {
       });
     }
 
+    // Deterministic guard: drop "future date" issues when no CV date is actually after today.
+    const hasFutureDate = collectDates(resume_content_json).some(d => d > today);
+    if (!hasFutureDate && Array.isArray(result?.first_scan_issues)) {
+      result.first_scan_issues = result.first_scan_issues.filter((iss: any) => {
+        const hay = `${iss?.title || ""} ${iss?.why_it_matters || ""} ${iss?.fix || ""}`.toLowerCase();
+        return !(hay.includes("future") || hay.includes("framtid"));
+      });
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -105,6 +122,22 @@ serve(async (req) => {
 });
 
 // --- Extract bullets ---
+function collectDates(cv: any): Date[] {
+  const out: Date[] = [];
+  const push = (s: any) => {
+    if (typeof s !== "string") return;
+    const m = s.match(/(\d{4})[-/\s]?(\d{1,2})?/);
+    if (!m) return;
+    const y = parseInt(m[1], 10);
+    const mo = m[2] ? Math.min(12, Math.max(1, parseInt(m[2], 10))) : 1;
+    if (y >= 1900 && y <= 2100) out.push(new Date(y, mo - 1, 1));
+  };
+  for (const e of cv?.experience || []) { push(e?.startDate); if (!e?.isPresent) push(e?.endDate); }
+  for (const e of cv?.education || []) { push(e?.startDate); if (!e?.isPresent) push(e?.endDate); }
+  for (const e of cv?.projects || []) { push(e?.startDate); if (!e?.isPresent) push(e?.endDate); }
+  return out;
+}
+
 function extractBullets(cv: any): { id: string; text: string }[] {
   const bullets: { id: string; text: string }[] = [];
   for (let i = 0; i < (cv.experience?.length || 0); i++) {
