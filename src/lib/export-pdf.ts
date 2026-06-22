@@ -177,6 +177,17 @@ export async function exportToPdf(
         if (cv.experience.length === 0) break;
         drawH2(t("sectionExperience"));
         for (const exp of cv.experience) {
+          // Keep role header together with at least its date + first bullet.
+          // If they don't fit on the current page, start a new page first.
+          const validBullets = exp.bullets.filter(Boolean);
+          const headerH = 10 * 1.4 * 0.3528; // h3 line
+          const dateH = 9 * 1.4 * 0.3528;
+          const firstBulletH = validBullets.length > 0 ? 10 * 1.4 * 0.3528 : 0;
+          const needed = headerH + dateH + firstBulletH + 2;
+          if (y + needed > pageH - marginBottom) {
+            pdf.addPage();
+            y = marginTop;
+          }
           // Title line
           let titleLine = exp.title;
           if (exp.company) titleLine += `, ${exp.company}`;
@@ -189,7 +200,6 @@ export async function exportToPdf(
           y += 1;
 
           // Bullets
-          const validBullets = exp.bullets.filter(Boolean);
           for (const bullet of validBullets) {
             drawBullet(bullet);
           }
@@ -235,6 +245,14 @@ export async function exportToPdf(
         if (cv.projects.length === 0) break;
         drawH2(t("sectionProjects"));
         for (const p of cv.projects) {
+          // Keep project header together with its first line of content.
+          const headerH = 10 * 1.4 * 0.3528;
+          const firstLineH = (p.description || p.bullets[0]) ? 10 * 1.4 * 0.3528 : 0;
+          const needed = headerH + firstLineH + 2;
+          if (y + needed > pageH - marginBottom) {
+            pdf.addPage();
+            y = marginTop;
+          }
           drawH3(p.name);
           if (p.description) {
             drawText(p.description, marginL, y, { color: colors.gray });
