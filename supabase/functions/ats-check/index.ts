@@ -22,7 +22,15 @@ serve(async (req) => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-    let userPrompt = `## TODAY'S DATE\n${todayStr}\n\n`;
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth() + 1;
+    let userPrompt = `## TODAY'S DATE\n${todayStr} (year=${todayYear}, month=${todayMonth})\n\n`;
+    userPrompt += `## DATE RULES (STRICT)\n`;
+    userPrompt += `- A date is "in the future" ONLY if it is strictly after ${todayStr}.\n`;
+    userPrompt += `- Any date with a year < ${todayYear} is in the PAST. Never flag it as future.\n`;
+    userPrompt += `- A date in year ${todayYear} is in the future only if its month > ${todayMonth}.\n`;
+    userPrompt += `- "Present"/"Pågående"/"Nuvarande" combined with a past start date is NORMAL (current employment). Do NOT flag this as a future employment date.\n`;
+    userPrompt += `- Before raising any "future date" issue, recompute: is the start date strictly after ${todayStr}? If not, do NOT include the issue.\n\n`;
     userPrompt += `## CV DATA (JSON)\n\`\`\`json\n${JSON.stringify(resume_content_json, null, 2)}\n\`\`\`\n\n`;
     userPrompt += `## RENDERED PLAIN TEXT (what ATS sees)\n\`\`\`\n${renderedText}\n\`\`\`\n\n`;
     userPrompt += `## BULLETS WITH IDS\n\`\`\`json\n${JSON.stringify(bulletList, null, 2)}\n\`\`\`\n\n`;
