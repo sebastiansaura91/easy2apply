@@ -100,6 +100,15 @@ serve(async (req) => {
       });
     }
 
+    // Deterministic guard: drop "future date" issues when no CV date is actually after today.
+    const hasFutureDate = collectDates(resume_content_json).some(d => d > today);
+    if (!hasFutureDate && Array.isArray(result?.first_scan_issues)) {
+      result.first_scan_issues = result.first_scan_issues.filter((iss: any) => {
+        const hay = `${iss?.title || ""} ${iss?.why_it_matters || ""} ${iss?.fix || ""}`.toLowerCase();
+        return !(hay.includes("future") || hay.includes("framtid"));
+      });
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
