@@ -23,6 +23,8 @@ interface Props {
   cvLanguage: "sv" | "en";
   t: (k: any) => string;
   jobPostingText?: string;
+  /** Pre-computed analysis (e.g. carried from the tailoring wizard) to show immediately. */
+  initialResult?: AtsCheckResult | null;
   onApplyBullet?: (bulletPath: string, newText: string) => void;
   onNavigateToSection?: (sectionType: string) => void;
   onUpdateProfile?: (text: string) => void;
@@ -47,11 +49,11 @@ function severityBorder(severity: CvIssue["severity"]) {
 }
 
 export function InsightsPanel({
-  cv, cvLanguage, t, jobPostingText, onApplyBullet, onNavigateToSection,
+  cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
   onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills,
 }: Props) {
   const { toast } = useToast();
-  const [deepResult, setDeepResult] = useState<AtsCheckResult | null>(null);
+  const [deepResult, setDeepResult] = useState<AtsCheckResult | null>(initialResult ?? null);
   const [loading, setLoading] = useState(false);
   const [jobText, setJobText] = useState(jobPostingText || "");
   const [showJob, setShowJob] = useState(false);

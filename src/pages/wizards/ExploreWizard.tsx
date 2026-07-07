@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFlow } from "@/contexts/FlowContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CVContent } from "@/types/cv";
 import { AtsCheckResult } from "@/types/ats-check";
@@ -18,6 +19,7 @@ import { v4 as uuidv4 } from "uuid";
 export default function ExploreWizard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const flow = useFlow();
   const { toast } = useToast();
   const [step, setStep] = useState<"upload" | "loading" | "results">("upload");
   const [parsedCV, setParsedCV] = useState<CVContent | null>(null);
@@ -47,8 +49,9 @@ export default function ExploreWizard() {
 
   const improveInEditor = async () => {
     if (!user || !parsedCV) return;
+    if (result) flow.setAnalysis(result);
     // Picked an existing CV → open it in place instead of cloning a copy.
-    if (existingId) { navigate(`/editor/${existingId}`); return; }
+    if (existingId) { flow.setResumeId(existingId); navigate(`/editor/${existingId}`); return; }
     // Fresh upload → create one new resume.
     const id = uuidv4();
     const title = parsedCV.contact?.name ? `${parsedCV.contact.name} – CV` : "My CV";
@@ -56,6 +59,7 @@ export default function ExploreWizard() {
       id, user_id: user.id, title, language: cvLang, template_id: "default", content_json: parsedCV as any,
     });
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    flow.setResumeId(id);
     navigate(`/editor/${id}`);
   };
 

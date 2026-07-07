@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFlow } from "@/contexts/FlowContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CVContent, emptyCV } from "@/types/cv";
 import { convertLanguageLevels } from "@/lib/language-level-mapping";
@@ -9,9 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks } from "lucide-react";
+import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { InsightsPanel } from "@/components/editor/InsightsPanel";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
@@ -28,7 +31,10 @@ const CVEditor = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user } = useAuth();
+  const flow = useFlow();
   const { toast } = useToast();
+  const [insightsOpen, setInsightsOpen] = useState(false);
+  const autoOpenedRef = useRef(false);
 
   const [cv, setCv] = useState<CVContent>(emptyCV);
   const [title, setTitle] = useState("");
@@ -174,6 +180,32 @@ const CVEditor = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [mode, clampedStep, enabledSections.length]);
 
+  // Tailoring analysis carried in from a wizard, scoped to THIS resume so a stale
+  // analysis from another CV never shows here.
+  const flowScoped = flow.resumeId === id;
+  const seededJob = flowScoped ? (flow.jobPostingText || undefined) : undefined;
+  const seededResult = flowScoped ? flow.analysis : null;
+
+  // Auto-open the insights panel once when arriving from a wizard with analysis/job context,
+  // so "Fix this in editor" lands on the actual issues to adjust for the role.
+  useEffect(() => {
+    if (loading || autoOpenedRef.current) return;
+    if (flowScoped && (flow.analysis || (flow.jobPostingText && flow.jobPostingText.trim()))) {
+      setInsightsOpen(true);
+      autoOpenedRef.current = true;
+    }
+  }, [loading, flowScoped, flow.analysis, flow.jobPostingText]);
+
+  const updateProfile = (text: string) => updateCv("profile", text);
+  const updateExperienceBullets = (expIdx: number, bullets: string[]) =>
+    setCv(prev => ({ ...prev, experience: prev.experience.map((e, i) => i === expIdx ? { ...e, bullets } : e) }));
+  const updateSkills = (skills: string[]) => updateCv("skills", skills);
+  const navigateToSection = (sectionType: string) => {
+    const idx = enabledSections.findIndex(s => s.type === sectionType);
+    if (idx >= 0) { setMode("step"); setStepIdx(idx); }
+    setInsightsOpen(false);
+  };
+
   const safeName = (title || "cv").replace(/[^a-zA-Z0-9åäöÅÄÖ_-]/g, "_");
   const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
 
@@ -199,6 +231,9 @@ const CVEditor = () => {
           <div className="flex items-center gap-1.5">
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => navigate("/wizard/apply")}>
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Tailor for a job" : "Anpassa för jobb"}
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setInsightsOpen(true)}>
+              <Target className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Insights" : "Analys"}
             </Button>
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setStyleOpen(true)}>
               <Palette className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Style" : "Stil"}
@@ -340,6 +375,26 @@ const CVEditor = () => {
           </ScrollArea>
         </main>
       )}
+
+      {/* Tailoring insights panel */}
+      <Sheet open={insightsOpen} onOpenChange={setInsightsOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 overflow-y-auto">
+          <SheetHeader className="p-4 pb-0">
+            <SheetTitle>{cvLanguage === "en" ? "Tailoring insights" : "Analys & förbättring"}</SheetTitle>
+          </SheetHeader>
+          <InsightsPanel
+            cv={cv}
+            cvLanguage={cvLanguage}
+            t={t}
+            jobPostingText={seededJob}
+            initialResult={seededResult}
+            onNavigateToSection={navigateToSection}
+            onUpdateProfile={updateProfile}
+            onUpdateExperienceBullets={updateExperienceBullets}
+            onUpdateSkills={updateSkills}
+          />
+        </SheetContent>
+      </Sheet>
 
       {/* Style dialog (stub) */}
       <Dialog open={styleOpen} onOpenChange={setStyleOpen}>

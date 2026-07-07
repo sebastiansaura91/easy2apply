@@ -55,8 +55,9 @@ export default function ImproveWizard() {
 
   const openEditor = async () => {
     if (!user || !parsedCV) return;
+    if (result) flow.setAnalysis(result);
     // Picked an existing CV → open it in place instead of cloning a copy.
-    if (existingId) { navigate(`/editor/${existingId}`); return; }
+    if (existingId) { flow.setResumeId(existingId); navigate(`/editor/${existingId}`); return; }
     // Fresh upload → create one new resume.
     const id = uuidv4();
     const title = parsedCV.contact?.name ? `${parsedCV.contact.name} – CV` : "My CV";
@@ -64,6 +65,7 @@ export default function ImproveWizard() {
       id, user_id: user.id, title, language: cvLang, template_id: "default", content_json: parsedCV as any,
     });
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    flow.setResumeId(id);
     navigate(`/editor/${id}`);
   };
 

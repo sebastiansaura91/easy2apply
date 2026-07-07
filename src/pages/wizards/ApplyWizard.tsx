@@ -131,6 +131,7 @@ export default function ApplyWizard() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setMatchResult(data as AtsCheckResult);
+      flow.setAnalysis(data as AtsCheckResult);
       setStep(3);
     } catch (e: any) {
       toast({ title: "Match analysis failed", description: e.message, variant: "destructive" });
