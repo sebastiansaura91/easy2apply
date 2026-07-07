@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, FileDown, Globe, Languages, Loader2, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
@@ -19,8 +20,6 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { SortableSectionItem } from "@/components/cv-editor/SortableSectionItem";
 import { A4Preview } from "@/components/cv-editor/A4Preview";
 import { SectionFormRenderer } from "@/components/cv-editor/SectionForms";
-import { SectionNav } from "@/components/editor/SectionNav";
-import { InsightsPanel } from "@/components/editor/InsightsPanel";
 import { cvHeadings } from "@/i18n/cvHeadings";
 import { exportToPdf } from "@/lib/export-pdf";
 import { detectCvLanguages } from "@/lib/language-detection";
@@ -39,9 +38,10 @@ const CVEditor = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [translating, setTranslating] = useState(false);
-  const [activeSection, setActiveSection] = useState("contact");
-  const [showInsights, setShowInsights] = useState(true);
-  const [showPreview, setShowPreview] = useState(false);
+  const [mode, setMode] = useState<"step" | "overview">("step");
+  const [stepIdx, setStepIdx] = useState(0);
+  const [styleOpen, setStyleOpen] = useState(false);
+  const [pageBreaksOpen, setPageBreaksOpen] = useState(false);
   const saveTimeout = useRef<number | null>(null);
 
   const sensors = useSensors(
@@ -123,67 +123,98 @@ const CVEditor = () => {
     } finally { setTranslating(false); }
   };
 
-  const handleApplyBullet = (bulletPath: string, newText: string) => {
-    const match = bulletPath.match(/^(\w+)\[(\d+)\]\.bullets\[(\d+)\]$/);
-    if (!match) return;
-    const [, section, si, bi] = match;
-    const sIdx = parseInt(si), bIdx = parseInt(bi);
-    if (section === "experience") {
-      const updated = [...cv.experience];
-      if (updated[sIdx]?.bullets?.[bIdx] !== undefined) {
-        updated[sIdx] = { ...updated[sIdx], bullets: updated[sIdx].bullets.map((b, i) => i === bIdx ? newText : b) };
-        updateCv("experience", updated);
-      }
-    } else if (section === "projects") {
-      const updated = [...cv.projects];
-      if (updated[sIdx]?.bullets?.[bIdx] !== undefined) {
-        updated[sIdx] = { ...updated[sIdx], bullets: updated[sIdx].bullets.map((b, i) => i === bIdx ? newText : b) };
-        updateCv("projects", updated);
-      }
-    }
-  };
-
   const enabledSections = [...cv.sections].sort((a, b) => a.order - b.order).filter(s => s.enabled);
+  const clampedStep = Math.min(stepIdx, Math.max(0, enabledSections.length - 1));
+  const currentSection = enabledSections[clampedStep];
+  const isFirst = clampedStep === 0;
+  const isLast = clampedStep >= enabledSections.length - 1;
 
-  const scrollToSection = (type: string) => {
-    setActiveSection(type);
-    document.getElementById(`section-${type}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const goNext = () => {
+    if (isLast) return;
+    setStepIdx(clampedStep + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  const goPrev = () => {
+    if (isFirst) return;
+    setStepIdx(clampedStep - 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    if (mode !== "step") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter") return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
+      e.preventDefault();
+      goNext();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode, clampedStep, enabledSections.length]);
+
+  const safeName = (title || "cv").replace(/[^a-zA-Z0-9åäöÅÄÖ_-]/g, "_");
+  const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
 
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">{t("loading")}</p></div>;
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Top bar */}
-      <nav className="border-b border-border bg-card/80 backdrop-blur-sm flex-shrink-0 z-50">
-        <div className="flex items-center justify-between h-12 px-3">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/dashboard")}>
+      <nav className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto flex items-center justify-between h-14 px-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => navigate("/dashboard")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <Input value={title} onChange={e => setTitle(e.target.value)} className="h-7 w-48 text-xs font-medium border-transparent hover:border-input focus:border-input" />
+            <Input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              className="h-8 w-56 text-sm font-medium border-transparent hover:border-input focus:border-input bg-transparent"
+              placeholder={cvLanguage === "en" ? "Untitled resume" : "Namnlöst CV"}
+            />
+            {saving && <span className="text-[10px] text-muted-foreground ml-1">{cvLanguage === "en" ? "Saving…" : "Sparar…"}</span>}
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => navigate("/wizard/apply")}>
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Tailor for a job" : "Anpassa för jobb"}
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setStyleOpen(true)}>
+              <Palette className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Style" : "Stil"}
+            </Button>
+            {/* Mode toggle */}
+            <div className="flex items-center gap-0 rounded-md border border-border p-0.5 bg-muted/30">
+              <button
+                type="button"
+                onClick={() => setMode("overview")}
+                className={`h-7 px-2.5 text-[11px] rounded inline-flex items-center gap-1 ${mode === "overview" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+              >
+                <LayoutList className="h-3 w-3" />{cvLanguage === "en" ? "Overview" : "Översikt"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("step")}
+                className={`h-7 px-2.5 text-[11px] rounded inline-flex items-center gap-1 ${mode === "step" ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}
+              >
+                <ListChecks className="h-3 w-3" />{cvLanguage === "en" ? "Step-by-step" : "Steg-för-steg"}
+              </button>
+            </div>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setPageBreaksOpen(true)}>
+              <FileText className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Page breaks" : "Sidbrytningar"}
+            </Button>
+            <div className="flex items-center gap-1 ml-1">
               <Globe className="h-3 w-3 text-muted-foreground" />
               <Select value={cvLanguage} onValueChange={(v: "sv" | "en") => setCvLanguage(v)}>
-                <SelectTrigger className="h-7 w-20 text-[10px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 w-20 text-[11px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sv">Svenska</SelectItem>
                   <SelectItem value="en">English</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowInsights(!showInsights)}>
-              {showInsights ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+            <Button size="sm" className="h-8 text-xs" onClick={doExport}>
+              <FileDown className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Download PDF" : "Ladda ner PDF"}
             </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={saveCV} disabled={saving}>
-              <Save className="mr-1 h-3 w-3" />{saving ? "Saving..." : "Save"}
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
-              const safeName = (title || "cv").replace(/[^a-zA-Z0-9åäöÅÄÖ_-]/g, "_");
-              exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
-            }}><FileDown className="mr-1 h-3 w-3" />PDF</Button>
           </div>
         </div>
       </nav>
@@ -202,31 +233,80 @@ const CVEditor = () => {
         </div>
       )}
 
-      {/* 3-zone layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Section nav */}
-        <aside className="w-48 border-r border-border bg-card/30 overflow-y-auto flex-shrink-0 hidden md:block">
-          <SectionNav sections={enabledSections} activeSection={activeSection} onSelect={scrollToSection} cv={cv} cvLanguage={cvLanguage} />
-          <div className="px-3 pb-4">
-            <Button variant="ghost" size="sm" className="w-full text-xs justify-start" onClick={() => setShowPreview(!showPreview)}>
-              {showPreview ? "Hide preview" : "Show preview"}
-            </Button>
-          </div>
-        </aside>
+      {/* Main */}
+      {mode === "step" ? (
+        <main className="flex-1">
+          <div className="max-w-4xl mx-auto px-6 py-8">
+            <div className="rounded-lg border border-border bg-card/40 p-8">
+              {/* Progress bar */}
+              <div className="flex items-center gap-1.5 mb-8">
+                {enabledSections.map((s, i) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setStepIdx(i)}
+                    aria-label={tCv(`section${s.type.charAt(0).toUpperCase() + s.type.slice(1)}`)}
+                    className={`h-1 flex-1 rounded-full transition-colors ${i <= clampedStep ? "bg-primary" : "bg-muted"}`}
+                  />
+                ))}
+              </div>
 
-        {/* Center: Editing */}
-        <main className="flex-1 overflow-y-auto">
+              {/* Section title */}
+              {currentSection && (
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="text-2xl font-semibold tracking-tight">
+                    {tCv(`section${currentSection.type.charAt(0).toUpperCase() + currentSection.type.slice(1)}`)}
+                  </h2>
+                  <span className="text-[11px] text-muted-foreground">
+                    {clampedStep + 1} / {enabledSections.length}
+                  </span>
+                </div>
+              )}
+
+              {/* Current section form */}
+              {currentSection && (
+                <div className="[&_.card]:border-0">
+                  <SectionFormRenderer sectionType={currentSection.type} cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />
+                </div>
+              )}
+            </div>
+
+            {/* Footer nav */}
+            <div className="flex items-center justify-between mt-6 px-2">
+              <Button variant="ghost" size="sm" onClick={goPrev} disabled={isFirst}>
+                <ArrowLeft className="h-4 w-4 mr-1.5" />{cvLanguage === "en" ? "Back" : "Tillbaka"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {cvLanguage === "en" ? "Press Enter to continue." : "Tryck Enter för att fortsätta."}
+              </span>
+              {isLast ? (
+                <Button size="sm" onClick={doExport}>
+                  <FileDown className="h-4 w-4 mr-1.5" />{cvLanguage === "en" ? "Download PDF" : "Ladda ner PDF"}
+                </Button>
+              ) : (
+                <Button size="sm" onClick={goNext}>
+                  {cvLanguage === "en" ? "Continue" : "Fortsätt"}<ArrowRight className="h-4 w-4 ml-1.5" />
+                </Button>
+              )}
+            </div>
+
+            <p className="text-center text-[11px] text-muted-foreground mt-2">
+              {cvLanguage === "en" ? "You can edit this later." : "Du kan redigera detta senare."}
+            </p>
+          </div>
+        </main>
+      ) : (
+        <main className="flex-1">
           <ScrollArea className="h-full">
-            <div className="max-w-2xl mx-auto p-6 space-y-6">
+            <div className="max-w-3xl mx-auto p-6 space-y-6">
               {enabledSections.map(section => (
                 <div key={section.id} id={`section-${section.type}`}>
                   <SectionFormRenderer sectionType={section.type} cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />
                 </div>
               ))}
 
-              {/* Section management */}
               <div className="border-t border-border pt-6">
-                <p className="text-xs font-semibold uppercase text-muted-foreground mb-3">Manage sections</p>
+                <p className="text-xs font-semibold uppercase text-muted-foreground mb-3">{cvLanguage === "en" ? "Manage sections" : "Hantera sektioner"}</p>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={cv.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                     {[...cv.sections].sort((a, b) => a.order - b.order).map(section => (
@@ -235,47 +315,38 @@ const CVEditor = () => {
                   </SortableContext>
                 </DndContext>
               </div>
-
-              {/* Inline preview */}
-              {showPreview && (
-                <div className="border-t border-border pt-6">
-                  <p className="text-xs font-semibold uppercase text-muted-foreground mb-4">Preview</p>
-                  <div className="bg-muted/50 p-4 rounded-lg flex justify-center overflow-auto">
-                    <div className="transform scale-[0.6] origin-top">
-                      <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </ScrollArea>
         </main>
+      )}
 
-        {/* Right: Insights */}
-        {showInsights && (
-          <aside className="w-72 border-l border-border bg-card/30 overflow-y-auto flex-shrink-0 hidden lg:block">
-            <ScrollArea className="h-full">
-              <InsightsPanel
-                cv={cv}
-                cvLanguage={cvLanguage}
-                t={t}
-                jobPostingText={flow.jobPostingText || undefined}
-                onApplyBullet={handleApplyBullet}
-                onNavigateToSection={scrollToSection}
-                onUpdateProfile={(text) => updateCv("profile", text)}
-                onUpdateExperienceBullets={(expIdx, bullets) => {
-                  const updated = [...cv.experience];
-                  if (updated[expIdx]) {
-                    updated[expIdx] = { ...updated[expIdx], bullets };
-                    updateCv("experience", updated);
-                  }
-                }}
-                onUpdateSkills={(skills) => updateCv("skills", [...new Set([...cv.skills, ...skills])])}
-              />
-            </ScrollArea>
-          </aside>
-        )}
-      </div>
+      {/* Style dialog (stub) */}
+      <Dialog open={styleOpen} onOpenChange={setStyleOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{cvLanguage === "en" ? "Style" : "Stil"}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {cvLanguage === "en"
+              ? "This CV uses a single-column ATS-safe template. Additional style options are coming soon."
+              : "Detta CV använder en enkolumnig ATS-säker mall. Fler stilalternativ kommer snart."}
+          </p>
+        </DialogContent>
+      </Dialog>
+
+      {/* Page breaks dialog */}
+      <Dialog open={pageBreaksOpen} onOpenChange={setPageBreaksOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{cvLanguage === "en" ? "Page breaks preview" : "Förhandsgranskning av sidbrytningar"}</DialogTitle>
+          </DialogHeader>
+          <div className="bg-muted/40 p-4 rounded-lg flex justify-center overflow-auto">
+            <div className="transform scale-[0.75] origin-top">
+              <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
