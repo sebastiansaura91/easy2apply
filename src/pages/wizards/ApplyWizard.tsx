@@ -33,25 +33,31 @@ export default function ApplyWizard() {
   const [matching, setMatching] = useState(false);
   const [creatingForFix, setCreatingForFix] = useState(false);
   const [cvLanguage, setCvLanguage] = useState<"sv" | "en">("en");
+  // The single tailored copy created for THIS application. Tailoring always works on a
+  // copy so the master template is never overwritten, and we reuse this id across both
+  // "Fix this in editor" and "Open in editor" so we never spawn duplicate copies.
+  const [tailoredId, setTailoredId] = useState<string | null>(null);
 
-  const openEditorToFix = async () => {
-    if (!user || !parsedCV) return;
-    // If we already have a resume ID, navigate directly
-    if (flow.resumeId) {
-      navigate(`/editor/${flow.resumeId}`);
-      return;
-    }
-    // Otherwise create the resume first
-    setCreatingForFix(true);
+  const createTailoredCopy = async (): Promise<string | null> => {
+    if (!user || !parsedCV) return null;
     const id = uuidv4();
     const title = jobAnalysis ? `CV — ${jobAnalysis.job_title}` : "New CV";
     const { error } = await supabase.from("resumes").insert({
       id, user_id: user.id, title, language: cvLanguage, template_id: "default", content_json: parsedCV as any,
     });
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); setCreatingForFix(false); return; }
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return null; }
+    setTailoredId(id);
     flow.setResumeId(id);
+    return id;
+  };
+
+  const openEditorToFix = async () => {
+    if (!user || !parsedCV) return;
+    if (tailoredId) { navigate(`/editor/${tailoredId}`); return; }
+    setCreatingForFix(true);
+    const id = await createTailoredCopy();
     setCreatingForFix(false);
-    navigate(`/editor/${id}`);
+    if (id) navigate(`/editor/${id}`);
   };
 
   const analyzeJob = async () => {
@@ -110,7 +116,9 @@ export default function ApplyWizard() {
   const handleCVParsed = (cv: CVContent, existingResumeId?: string) => {
     setParsedCV(cv);
     flow.setParsedCV(cv);
-    if (existingResumeId) flow.setResumeId(existingResumeId);
+    // A newly picked/uploaded CV invalidates any tailored copy from a previous selection,
+    // so the next editor action creates a fresh copy from THIS cv (not a stale one).
+    setTailoredId(null);
   };
 
   const runMatch = async () => {
@@ -131,14 +139,10 @@ export default function ApplyWizard() {
 
   const createResumeAndOpen = async () => {
     if (!user || !parsedCV) return;
-    const id = uuidv4();
-    const title = jobAnalysis ? `CV — ${jobAnalysis.job_title}` : "New CV";
-    const { error } = await supabase.from("resumes").insert({
-      id, user_id: user.id, title, language: cvLanguage, template_id: "default", content_json: parsedCV as any,
-    });
-    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    flow.setResumeId(id);
-    navigate(`/editor/${id}`);
+    // Reuse the tailored copy if one was already created this session (e.g. via "Fix this in editor").
+    if (tailoredId) { navigate(`/editor/${tailoredId}`); return; }
+    const id = await createTailoredCopy();
+    if (id) navigate(`/editor/${id}`);
   };
 
   const createEmptyAndOpen = async () => {

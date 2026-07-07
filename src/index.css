@@ -162,8 +162,27 @@
   margin-top: 4pt;
 }
 
+.a4-preview ol {
+  list-style: decimal;
+  padding-left: 16pt;
+  margin-top: 4pt;
+}
+
 .a4-preview li {
   margin-bottom: 2pt;
+}
+
+.a4-preview .role-meta {
+  font-size: 9pt;
+  color: #475569;
+  margin: 2pt 0 0 0;
+}
+
+.a4-preview .role-scope {
+  font-size: 9.5pt;
+  font-style: italic;
+  color: #475569;
+  margin: 2pt 0 0 0;
 }
 
 .a4-preview .contact-line {

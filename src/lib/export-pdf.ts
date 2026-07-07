@@ -117,7 +117,7 @@ export async function exportToPdf(
     drawText(text, marginL, y, { fontSize: 10.5, fontStyle: "bold" });
   }
 
-  function drawBullet(text: string) {
+  function drawBullet(text: string, marker?: string) {
     checkPage(5);
     const bulletX = marginL + 3;
     const textX = marginL + 7;
@@ -127,8 +127,13 @@ export async function exportToPdf(
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(...colors.black);
 
-    // Draw bullet dot
-    pdf.circle(bulletX, y - 1, 0.5, "F");
+    if (marker) {
+      // Numbered marker (e.g. "1.") left-aligned to the bullet column
+      pdf.text(marker, bulletX - 1, y);
+    } else {
+      // Draw bullet dot
+      pdf.circle(bulletX, y - 1, 0.5, "F");
+    }
 
     const lines = pdf.splitTextToSize(text, bulletMaxW);
     const lineHeightMm = 10 * 1.4 * 0.3528;
@@ -180,10 +185,18 @@ export async function exportToPdf(
           // Keep role header together with at least its date + first bullet.
           // If they don't fit on the current page, start a new page first.
           const validBullets = exp.bullets.filter(Boolean);
-          const headerH = 10 * 1.4 * 0.3528; // h3 line
+          const metaLine = [
+            exp.pnlSize ? `${t("labelPnl")}: ${exp.pnlSize}` : null,
+            exp.headcount ? `${t("labelTeam")}: ${exp.headcount}` : null,
+            exp.revenueImpact ? `${t("labelRevenue")}: ${exp.revenueImpact}` : null,
+          ].filter(Boolean).join("   ·   ");
+          const lineH = 10 * 1.4 * 0.3528;
+          const headerH = lineH; // h3 line
           const dateH = 9 * 1.4 * 0.3528;
-          const firstBulletH = validBullets.length > 0 ? 10 * 1.4 * 0.3528 : 0;
-          const needed = headerH + dateH + firstBulletH + 2;
+          const metaH = metaLine ? dateH : 0;
+          const scopeH = exp.roleScope ? lineH : 0;
+          const firstBulletH = validBullets.length > 0 ? lineH : 0;
+          const needed = headerH + dateH + metaH + scopeH + firstBulletH + 2;
           if (y + needed > pageH - marginBottom) {
             pdf.addPage();
             y = marginTop;
@@ -199,10 +212,23 @@ export async function exportToPdf(
           drawText(dateLine, marginL, y, { fontSize: 9, color: colors.gray });
           y += 1;
 
-          // Bullets
-          for (const bullet of validBullets) {
-            drawBullet(bullet);
+          // Executive scope metrics (P&L / team / revenue impact)
+          if (metaLine) {
+            drawText(metaLine, marginL, y, { fontSize: 9, color: colors.gray });
+            y += 0.5;
           }
+
+          // Role scope prose (mandate, P&L, team, geography)
+          if (exp.roleScope) {
+            drawText(exp.roleScope, marginL, y, { fontSize: 9.5, fontStyle: "italic", color: colors.gray });
+            y += 1;
+          }
+
+          // Bullets — honor numbered vs bulleted style
+          const numbered = exp.bulletStyle === "numbered";
+          validBullets.forEach((bullet, bi) => {
+            drawBullet(bullet, numbered ? `${bi + 1}.` : undefined);
+          });
           y += 2;
         }
         break;
@@ -257,7 +283,7 @@ export async function exportToPdf(
           if (p.description) {
             drawText(p.description, marginL, y, { color: colors.gray });
           }
-          for (const b of p.bullets) {
+          for (const b of p.bullets.filter(Boolean)) {
             drawBullet(b);
           }
           y += 2;

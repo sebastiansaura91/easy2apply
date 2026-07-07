@@ -17,6 +17,9 @@ export const cvHeadings: Record<string, Record<string, string>> = {
     contactWebsite: "Webbplats",
     contactLinkedin: "LinkedIn",
     yourName: "Ditt Namn",
+    labelPnl: "P&L",
+    labelTeam: "Team",
+    labelRevenue: "Intäkt",
   },
   en: {
     sectionContact: "Contact Information",
@@ -35,5 +38,8 @@ export const cvHeadings: Record<string, Record<string, string>> = {
     contactWebsite: "Website",
     contactLinkedin: "LinkedIn",
     yourName: "Your Name",
+    labelPnl: "P&L",
+    labelTeam: "Team",
+    labelRevenue: "Revenue",
   },
 };

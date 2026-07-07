@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CVContent } from "@/types/cv";
 import { AtsCheckResult } from "@/types/ats-check";
+import { detectDominantLanguage } from "@/lib/language-detection";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,14 +21,19 @@ export default function ExploreWizard() {
   const { toast } = useToast();
   const [step, setStep] = useState<"upload" | "loading" | "results">("upload");
   const [parsedCV, setParsedCV] = useState<CVContent | null>(null);
+  const [existingId, setExistingId] = useState<string | null>(null);
+  const [cvLang, setCvLang] = useState<"sv" | "en">("en");
   const [result, setResult] = useState<AtsCheckResult | null>(null);
 
-  const handleParsed = async (cv: CVContent) => {
+  const handleParsed = async (cv: CVContent, existingResumeId?: string) => {
     setParsedCV(cv);
+    setExistingId(existingResumeId ?? null);
+    const lang = detectDominantLanguage(cv);
+    setCvLang(lang);
     setStep("loading");
     try {
       const { data, error } = await supabase.functions.invoke("ats-check", {
-        body: { resume_content_json: cv, locale: "en" },
+        body: { resume_content_json: cv, locale: lang },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -41,10 +47,13 @@ export default function ExploreWizard() {
 
   const improveInEditor = async () => {
     if (!user || !parsedCV) return;
+    // Picked an existing CV → open it in place instead of cloning a copy.
+    if (existingId) { navigate(`/editor/${existingId}`); return; }
+    // Fresh upload → create one new resume.
     const id = uuidv4();
     const title = parsedCV.contact?.name ? `${parsedCV.contact.name} – CV` : "My CV";
     const { error } = await supabase.from("resumes").insert({
-      id, user_id: user.id, title, language: "en", template_id: "default", content_json: parsedCV as any,
+      id, user_id: user.id, title, language: cvLang, template_id: "default", content_json: parsedCV as any,
     });
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
     navigate(`/editor/${id}`);

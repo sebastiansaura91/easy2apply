@@ -122,12 +122,30 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
                     <p className="contact-line">
                       {exp.startDate} – {exp.isPresent ? t("present") : exp.endDate}
                     </p>
+                    {(exp.pnlSize || exp.headcount || exp.revenueImpact) && (
+                      <p className="role-meta">
+                        {[
+                          exp.pnlSize && `${t("labelPnl")}: ${exp.pnlSize}`,
+                          exp.headcount && `${t("labelTeam")}: ${exp.headcount}`,
+                          exp.revenueImpact && `${t("labelRevenue")}: ${exp.revenueImpact}`,
+                        ].filter(Boolean).join("   ·   ")}
+                      </p>
+                    )}
+                    {exp.roleScope && <p className="role-scope">{exp.roleScope}</p>}
                     {exp.bullets.filter(Boolean).length > 0 && (
-                      <ul>
-                        {exp.bullets.filter(Boolean).map((b, i) => (
-                          <li key={i}>{b}</li>
-                        ))}
-                      </ul>
+                      exp.bulletStyle === "numbered" ? (
+                        <ol>
+                          {exp.bullets.filter(Boolean).map((b, i) => (
+                            <li key={i}>{b}</li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <ul>
+                          {exp.bullets.filter(Boolean).map((b, i) => (
+                            <li key={i}>{b}</li>
+                          ))}
+                        </ul>
+                      )
                     )}
                   </div>
                 ))}
@@ -169,7 +187,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
                   <div key={p.id}>
                     <h3>{p.name}</h3>
                     <p>{p.description}</p>
-                    {p.bullets.length > 0 && <ul>{p.bullets.map((b, i) => <li key={i}>{b}</li>)}</ul>}
+                    {p.bullets.filter(Boolean).length > 0 && <ul>{p.bullets.filter(Boolean).map((b, i) => <li key={i}>{b}</li>)}</ul>}
                   </div>
                 ))}
               </div>

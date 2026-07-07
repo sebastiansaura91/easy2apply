@@ -158,3 +158,19 @@ export function detectCvLanguages(cv: CVContent, systemLanguage: "sv" | "en"): L
     recommendation,
   };
 }
+
+/**
+ * Best-guess dominant language of a CV, weighted by per-section detection confidence.
+ * Used to analyze and store an uploaded CV in its actual language instead of assuming
+ * English. Falls back to "en" when there is no clear signal.
+ */
+export function detectDominantLanguage(cv: CVContent): "sv" | "en" {
+  const { detected_sections } = detectCvLanguages(cv, "en");
+  let sv = 0;
+  let en = 0;
+  for (const s of detected_sections) {
+    if (s.language === "sv") sv += s.confidence;
+    else if (s.language === "en") en += s.confidence;
+  }
+  return sv > en ? "sv" : "en";
+}

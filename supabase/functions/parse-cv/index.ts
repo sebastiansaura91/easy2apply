@@ -1,10 +1,49 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { unzipSync, strFromU8 } from "https://esm.sh/fflate@0.8.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+/**
+ * Base64-encode bytes in chunks. `btoa(String.fromCharCode(...bytes))` spreads the
+ * entire byte array as function arguments and overflows the call stack for any file
+ * over ~100 KB — i.e. essentially every real PDF. Chunking avoids that.
+ */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000; // 32 KB per chunk — safely under the arg-count limit
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Extract plain text from a .docx. A DOCX is a ZIP archive, not UTF-8 text — decoding
+ * it directly yields binary garbage. We unzip it and pull the text out of
+ * word/document.xml, turning paragraph/break tags into newlines.
+ */
+function extractDocxText(bytes: Uint8Array): string {
+  const files = unzipSync(bytes);
+  const docXml = files["word/document.xml"];
+  if (!docXml) throw new Error("Invalid DOCX: word/document.xml not found");
+  const xml = strFromU8(docXml);
+  const withBreaks = xml
+    .replace(/<\/w:p>/g, "\n")
+    .replace(/<w:tab\s*\/?>/g, "\t")
+    .replace(/<w:br\s*\/?>/g, "\n");
+  const text = withBreaks.replace(/<[^>]+>/g, "");
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 const CV_PARSE_PROMPT = `You are a CV/resume parser. Extract structured data from the following CV text and return ONLY valid JSON matching this exact schema. Do not include any markdown formatting or code blocks - return raw JSON only.
 
@@ -57,26 +96,26 @@ serve(async (req) => {
       });
     }
 
-    // Read file as text - for PDF we'll send as base64, for text-based formats as text
     const arrayBuffer = await file.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
-    
-    // Convert to base64 for the AI to process
-    const base64 = btoa(String.fromCharCode(...bytes));
-    
+
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) {
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
-    // Use Gemini with document understanding
-    const isPdf = file.type === "application/pdf";
-    const isDocx = file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    
+    // Detect format by MIME type, falling back to file extension (some browsers omit type).
+    const name = (file.name || "").toLowerCase();
+    const isPdf = file.type === "application/pdf" || name.endsWith(".pdf");
+    const isDocx =
+      file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      name.endsWith(".docx");
+
     let messages: any[];
-    
+
     if (isPdf) {
       // Send PDF as inline data for Gemini's multimodal capabilities
+      const base64 = bytesToBase64(bytes);
       messages = [
         {
           role: "user",
@@ -92,9 +131,19 @@ serve(async (req) => {
         },
       ];
     } else {
-      // For DOCX and other text formats, decode as text
-      const decoder = new TextDecoder("utf-8");
-      const text = decoder.decode(bytes);
+      // DOCX must be unzipped; other text formats decode as UTF-8.
+      let text: string;
+      if (isDocx) {
+        text = extractDocxText(bytes);
+      } else {
+        text = new TextDecoder("utf-8").decode(bytes);
+      }
+      if (!text.trim()) {
+        return new Response(JSON.stringify({ error: "Could not read any text from the file. Try a PDF or paste the text." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       messages = [
         {
           role: "user",
@@ -116,15 +165,27 @@ serve(async (req) => {
       }),
     });
 
+    if (response.status === 429) {
+      return new Response(JSON.stringify({ error: "Rate limit reached. Please try again in a moment." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (response.status === 402) {
+      return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits and retry." }), {
+        status: 402,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI Gateway error:", errorText);
+      console.error("AI Gateway error:", response.status, errorText);
       throw new Error(`AI Gateway error: ${response.status}`);
     }
 
     const result = await response.json();
     const content = result.choices?.[0]?.message?.content;
-    
+
     if (!content) {
       throw new Error("No response from AI");
     }
@@ -135,14 +196,24 @@ serve(async (req) => {
       jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
     }
 
-    const parsed = JSON.parse(jsonStr);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      console.error("Failed to parse AI JSON output");
+      return new Response(JSON.stringify({ error: "Could not parse the CV. Please try again." }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     return new Response(JSON.stringify({ cv: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Error parsing CV:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error parsing CV:", message);
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

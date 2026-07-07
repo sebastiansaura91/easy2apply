@@ -75,6 +75,12 @@ const CVEditor = () => {
     if (error) toast({ title: t("error"), description: error.message, variant: "destructive" });
   }, [id, user, title, cv, cvLanguage, t, toast]);
 
+  // Keep a ref to the latest saveCV + a dirty flag so we can flush pending edits on
+  // unmount / tab-close without depending on a stale closure.
+  const saveCVRef = useRef(saveCV);
+  const dirtyRef = useRef(false);
+  useEffect(() => { saveCVRef.current = saveCV; }, [saveCV]);
+
   const prevLangRef = useRef(cvLanguage);
   useEffect(() => {
     if (loading) return;
@@ -89,10 +95,27 @@ const CVEditor = () => {
 
   useEffect(() => {
     if (loading) return;
+    dirtyRef.current = true;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    saveTimeout.current = window.setTimeout(() => saveCV(), 2000);
+    saveTimeout.current = window.setTimeout(() => { saveCV(); dirtyRef.current = false; }, 2000);
     return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
   }, [cv, title, cvLanguage, loading]);
+
+  // Flush any pending debounced save when leaving the editor (navigation unmount) or
+  // closing the tab, so edits made within the 2s debounce window are never lost.
+  useEffect(() => {
+    const flush = () => {
+      if (!dirtyRef.current) return;
+      if (saveTimeout.current) { clearTimeout(saveTimeout.current); saveTimeout.current = null; }
+      dirtyRef.current = false;
+      void saveCVRef.current();
+    };
+    window.addEventListener("beforeunload", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      flush();
+    };
+  }, []);
 
   const updateCv = <K extends keyof CVContent>(key: K, value: CVContent[K]) => setCv(prev => ({ ...prev, [key]: value }));
 
