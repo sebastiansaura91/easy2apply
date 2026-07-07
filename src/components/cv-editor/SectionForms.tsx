@@ -305,6 +305,25 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                 <Checkbox checked={exp.isPresent} onCheckedChange={(v) => updateExperience(idx, { isPresent: !!v, endDate: "" })} />
                 <span className="text-sm">{isSv ? "Nuvarande" : "Present"}</span>
               </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">{isSv ? "P&L-storlek? (t.ex. €120M)" : "P&L size? (e.g. €120M)"}</label>
+                  <Input value={exp.pnlSize || ""} onChange={(e) => updateExperience(idx, { pnlSize: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">{isSv ? "Personalansvar? (t.ex. 250)" : "Headcount managed? (e.g. 250)"}</label>
+                  <Input value={exp.headcount || ""} onChange={(e) => updateExperience(idx, { headcount: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">{isSv ? "Intäktspåverkan? (t.ex. +35% YoY)" : "Revenue impact? (e.g. +35% YoY)"}</label>
+                  <Input value={exp.revenueImpact || ""} onChange={(e) => updateExperience(idx, { revenueImpact: e.target.value })} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium">{isSv ? "Rollomfattning" : "Role scope"}</label>
+                <p className="text-[10px] text-muted-foreground">{isSv ? "Mandat, P&L, team, geografi. 1–3 meningar i prosa." : "Mandate, P&L, team, geography. 1–3 sentences in prose."}</p>
+                <Textarea rows={3} value={exp.roleScope || ""} onChange={(e) => updateExperience(idx, { roleScope: e.target.value })} />
+              </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
@@ -324,6 +343,22 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                     </Tooltip>
                   </div>
                   <div className="flex gap-1">
+                    <div className="flex items-center gap-0 rounded-md border border-border p-0.5 mr-1">
+                      <button
+                        type="button"
+                        className={`h-6 px-2 text-[11px] rounded ${(exp.bulletStyle || "bulleted") === "bulleted" ? "bg-muted" : ""}`}
+                        onClick={() => updateExperience(idx, { bulletStyle: "bulleted" })}
+                      >
+                        {isSv ? "Punkter" : "Bullets"}
+                      </button>
+                      <button
+                        type="button"
+                        className={`h-6 px-2 text-[11px] rounded ${exp.bulletStyle === "numbered" ? "bg-muted" : ""}`}
+                        onClick={() => updateExperience(idx, { bulletStyle: "numbered" })}
+                      >
+                        {isSv ? "Numrerade" : "Numbered"}
+                      </button>
+                    </div>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
