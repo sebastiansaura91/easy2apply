@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFlow } from "@/contexts/FlowContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CVContent, emptyCV } from "@/types/cv";
 import { convertLanguageLevels } from "@/lib/language-level-mapping";
@@ -29,7 +28,6 @@ const CVEditor = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user } = useAuth();
-  const flow = useFlow();
   const { toast } = useToast();
 
   const [cv, setCv] = useState<CVContent>(emptyCV);
