@@ -16,6 +16,11 @@ export interface ExperienceItem {
   endDate: string;
   isPresent: boolean;
   bullets: string[];
+  pnlSize?: string;
+  headcount?: string;
+  revenueImpact?: string;
+  roleScope?: string;
+  bulletStyle?: "bulleted" | "numbered";
 }
 
 export interface EducationItem {
