@@ -22,24 +22,29 @@ const Dashboard = () => {
   const { toast } = useToast();
   const [resumes, setResumes] = useState<ResumeRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [goalOpen, setGoalOpen] = useState(false);
 
   const fetchResumes = async () => {
     if (!user) return;
+    setLoading(true);
     const { data, error } = await supabase
       .from("resumes").select("id, title, language, updated_at, created_at")
       .eq("user_id", user.id).order("updated_at", { ascending: false });
-    if (!error) setResumes((data as ResumeRow[]) || []);
+    if (error) { setFetchError(true); setLoading(false); return; }
+    setFetchError(false);
+    setResumes((data as ResumeRow[]) || []);
     setLoading(false);
   };
 
   useEffect(() => { fetchResumes(); }, [user]);
 
-  // Redirect to onboarding if no resumes
+  // Redirect to onboarding only when we've CONFIRMED the account is empty (no fetch error) —
+  // a transient network error must not bounce a user who actually has CVs.
   useEffect(() => {
-    if (!loading && resumes.length === 0) navigate("/onboarding");
-  }, [loading, resumes.length]);
+    if (!loading && !fetchError && resumes.length === 0) navigate("/onboarding");
+  }, [loading, fetchError, resumes.length]);
 
   const duplicateResume = async (r: ResumeRow) => {
     if (!user) return;
@@ -110,6 +115,11 @@ const Dashboard = () => {
         {/* Resume list */}
         {loading ? (
           <div className="text-center py-16 text-muted-foreground">Loading...</div>
+        ) : fetchError ? (
+          <div className="text-center py-16 space-y-3">
+            <p className="text-sm text-muted-foreground">Couldn't load your CVs — check your connection.</p>
+            <Button variant="outline" size="sm" onClick={fetchResumes}>Try again</Button>
+          </div>
         ) : (
           <div className="space-y-2">
             {resumes.map(r => (
