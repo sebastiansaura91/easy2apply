@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { GoalChooser } from "@/components/shared/GoalChooser";
 import { CVMeta } from "@/types/cv";
+import { getResumeMeta, groupResumesByKind } from "@/lib/resume-grouping";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -68,7 +69,7 @@ const Dashboard = () => {
     setDeleteId(null);
   };
 
-  const getMeta = (r: ResumeRow): CVMeta => r.content_json?.__meta ?? {};
+  const getMeta = (r: ResumeRow): CVMeta => getResumeMeta(r);
 
   const toggleTemplate = async (r: ResumeRow) => {
     if (!user) return;
@@ -81,9 +82,7 @@ const Dashboard = () => {
     else { fetchResumes(); toast({ title: nextIsTemplate ? "Marked as template" : "Unmarked as template" }); }
   };
 
-  const templates = resumes.filter(r => getMeta(r).isTemplate);
-  const applications = resumes.filter(r => !getMeta(r).isTemplate && getMeta(r).tailoredForJob);
-  const others = resumes.filter(r => !getMeta(r).isTemplate && !getMeta(r).tailoredForJob);
+  const { templates, applications, others } = groupResumesByKind(resumes);
 
   const renderCard = (r: ResumeRow) => {
     const meta = getMeta(r);
