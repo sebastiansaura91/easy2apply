@@ -4,17 +4,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, Copy, Trash2, Edit3, Shield, Settings, LogOut, Plus, Briefcase, TrendingUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { FileText, Copy, Trash2, Edit3, Shield, Settings, LogOut, Plus, Briefcase, TrendingUp, Star, StarOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { GoalChooser } from "@/components/shared/GoalChooser";
+import { CVMeta } from "@/types/cv";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { v4 as uuidv4 } from "uuid";
 
-interface ResumeRow { id: string; title: string; language: string; updated_at: string; created_at: string; }
+interface ResumeRow { id: string; title: string; language: string; updated_at: string; created_at: string; content_json?: { __meta?: CVMeta } | null; }
 
 const Dashboard = () => {
   const { user, signOut } = useAuth();
@@ -30,7 +32,7 @@ const Dashboard = () => {
     if (!user) return;
     setLoading(true);
     const { data, error } = await supabase
-      .from("resumes").select("id, title, language, updated_at, created_at")
+      .from("resumes").select("id, title, language, updated_at, created_at, content_json")
       .eq("user_id", user.id).order("updated_at", { ascending: false });
     if (error) { setFetchError(true); setLoading(false); return; }
     setFetchError(false);
@@ -64,6 +66,56 @@ const Dashboard = () => {
     if (!error) setResumes(p => p.filter(r => r.id !== deleteId));
     else toast({ title: "Error", description: error.message, variant: "destructive" });
     setDeleteId(null);
+  };
+
+  const getMeta = (r: ResumeRow): CVMeta => r.content_json?.__meta ?? {};
+
+  const toggleTemplate = async (r: ResumeRow) => {
+    if (!user) return;
+    const nextIsTemplate = !getMeta(r).isTemplate;
+    // Fetch full content_json so we don't clobber the document when writing metadata.
+    const { data } = await supabase.from("resumes").select("content_json").eq("id", r.id).single();
+    const content = { ...((data?.content_json as any) || {}), __meta: { ...getMeta(r), isTemplate: nextIsTemplate } };
+    const { error } = await supabase.from("resumes").update({ content_json: content }).eq("id", r.id);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { fetchResumes(); toast({ title: nextIsTemplate ? "Marked as template" : "Unmarked as template" }); }
+  };
+
+  const templates = resumes.filter(r => getMeta(r).isTemplate);
+  const applications = resumes.filter(r => !getMeta(r).isTemplate && getMeta(r).tailoredForJob);
+  const others = resumes.filter(r => !getMeta(r).isTemplate && !getMeta(r).tailoredForJob);
+
+  const renderCard = (r: ResumeRow) => {
+    const meta = getMeta(r);
+    return (
+      <Card key={r.id} className="hover:shadow-md transition-shadow">
+        <CardContent className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={() => navigate(`/editor/${r.id}`)}>
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              {meta.isTemplate ? <Star className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-primary" />}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium text-sm truncate">{r.title}</h3>
+                {meta.isTemplate && <Badge variant="secondary" className="text-[9px] h-4">Template</Badge>}
+              </div>
+              <p className="text-xs text-muted-foreground truncate">
+                {meta.tailoredForJob ? `for ${meta.tailoredForJob}${meta.tailoredForCompany ? ` · ${meta.tailoredForCompany}` : ""} · ` : ""}
+                {format(new Date(r.updated_at), "yyyy-MM-dd HH:mm")} · {r.language.toUpperCase()}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <Button variant="ghost" size="icon" className="h-8 w-8" title={meta.isTemplate ? "Unmark template" : "Mark as template"} onClick={() => toggleTemplate(r)}>
+              {meta.isTemplate ? <StarOff className="h-3.5 w-3.5" /> : <Star className="h-3.5 w-3.5" />}
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit" onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" title="Duplicate" onClick={() => duplicateResume(r)}><Copy className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" title="Delete" onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   return (
@@ -121,29 +173,36 @@ const Dashboard = () => {
             <Button variant="outline" size="sm" onClick={fetchResumes}>Try again</Button>
           </div>
         ) : (
-          <div className="space-y-2">
-            {resumes.map(r => (
-              <Card key={r.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={() => navigate(`/editor/${r.id}`)}>
-                    <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <FileText className="h-4 w-4 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-medium text-sm truncate">{r.title}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(r.updated_at), "yyyy-MM-dd HH:mm")} · {r.language.toUpperCase()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-3.5 w-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => duplicateResume(r)}><Copy className="h-3.5 w-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="space-y-8">
+            {templates.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <Star className="h-3.5 w-3.5 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Templates</p>
+                </div>
+                <div className="space-y-2">{templates.map(renderCard)}</div>
+              </section>
+            )}
+            {applications.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <Briefcase className="h-3.5 w-3.5 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Applications</p>
+                </div>
+                <div className="space-y-2">{applications.map(renderCard)}</div>
+              </section>
+            )}
+            {others.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {templates.length > 0 || applications.length > 0 ? "Other CVs" : "Your CVs"}
+                  </p>
+                </div>
+                <div className="space-y-2">{others.map(renderCard)}</div>
+              </section>
+            )}
           </div>
         )}
       </div>

@@ -59,6 +59,18 @@ export interface CVSection {
   order: number;
 }
 
+/**
+ * App-level metadata stored alongside CV content (inside content_json). Kept separate
+ * from the document fields so it never affects PDF/preview output. Enables the dashboard
+ * to group master templates vs. job-tailored copies without a DB schema change.
+ */
+export interface CVMeta {
+  isTemplate?: boolean;
+  tailoredForJob?: string;
+  tailoredForCompany?: string;
+  createdFrom?: string;
+}
+
 export interface CVContent {
   contact: ContactInfo;
   profile: string;
@@ -70,6 +82,7 @@ export interface CVContent {
   languages: LanguageItem[];
   other: string;
   sections: CVSection[];
+  __meta?: CVMeta;
 }
 
 export const defaultSections: CVSection[] = [
