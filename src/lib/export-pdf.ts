@@ -5,12 +5,14 @@ import { CVContent, CVSection } from "@/types/cv";
  * Renders CV data directly to PDF using jsPDF text rendering.
  * Produces crisp vector text that is selectable and ATS-parseable.
  */
-export async function exportToPdf(
+/**
+ * Build the CV PDF document (without saving). Exposed for testing the rendered output.
+ */
+export function buildPdf(
   cv: CVContent,
   enabledSections: CVSection[],
-  t: (k: string) => string,
-  filename: string = "cv.pdf"
-): Promise<void> {
+  t: (k: string) => string
+): jsPDF {
   const pdf = new jsPDF("p", "mm", "a4");
   const pageW = 210;
   const pageH = 297;
@@ -311,5 +313,15 @@ export async function exportToPdf(
     }
   }
 
+  return pdf;
+}
+
+export async function exportToPdf(
+  cv: CVContent,
+  enabledSections: CVSection[],
+  t: (k: string) => string,
+  filename: string = "cv.pdf"
+): Promise<void> {
+  const pdf = buildPdf(cv, enabledSections, t);
   pdf.save(filename);
 }
