@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CVContent } from "@/types/cv";
 import { FileUp, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface Props {
   onParsed: (cv: CVContent) => void;
@@ -15,6 +16,8 @@ export function CVUploadZone({ onParsed, className }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { language } = useLanguage();
+  const isSv = language === "sv";
 
   const handle = async (file: File) => {
     const ok = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
@@ -45,18 +48,18 @@ export function CVUploadZone({ onParsed, className }: Props) {
       {done ? (
         <div className="flex flex-col items-center gap-3">
           <CheckCircle2 className="h-10 w-10 text-green-500" />
-          <p className="font-medium text-sm">CV uploaded and parsed</p>
+          <p className="font-medium text-sm">{isSv ? "Filen är inläst" : "File uploaded and parsed"}</p>
         </div>
       ) : uploading ? (
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-10 w-10 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground">Analyzing your CV with AI...</p>
+          <p className="text-sm text-muted-foreground">{isSv ? "Läser in med AI…" : "Reading it with AI…"}</p>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3">
           <FileUp className="h-10 w-10 text-muted-foreground/50" />
-          <p className="font-medium text-sm">Drag and drop your CV here</p>
-          <p className="text-xs text-muted-foreground">or click to select · PDF, DOCX, TXT (max 10 MB)</p>
+          <p className="font-medium text-sm">{isSv ? "Släpp din fil här" : "Drop your file here"}</p>
+          <p className="text-xs text-muted-foreground">{isSv ? "eller klicka för att välja · PDF, DOCX, TXT (max 10 MB)" : "or click to select · PDF, DOCX, TXT (max 10 MB)"}</p>
         </div>
       )}
       <input ref={ref} type="file" accept=".pdf,.docx,.txt" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handle(f); }} disabled={uploading || done} />

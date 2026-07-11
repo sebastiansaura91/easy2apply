@@ -65,10 +65,36 @@ export function ContactForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
 }
 
 export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
+  const isSv = cvLanguage !== "en";
+  const [drafting, setDrafting] = useState(false);
+  const { toast } = useToast();
+
+  const draft = async () => {
+    if (!cv.experience?.length && !cv.skills?.length) {
+      toast({ title: isSv ? "Lägg till erfarenhet först" : "Add some experience first", variant: "destructive" });
+      return;
+    }
+    setDrafting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("draft-summary", {
+        body: { resume_content_json: cv, system_language: isSv ? "sv" : "en" },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      if ((data as any)?.summary) updateCv("profile", (data as any).summary);
+    } catch (e: any) {
+      toast({ title: isSv ? "Kunde inte skapa utkast" : "Couldn't draft", description: e.message, variant: "destructive" });
+    } finally { setDrafting(false); }
+  };
+
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">{t("sectionProfile")}</CardTitle>
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={draft} disabled={drafting}>
+          {drafting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+          {isSv ? "Skriv utkast från min erfarenhet" : "Draft from my experience"}
+        </Button>
       </CardHeader>
       <CardContent>
         <Textarea rows={4} value={cv.profile} onChange={(e) => updateCv("profile", e.target.value)} placeholder={cvLanguage === "en" ? "Write a short professional summary..." : "Skriv en kort professionell sammanfattning..."} />

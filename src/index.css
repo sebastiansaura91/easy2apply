@@ -2,38 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap');
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
-    --foreground: 222 47% 11%;
+    /* Warm "executive" palette: cream background, muted gold/brown primary. */
+    --background: 40 33% 94%;
+    --foreground: 30 15% 15%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card: 40 30% 98%;
+    --card-foreground: 30 15% 15%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover: 40 30% 98%;
+    --popover-foreground: 30 15% 15%;
 
-    --primary: 224 64% 33%;
-    --primary-foreground: 0 0% 100%;
-    --primary-hover: 224 64% 38%;
+    --primary: 40 58% 34%;
+    --primary-foreground: 40 40% 97%;
+    --primary-hover: 40 58% 29%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 215 25% 27%;
+    --secondary: 40 22% 90%;
+    --secondary-foreground: 30 20% 25%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 40 20% 91%;
+    --muted-foreground: 35 12% 42%;
 
-    --accent: 220 14% 96%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 40 30% 88%;
+    --accent-foreground: 30 20% 20%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 62% 44%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 224 64% 33%;
+    --border: 40 20% 84%;
+    --input: 40 20% 84%;
+    --ring: 40 58% 34%;
 
     --radius: 0.5rem;
 
@@ -113,7 +114,7 @@
   }
 
   h1, h2, h3 {
-    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    font-family: 'Fraunces', Georgia, serif;
   }
 }
 

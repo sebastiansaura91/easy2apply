@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import { CVContent, CVSection } from "@/types/cv";
-import { getTemplateStyle } from "./templates";
+import { getTemplateStyle, withAccent } from "./templates";
 
 /**
  * Renders CV data directly to PDF using jsPDF text rendering.
@@ -13,9 +13,10 @@ export function buildPdf(
   cv: CVContent,
   enabledSections: CVSection[],
   t: (k: string) => string,
-  styleId?: string
+  styleId?: string,
+  accentHex?: string
 ): jsPDF {
-  const tpl = getTemplateStyle(styleId);
+  const tpl = withAccent(getTemplateStyle(styleId), accentHex);
   const font = tpl.pdfFont;
   const pdf = new jsPDF("p", "mm", "a4");
   const pageW = 210;
@@ -325,8 +326,9 @@ export async function exportToPdf(
   enabledSections: CVSection[],
   t: (k: string) => string,
   filename: string = "cv.pdf",
-  styleId?: string
+  styleId?: string,
+  accentHex?: string
 ): Promise<void> {
-  const pdf = buildPdf(cv, enabledSections, t, styleId);
+  const pdf = buildPdf(cv, enabledSections, t, styleId, accentHex);
   pdf.save(filename);
 }

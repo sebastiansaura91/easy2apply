@@ -39,7 +39,7 @@ const Auth = () => {
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
           <Shield className="h-8 w-8 text-primary" />
-          <span className="text-2xl font-bold font-['Space_Grotesk']">CVSäkert</span>
+          <span className="text-2xl font-bold font-['Fraunces']">CVSäkert</span>
         </div>
 
         <Card>

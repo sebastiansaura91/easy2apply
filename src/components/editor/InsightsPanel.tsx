@@ -228,7 +228,7 @@ export function InsightsPanel({
     <div className="p-4 space-y-4">
       {/* ── Health overview ── */}
       <div className="text-center pb-3 border-b border-border">
-        <div className={`text-3xl font-bold font-['Space_Grotesk'] ${healthColor}`}>{healthScore}</div>
+        <div className={`text-3xl font-bold font-['Fraunces'] ${healthColor}`}>{healthScore}</div>
         <p className={`text-xs font-semibold ${healthColor}`}>{healthLabel}</p>
         <div className="flex justify-center gap-3 mt-2">
           {errorCount > 0 && (
@@ -373,7 +373,7 @@ export function InsightsPanel({
       {deepResult && (
         <div className="space-y-3 pt-3 border-t border-border">
           <div className="text-center">
-            <div className={`text-3xl font-bold font-['Space_Grotesk'] ${scoreColor(deepResult.overall_score)}`}>
+            <div className={`text-3xl font-bold font-['Fraunces'] ${scoreColor(deepResult.overall_score)}`}>
               {Math.round(deepResult.overall_score)}
             </div>
             <div className={`text-xs font-semibold ${scoreColor(deepResult.overall_score)}`}>Grade {deepResult.grade}</div>

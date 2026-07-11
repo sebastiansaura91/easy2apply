@@ -27,3 +27,7 @@ verify_jwt = true
 # Role-fit analysis — accepts profile + optional posting; requires a valid JWT.
 [functions.analyze-role-fit]
 verify_jwt = true
+
+# Draft an executive summary from the candidate's own experience; requires a valid JWT.
+[functions.draft-summary]
+verify_jwt = true

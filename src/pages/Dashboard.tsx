@@ -172,7 +172,7 @@ const Dashboard = () => {
         <div className="container mx-auto flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
             <Shield className="h-5 w-5 text-primary" />
-            <span className="text-base font-semibold font-['Space_Grotesk']">CVSäkert</span>
+            <span className="text-base font-semibold font-['Fraunces']">CVSäkert</span>
           </div>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}><Settings className="h-4 w-4" /></Button>
@@ -183,7 +183,7 @@ const Dashboard = () => {
 
       <div className="container mx-auto px-4 py-10 max-w-3xl">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold font-['Space_Grotesk']">{isSv ? "Hem" : "Home"}</h1>
+          <h1 className="text-2xl font-semibold font-['Fraunces']">{isSv ? "Hem" : "Home"}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {isSv ? "Din profil är grunden. Rikta ett CV när du ska söka något." : "Your profile is the basis. Tailor a CV when you apply for something."}
           </p>
@@ -221,53 +221,4 @@ const Dashboard = () => {
                 </Button>
               </div>
               {applications.length > 0 ? (
-                <div className="space-y-2">{applications.map(renderApplicationCard)}</div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-border p-6 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    {isSv ? "Inga ansökningar än. Klicka \"Rikta CV\" för att skapa en från din profil." : "No applications yet. Click \"Tailor a CV\" to create one from your profile."}
-                  </p>
-                </div>
-              )}
-            </section>
-
-            {/* Secondary */}
-            <button onClick={() => profile && navigate(`/editor/${profile.id}`)}
-              className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 hover:border-primary/30 transition-all text-left w-full">
-              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium text-sm">{isSv ? "Förbättra eller granska profilen" : "Improve or audit the profile"}</p>
-                <p className="text-xs text-muted-foreground">{isSv ? "ATS-koll, rekryterar-scan, styrkeanalys" : "ATS check, recruiter scan, strength analysis"}</p>
-              </div>
-            </button>
-          </div>
-        )}
-      </div>
-
-      <RoleTemplateDialog
-        open={riktaOpen}
-        onOpenChange={setRiktaOpen}
-        base={profile ? { id: profile.id, title: profile.title, language: profile.language } : null}
-        userId={user?.id}
-        onCreated={fetchResumes}
-      />
-
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{isSv ? "Radera ansökan" : "Delete application"}</AlertDialogTitle>
-            <AlertDialogDescription>{isSv ? "Är du säker? Detta kan inte ångras." : "Are you sure? This cannot be undone."}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{isSv ? "Avbryt" : "Cancel"}</AlertDialogCancel>
-            <AlertDialogAction onClick={deleteResume}>{isSv ? "Radera" : "Delete"}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-};
-
-export default Dashboard;
+                <div className="space-y-2">{applications.map(renderApp

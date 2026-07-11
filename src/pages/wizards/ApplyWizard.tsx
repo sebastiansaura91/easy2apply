@@ -182,7 +182,7 @@ export default function ApplyWizard() {
           </button>
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold font-['Space_Grotesk']">CVSäkert</span>
+            <span className="text-sm font-semibold font-['Fraunces']">CVSäkert</span>
           </div>
           <div className="text-xs text-muted-foreground">{step + 1}/{steps.length}</div>
         </div>
@@ -206,7 +206,7 @@ export default function ApplyWizard() {
           {step === 0 && (
             <motion.div key="s0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div>
-                <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Paste the job posting</h2>
+                <h2 className="text-2xl font-semibold font-['Fraunces']">Paste the job posting</h2>
                 <p className="text-sm text-muted-foreground mt-1">We'll analyze it and extract the key requirements so you know exactly what to optimize.</p>
               </div>
               <Textarea rows={12} value={jobText} onChange={e => setJobText(e.target.value)} placeholder="Paste the full job description here..." className="text-sm" />
@@ -221,7 +221,7 @@ export default function ApplyWizard() {
           {step === 1 && jobAnalysis && (
             <motion.div key="s1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div>
-                <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Job Analysis</h2>
+                <h2 className="text-2xl font-semibold font-['Fraunces']">Job Analysis</h2>
                 <p className="text-sm text-muted-foreground mt-1">Here's what we found in the posting.</p>
               </div>
 
@@ -323,7 +323,7 @@ export default function ApplyWizard() {
           {step === 2 && (
             <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div>
-                <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Your CV</h2>
+                <h2 className="text-2xl font-semibold font-['Fraunces']">Your CV</h2>
                 <p className="text-sm text-muted-foreground mt-1">Upload your existing CV to see how well it matches the role.</p>
               </div>
 
@@ -352,14 +352,14 @@ export default function ApplyWizard() {
           {step === 3 && matchResult && (
             <motion.div key="s3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div>
-                <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Match Results</h2>
+                <h2 className="text-2xl font-semibold font-['Fraunces']">Match Results</h2>
                 <p className="text-sm text-muted-foreground mt-1">Here's how your CV performs against this role.</p>
               </div>
 
               {/* Score */}
               <Card className="border-2"><CardContent className="p-6 flex items-center gap-6">
                 <div className="text-center">
-                  <div className={`text-4xl font-bold font-['Space_Grotesk'] ${scoreColor(matchResult.overall_score)}`}>
+                  <div className={`text-4xl font-bold font-['Fraunces'] ${scoreColor(matchResult.overall_score)}`}>
                     {Math.round(matchResult.overall_score)}
                   </div>
                   <div className={`text-sm font-semibold ${scoreColor(matchResult.overall_score)}`}>Grade {matchResult.grade}</div>

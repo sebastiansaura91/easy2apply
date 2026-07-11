@@ -84,6 +84,8 @@ export interface CVMeta {
   targetRoleLabel?: string;
   /** Chosen visual template style id (see lib/templates.ts). Defaults to "classic". */
   templateStyle?: string;
+  /** Optional accent colour hex overriding the style's default accent. */
+  templateAccent?: string;
 }
 
 export interface CVContent {

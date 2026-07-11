@@ -80,7 +80,7 @@ export default function ImproveWizard() {
           </button>
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold font-['Space_Grotesk']">CVSäkert</span>
+            <span className="text-sm font-semibold font-['Fraunces']">CVSäkert</span>
           </div>
           <div className="text-xs text-muted-foreground">{Math.min(step + 1, steps.length)}/{steps.length}</div>
         </div>
@@ -102,7 +102,7 @@ export default function ImproveWizard() {
           {step === 0 && (
             <motion.div key="s0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div>
-                <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Upload your CV</h2>
+                <h2 className="text-2xl font-semibold font-['Fraunces']">Upload your CV</h2>
                 <p className="text-sm text-muted-foreground mt-1">We'll run a full audit — ATS safety, recruiter scan, bullet analysis, and language check.</p>
               </div>
               <CVPicker onParsed={handleParsed} />
@@ -112,7 +112,7 @@ export default function ImproveWizard() {
           {step === 1 && analyzing && (
             <motion.div key="s1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20 gap-4">
               <Loader2 className="h-12 w-12 text-primary animate-spin" />
-              <p className="text-lg font-semibold font-['Space_Grotesk']">Running full analysis...</p>
+              <p className="text-lg font-semibold font-['Fraunces']">Running full analysis...</p>
               <p className="text-sm text-muted-foreground">ATS check · Recruiter scan · Bullet analysis · Language check</p>
             </motion.div>
           )}
@@ -120,13 +120,13 @@ export default function ImproveWizard() {
           {step === 2 && result && (
             <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div>
-                <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Your CV Performance</h2>
+                <h2 className="text-2xl font-semibold font-['Fraunces']">Your CV Performance</h2>
                 <p className="text-sm text-muted-foreground mt-1">{result.summary}</p>
               </div>
 
               <Card className="border-2"><CardContent className="p-6 flex items-center gap-6">
                 <div className="text-center">
-                  <div className={`text-4xl font-bold font-['Space_Grotesk'] ${scoreColor(result.overall_score)}`}>{Math.round(result.overall_score)}</div>
+                  <div className={`text-4xl font-bold font-['Fraunces'] ${scoreColor(result.overall_score)}`}>{Math.round(result.overall_score)}</div>
                   <div className={`text-sm font-semibold ${scoreColor(result.overall_score)}`}>Grade {result.grade}</div>
                 </div>
                 <div className="flex-1 space-y-2">

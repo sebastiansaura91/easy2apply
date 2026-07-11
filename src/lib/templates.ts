@@ -64,3 +64,29 @@ export const DEFAULT_TEMPLATE_STYLE = TEMPLATE_STYLES[0];
 export function getTemplateStyle(id?: string | null): TemplateStyle {
   return TEMPLATE_STYLES.find((s) => s.id === id) ?? DEFAULT_TEMPLATE_STYLE;
 }
+
+
+/** Accent colour presets the user can pick per CV (overrides the style's default accent). */
+export interface AccentPreset {
+  id: string;
+  label: { sv: string; en: string };
+  hex: string;
+}
+
+export const ACCENT_PRESETS: AccentPreset[] = [
+  { id: "gold", label: { sv: "Guld", en: "Gold" }, hex: "#9a7b2e" },
+  { id: "navy", label: { sv: "Marinbl\u00e5", en: "Navy" }, hex: "#1e3a5f" },
+  { id: "burgundy", label: { sv: "Vinr\u00f6d", en: "Burgundy" }, hex: "#7a2e2e" },
+  { id: "charcoal", label: { sv: "Koltrast", en: "Charcoal" }, hex: "#2b2b2b" },
+];
+
+export function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+export function withAccent(style: TemplateStyle, accentHex?: string | null): TemplateStyle {
+  if (!accentHex) return style;
+  return { ...style, accentHex, accentRgb: hexToRgb(accentHex) };
+}

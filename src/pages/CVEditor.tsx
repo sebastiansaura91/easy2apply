@@ -27,7 +27,7 @@ import { A4Preview } from "@/components/cv-editor/A4Preview";
 import { SectionFormRenderer } from "@/components/cv-editor/SectionForms";
 import { cvHeadings } from "@/i18n/cvHeadings";
 import { exportToPdf } from "@/lib/export-pdf";
-import { TEMPLATE_STYLES, getTemplateStyle } from "@/lib/templates";
+import { TEMPLATE_STYLES, getTemplateStyle, withAccent, ACCENT_PRESETS } from "@/lib/templates";
 import { detectCvLanguages } from "@/lib/language-detection";
 
 const CVEditor = () => {
@@ -221,10 +221,13 @@ const CVEditor = () => {
 
   const safeName = (title || "cv").replace(/[^a-zA-Z0-9åäöÅÄÖ_-]/g, "_");
   const templateStyleId = cv.__meta?.templateStyle;
-  const templateStyle = getTemplateStyle(templateStyleId);
+  const templateAccent = cv.__meta?.templateAccent;
+  const templateStyle = withAccent(getTemplateStyle(templateStyleId), templateAccent);
   const setTemplateStyle = (id: string) =>
     setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateStyle: id } }));
-  const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
+  const setTemplateAccent = (hex: string) =>
+    setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateAccent: hex } }));
+  const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
 
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">{t("loading")}</p></div>;
 
@@ -479,6 +482,24 @@ const CVEditor = () => {
                 </button>
               );
             })}
+          </div>
+          <div className="mt-4">
+            <p className="text-xs font-medium text-muted-foreground mb-2">{cvLanguage === "en" ? "Accent colour" : "Accentfärg"}</p>
+            <div className="flex items-center gap-2">
+              {ACCENT_PRESETS.map((a) => {
+                const active = templateStyle.accentHex.toLowerCase() === a.hex.toLowerCase();
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => setTemplateAccent(a.hex)}
+                    title={a.label[cvLanguage]}
+                    aria-label={a.label[cvLanguage]}
+                    className={`h-7 w-7 rounded-full transition-transform ${active ? "ring-2 ring-offset-2 ring-foreground/40 scale-110" : "hover:scale-105"}`}
+                    style={{ backgroundColor: a.hex }}
+                  />
+                );
+              })}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

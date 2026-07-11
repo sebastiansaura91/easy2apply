@@ -75,7 +75,7 @@ export default function ExploreWizard() {
           </button>
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold font-['Space_Grotesk']">CVSäkert</span>
+            <span className="text-sm font-semibold font-['Fraunces']">CVSäkert</span>
           </div>
           <div />
         </div>
@@ -86,7 +86,7 @@ export default function ExploreWizard() {
           {step === "upload" && (
             <motion.div key="up" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
               <div>
-                <h2 className="text-2xl font-semibold font-['Space_Grotesk']">Explore your CV strength</h2>
+                <h2 className="text-2xl font-semibold font-['Fraunces']">Explore your CV strength</h2>
                 <p className="text-sm text-muted-foreground mt-1">Upload your CV for a quick recruiter-style analysis. No commitment needed.</p>
               </div>
               <CVPicker onParsed={handleParsed} />
@@ -96,7 +96,7 @@ export default function ExploreWizard() {
           {step === "loading" && (
             <motion.div key="ld" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20 gap-4">
               <Loader2 className="h-12 w-12 text-primary animate-spin" />
-              <p className="text-lg font-semibold font-['Space_Grotesk']">Scanning your CV...</p>
+              <p className="text-lg font-semibold font-['Fraunces']">Scanning your CV...</p>
               <p className="text-sm text-muted-foreground">This takes about 15 seconds</p>
             </motion.div>
           )}
@@ -104,7 +104,7 @@ export default function ExploreWizard() {
           {step === "results" && result && (
             <motion.div key="res" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div className="text-center">
-                <div className={`text-5xl font-bold font-['Space_Grotesk'] ${scoreColor(result.overall_score)}`}>
+                <div className={`text-5xl font-bold font-['Fraunces'] ${scoreColor(result.overall_score)}`}>
                   {Math.round(result.overall_score)}
                 </div>
                 <div className={`text-lg font-semibold ${scoreColor(result.overall_score)} mt-1`}>Grade {result.grade}</div>

@@ -26,7 +26,7 @@ export function GoalChooser({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-['Space_Grotesk']">What do you want to do?</DialogTitle>
+          <DialogTitle className="font-['Fraunces']">What do you want to do?</DialogTitle>
         </DialogHeader>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
           {goals.map(g => (

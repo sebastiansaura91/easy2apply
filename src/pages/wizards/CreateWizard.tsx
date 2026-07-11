@@ -45,7 +45,7 @@ export default function CreateWizard() {
           </button>
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold font-['Space_Grotesk']">CVSäkert</span>
+            <span className="text-sm font-semibold font-['Fraunces']">CVSäkert</span>
           </div>
           <div />
         </div>
@@ -56,7 +56,7 @@ export default function CreateWizard() {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full space-y-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-semibold font-['Space_Grotesk']">{isSv ? "Var vill du börja?" : "Where do you want to start?"}</h2>
+                <h2 className="text-2xl font-semibold font-['Fraunces']">{isSv ? "Var vill du börja?" : "Where do you want to start?"}</h2>
                 <p className="text-sm text-muted-foreground mt-1">{isSv ? "Välj det som passar dig bäst." : "Pick the option that works best for you."}</p>
               </div>
               <div className="flex flex-col items-end gap-1">
@@ -82,44 +82,4 @@ export default function CreateWizard() {
               </button>
 
               <button onClick={() => openUpload("linkedin")}
-                className="group text-left rounded-xl border border-border bg-card p-6 hover:border-primary/50 hover:shadow-md transition-all">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <Linkedin className="h-5 w-5 text-primary" />
-                </div>
-                <h3 className="font-semibold text-sm">{isSv ? "LinkedIn-exporterad PDF" : "Use a LinkedIn-exported PDF"}</h3>
-                <p className="text-xs text-muted-foreground mt-1">{isSv ? "På LinkedIn: Profil → Mer → Spara som PDF." : "On LinkedIn: Profile → More → Save to PDF."}</p>
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <button onClick={() => createAndOpen(emptyCV)} className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
-                {isSv ? "Börja från noll" : "Start from scratch"}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-              <p className="text-xs italic text-muted-foreground">{isSv ? "Du kan ändra allt detta senare." : "You can edit this later."}</p>
-            </div>
-          </motion.div>
-        )}
-
-        {mode === "upload" && (
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full space-y-6">
-            <div>
-              <h2 className="text-2xl font-semibold font-['Space_Grotesk']">
-                {source === "linkedin"
-                  ? (isSv ? "Ladda upp din LinkedIn-PDF" : "Upload your LinkedIn PDF")
-                  : (isSv ? "Ladda upp ditt CV" : "Upload your CV")}
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {source === "linkedin"
-                  ? (isSv ? "På LinkedIn: gå till din profil → Mer → Spara som PDF, och släpp filen här." : "On LinkedIn: go to your profile → More → Save to PDF, then drop the file here.")
-                  : (isSv ? "Vi läser in det och du kan börja redigera direkt." : "We'll import it and you can start editing right away.")}
-              </p>
-            </div>
-            <CVUploadZone onParsed={(cv) => createAndOpen(cv)} />
-            <p className="text-xs italic text-muted-foreground text-center">{isSv ? "Du kan ändra allt detta senare." : "You can edit this later."}</p>
-          </motion.div>
-        )}
-      </div>
-    </div>
-  );
-}
+                className="group text-left rounded-xl border border-bor
