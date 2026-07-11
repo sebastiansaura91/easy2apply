@@ -221,4 +221,44 @@ const Dashboard = () => {
                 </Button>
               </div>
               {applications.length > 0 ? (
-                <div className="space-y-2">{applications.map(renderApp
+                <div className="space-y-2">
+                  {applications.map((r) => renderApplicationCard(r))}
+                </div>
+              ) : (
+                <div className="text-center py-8 border border-dashed border-border rounded-lg">
+                  <TrendingUp className="mx-auto h-5 w-5 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {isSv ? "Inga ansökningar än. Rikta ett CV mot en roll eller ett jobb." : "No applications yet. Tailor a CV to a role or job."}
+                  </p>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
+
+      <RoleTemplateDialog
+        open={riktaOpen}
+        onOpenChange={setRiktaOpen}
+        baseProfile={profile ?? null}
+      />
+
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{isSv ? "Radera CV?" : "Delete CV?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isSv ? "Det här går inte att ångra." : "This can't be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{isSv ? "Avbryt" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteResume}>{isSv ? "Radera" : "Delete"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default Dashboard;

@@ -82,4 +82,33 @@ export default function CreateWizard() {
               </button>
 
               <button onClick={() => openUpload("linkedin")}
-                className="group text-left rounded-xl border border-bor
+                className="group text-left rounded-xl border border-border bg-card p-6 hover:border-primary/50 hover:shadow-md transition-all">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                  <Linkedin className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="font-semibold text-sm">{isSv ? "Importera från LinkedIn" : "Import from LinkedIn"}</h3>
+                <p className="text-xs text-muted-foreground mt-1">{isSv ? "Ladda upp din LinkedIn-PDF." : "Upload your LinkedIn PDF export."}</p>
+              </button>
+            </div>
+
+            <div className="pt-2">
+              <Button variant="ghost" size="sm" onClick={() => createAndOpen(emptyCV(), isSv ? "Nytt CV" : "New CV")}>
+                {isSv ? "Eller börja från tomt" : "Or start from scratch"} <ArrowRight className="ml-1 h-4 w-4" />
+              </Button>
+            </div>
+          </motion.div>
+        )}
+
+        {mode === "upload" && (
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full">
+            <CVUploadZone
+              source={source}
+              language={lang}
+              onParsed={(cv, title) => createAndOpen(cv, title)}
+            />
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
