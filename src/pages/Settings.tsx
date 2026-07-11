@@ -97,4 +97,15 @@ const SettingsPage = () => {
                   <AlertDialogFooter>
                     <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
                     <AlertDialogAction onClick={handleDeleteAccount}>{t("confirm")}</AlertDialogAction>
-                  
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SettingsPage;
