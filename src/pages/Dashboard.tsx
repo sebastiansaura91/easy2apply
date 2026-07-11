@@ -1,16 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Copy, Trash2, Edit3, Shield, Settings, LogOut, Plus, Briefcase, TrendingUp, Star, StarOff } from "lucide-react";
+import { FileText, Copy, Trash2, Edit3, Shield, Settings, LogOut, Briefcase, TrendingUp, UserCircle, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { GoalChooser } from "@/components/shared/GoalChooser";
+import { RoleTemplateDialog } from "@/components/role/RoleTemplateDialog";
 import { CVMeta } from "@/types/cv";
-import { getResumeMeta, groupResumesByKind } from "@/lib/resume-grouping";
+import { getResumeMeta } from "@/lib/resume-grouping";
+import { findBaseProfile, profileCandidate } from "@/lib/profile";
+import { roleLabel } from "@/lib/role-advice";
+import { useLanguage } from "@/i18n/LanguageContext";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -23,11 +26,14 @@ const Dashboard = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { language } = useLanguage();
+  const isSv = language === "sv";
   const [resumes, setResumes] = useState<ResumeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [goalOpen, setGoalOpen] = useState(false);
+  const [riktaOpen, setRiktaOpen] = useState(false);
+  const healing = useRef(false);
 
   const fetchResumes = async () => {
     if (!user) return;
@@ -43,74 +49,117 @@ const Dashboard = () => {
 
   useEffect(() => { fetchResumes(); }, [user]);
 
-  // Redirect to onboarding only when we've CONFIRMED the account is empty (no fetch error) —
-  // a transient network error must not bounce a user who actually has CVs.
+  // P1: there is exactly ONE profile. If none is marked yet, the earliest-created CV
+  // (your first CV) becomes the profile. Self-heals once per load.
+  useEffect(() => {
+    if (loading || fetchError || resumes.length === 0 || healing.current) return;
+    if (findBaseProfile(resumes)) return;
+    const candidate = profileCandidate(resumes);
+    if (!candidate) return;
+    healing.current = true;
+    (async () => {
+      const { data } = await supabase.from("resumes").select("content_json").eq("id", candidate.id).single();
+      const content = { ...((data?.content_json as any) || {}), __meta: { ...getResumeMeta(candidate), isBaseProfile: true } };
+      await supabase.from("resumes").update({ content_json: content }).eq("id", candidate.id);
+      await fetchResumes();
+      healing.current = false;
+    })();
+  }, [loading, fetchError, resumes]);
+
+  // Redirect to onboarding only when we've CONFIRMED the account is empty (no fetch error).
   useEffect(() => {
     if (!loading && !fetchError && resumes.length === 0) navigate("/onboarding");
   }, [loading, fetchError, resumes.length]);
+
+  const profile = findBaseProfile(resumes) ?? profileCandidate(resumes);
+  const applications = resumes.filter((r) => r.id !== profile?.id);
 
   const duplicateResume = async (r: ResumeRow) => {
     if (!user) return;
     const { data } = await supabase.from("resumes").select("content_json").eq("id", r.id).single();
     if (!data) return;
     const id = uuidv4();
+    // A duplicate is never a second profile.
+    const content = { ...((data.content_json as any) || {}), __meta: { ...getResumeMeta(r), isBaseProfile: false, createdFrom: r.id } };
     const { error } = await supabase.from("resumes").insert({
-      id, user_id: user.id, title: `${r.title} (copy)`, language: r.language, template_id: "default", content_json: data.content_json,
+      id, user_id: user.id, title: `${r.title} (copy)`, language: r.language, template_id: "default", content_json: content,
     });
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { fetchResumes(); toast({ title: "CV duplicated" }); }
+    else { fetchResumes(); toast({ title: isSv ? "CV kopierat" : "CV duplicated" }); }
   };
 
   const deleteResume = async () => {
     if (!deleteId) return;
+    // P1: the profile can never be deleted.
+    if (deleteId === profile?.id) {
+      setDeleteId(null);
+      toast({ title: isSv ? "Profilen kan inte raderas" : "The profile can't be deleted", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase.from("resumes").delete().eq("id", deleteId);
     if (!error) setResumes(p => p.filter(r => r.id !== deleteId));
     else toast({ title: "Error", description: error.message, variant: "destructive" });
     setDeleteId(null);
   };
 
-  const getMeta = (r: ResumeRow): CVMeta => getResumeMeta(r);
+  const renderProfileCard = (r: ResumeRow) => (
+    <Card className="border-primary/40 bg-primary/5">
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={() => navigate(`/editor/${r.id}`)}>
+          <div className="h-10 w-10 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
+            <UserCircle className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-sm truncate">{r.title}</h3>
+              <Badge className="text-[9px] h-4">{isSv ? "Din profil" : "Your profile"}</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground truncate">
+              {isSv ? "Din verkliga bakgrund — grunden för alla riktade CV:n." : "Your real background — the basis for every tailored CV."}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <Button size="sm" className="h-8 text-xs" onClick={() => setRiktaOpen(true)}>
+            <Target className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Rikta CV" : "Tailor a CV"}
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Redigera profil" : "Edit profile"} onClick={() => navigate(`/editor/${r.id}`)}>
+            <Edit3 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
-  const toggleTemplate = async (r: ResumeRow) => {
-    if (!user) return;
-    const nextIsTemplate = !getMeta(r).isTemplate;
-    // Fetch full content_json so we don't clobber the document when writing metadata.
-    const { data } = await supabase.from("resumes").select("content_json").eq("id", r.id).single();
-    const content = { ...((data?.content_json as any) || {}), __meta: { ...getMeta(r), isTemplate: nextIsTemplate } };
-    const { error } = await supabase.from("resumes").update({ content_json: content }).eq("id", r.id);
-    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { fetchResumes(); toast({ title: nextIsTemplate ? "Marked as template" : "Unmarked as template" }); }
-  };
-
-  const { templates, applications, others } = groupResumesByKind(resumes);
-
-  const renderCard = (r: ResumeRow) => {
-    const meta = getMeta(r);
+  const renderApplicationCard = (r: ResumeRow) => {
+    const meta = getResumeMeta(r);
     return (
       <Card key={r.id} className="hover:shadow-md transition-shadow">
         <CardContent className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={() => navigate(`/editor/${r.id}`)}>
             <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-              {meta.isTemplate ? <Star className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-primary" />}
+              <FileText className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-medium text-sm truncate">{r.title}</h3>
-                {meta.isTemplate && <Badge variant="secondary" className="text-[9px] h-4">Template</Badge>}
+                {(meta.targetRole || meta.targetRoleLabel) && (
+                  <Badge variant="outline" className="text-[9px] h-4 gap-0.5 text-primary border-primary/30">
+                    <Target className="h-2.5 w-2.5" />
+                    {roleLabel(meta.targetRole, meta.targetRoleLabel, language)}
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
-                {meta.tailoredForJob ? `for ${meta.tailoredForJob}${meta.tailoredForCompany ? ` · ${meta.tailoredForCompany}` : ""} · ` : ""}
+                {meta.tailoredForJob ? `${isSv ? "för" : "for"} ${meta.tailoredForJob}${meta.tailoredForCompany ? ` · ${meta.tailoredForCompany}` : ""} · ` : ""}
                 {format(new Date(r.updated_at), "yyyy-MM-dd HH:mm")} · {r.language.toUpperCase()}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-0.5 flex-shrink-0">
-            <Button variant="ghost" size="icon" className="h-8 w-8" title={meta.isTemplate ? "Unmark template" : "Mark as template"} onClick={() => toggleTemplate(r)}>
-              {meta.isTemplate ? <StarOff className="h-3.5 w-3.5" /> : <Star className="h-3.5 w-3.5" />}
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit" onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-3.5 w-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title="Duplicate" onClick={() => duplicateResume(r)}><Copy className="h-3.5 w-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title="Delete" onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Redigera" : "Edit"} onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Kopiera" : "Duplicate"} onClick={() => duplicateResume(r)}><Copy className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Radera" : "Delete"} onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
           </div>
         </CardContent>
       </Card>
@@ -133,90 +182,87 @@ const Dashboard = () => {
       </nav>
 
       <div className="container mx-auto px-4 py-10 max-w-3xl">
-        {/* Welcome + CTA */}
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold font-['Space_Grotesk']">Your CVs</h1>
-          <p className="text-sm text-muted-foreground mt-1">Pick up where you left off or start something new.</p>
+          <h1 className="text-2xl font-semibold font-['Space_Grotesk']">{isSv ? "Hem" : "Home"}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isSv ? "Din profil är grunden. Rikta ett CV när du ska söka något." : "Your profile is the basis. Tailor a CV when you apply for something."}
+          </p>
         </div>
 
-        {/* Quick actions */}
-        <div className="grid sm:grid-cols-2 gap-3 mb-8">
-          <button onClick={() => { setGoalOpen(true); }}
-            className="group flex items-center gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4 hover:border-primary/40 transition-all text-left">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Briefcase className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="font-medium text-sm">Start new application</p>
-              <p className="text-xs text-muted-foreground">Match your CV to a specific role</p>
-            </div>
-          </button>
-          <button onClick={() => { setGoalOpen(true); }}
-            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 hover:border-primary/30 transition-all text-left">
-            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="font-medium text-sm">Improve or create CV</p>
-              <p className="text-xs text-muted-foreground">Audit, build, or explore</p>
-            </div>
-          </button>
-        </div>
-
-        {/* Resume list */}
         {loading ? (
-          <div className="text-center py-16 text-muted-foreground">Loading...</div>
+          <div className="text-center py-16 text-muted-foreground">{isSv ? "Laddar…" : "Loading..."}</div>
         ) : fetchError ? (
           <div className="text-center py-16 space-y-3">
-            <p className="text-sm text-muted-foreground">Couldn't load your CVs — check your connection.</p>
-            <Button variant="outline" size="sm" onClick={fetchResumes}>Try again</Button>
+            <p className="text-sm text-muted-foreground">{isSv ? "Kunde inte ladda dina CV:n — kolla anslutningen." : "Couldn't load your CVs — check your connection."}</p>
+            <Button variant="outline" size="sm" onClick={fetchResumes}>{isSv ? "Försök igen" : "Try again"}</Button>
           </div>
         ) : (
           <div className="space-y-8">
-            {templates.length > 0 && (
+            {/* Profile */}
+            {profile && (
               <section>
                 <div className="flex items-center gap-2 mb-3">
-                  <Star className="h-3.5 w-3.5 text-primary" />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Templates</p>
+                  <UserCircle className="h-3.5 w-3.5 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Profil" : "Profile"}</p>
                 </div>
-                <div className="space-y-2">{templates.map(renderCard)}</div>
+                {renderProfileCard(profile)}
               </section>
             )}
-            {applications.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <Briefcase className="h-3.5 w-3.5 text-primary" />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Applications</p>
+
+            {/* Applications */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ansökningar" : "Applications"}</p>
                 </div>
-                <div className="space-y-2">{applications.map(renderCard)}</div>
-              </section>
-            )}
-            {others.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {templates.length > 0 || applications.length > 0 ? "Other CVs" : "Your CVs"}
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setRiktaOpen(true)}>
+                  <Target className="mr-1 h-3 w-3" />{isSv ? "Rikta CV" : "Tailor a CV"}
+                </Button>
+              </div>
+              {applications.length > 0 ? (
+                <div className="space-y-2">{applications.map(renderApplicationCard)}</div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border p-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {isSv ? "Inga ansökningar än. Klicka \"Rikta CV\" för att skapa en från din profil." : "No applications yet. Click \"Tailor a CV\" to create one from your profile."}
                   </p>
                 </div>
-                <div className="space-y-2">{others.map(renderCard)}</div>
-              </section>
-            )}
+              )}
+            </section>
+
+            {/* Secondary */}
+            <button onClick={() => profile && navigate(`/editor/${profile.id}`)}
+              className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 hover:border-primary/30 transition-all text-left w-full">
+              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">{isSv ? "Förbättra eller granska profilen" : "Improve or audit the profile"}</p>
+                <p className="text-xs text-muted-foreground">{isSv ? "ATS-koll, rekryterar-scan, styrkeanalys" : "ATS check, recruiter scan, strength analysis"}</p>
+              </div>
+            </button>
           </div>
         )}
       </div>
 
-      <GoalChooser open={goalOpen} onOpenChange={setGoalOpen} />
+      <RoleTemplateDialog
+        open={riktaOpen}
+        onOpenChange={setRiktaOpen}
+        base={profile ? { id: profile.id, title: profile.title, language: profile.language } : null}
+        userId={user?.id}
+        onCreated={fetchResumes}
+      />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete CV</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure? This cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>{isSv ? "Radera ansökan" : "Delete application"}</AlertDialogTitle>
+            <AlertDialogDescription>{isSv ? "Är du säker? Detta kan inte ångras." : "Are you sure? This cannot be undone."}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={deleteResume}>Delete</AlertDialogAction>
+            <AlertDialogCancel>{isSv ? "Avbryt" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteResume}>{isSv ? "Radera" : "Delete"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

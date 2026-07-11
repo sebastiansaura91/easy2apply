@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { CVContent, CVSection } from "@/types/cv";
+import { getTemplateStyle } from "./templates";
 
 /**
  * Renders CV data directly to PDF using jsPDF text rendering.
@@ -11,8 +12,11 @@ import { CVContent, CVSection } from "@/types/cv";
 export function buildPdf(
   cv: CVContent,
   enabledSections: CVSection[],
-  t: (k: string) => string
+  t: (k: string) => string,
+  styleId?: string
 ): jsPDF {
+  const tpl = getTemplateStyle(styleId);
+  const font = tpl.pdfFont;
   const pdf = new jsPDF("p", "mm", "a4");
   const pageW = 210;
   const pageH = 297;
@@ -57,7 +61,7 @@ export function buildPdf(
     } = opts;
 
     pdf.setFontSize(fontSize);
-    pdf.setFont("helvetica", fontStyle);
+    pdf.setFont(font,fontStyle);
     pdf.setTextColor(...color);
 
     const lines = pdf.splitTextToSize(text, maxWidth);
@@ -83,7 +87,7 @@ export function buildPdf(
   ) {
     const { fontSize = 10, fontStyle = "normal", color = colors.black, maxWidth = contentW } = opts;
     pdf.setFontSize(fontSize);
-    pdf.setFont("helvetica", fontStyle);
+    pdf.setFont(font,fontStyle);
     pdf.setTextColor(...color);
 
     const lines = pdf.splitTextToSize(text, maxWidth);
@@ -102,13 +106,13 @@ export function buildPdf(
     y += 3;
     checkPage(8);
     pdf.setFontSize(11);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(...colors.black);
-    const upper = text.toUpperCase();
-    pdf.text(upper, marginL, y);
+    pdf.setFont(font,"bold");
+    pdf.setTextColor(...tpl.accentRgb);
+    const heading = tpl.uppercaseHeadings ? text.toUpperCase() : text;
+    pdf.text(heading, marginL, y);
     y += 1.5;
-    // Border line
-    pdf.setDrawColor(...colors.border);
+    // Accent rule under the heading
+    pdf.setDrawColor(...tpl.accentRgb);
     pdf.setLineWidth(0.4);
     pdf.line(marginL, y, marginL + contentW, y);
     y += 4;
@@ -126,7 +130,7 @@ export function buildPdf(
     const bulletMaxW = contentW - 7;
 
     pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
+    pdf.setFont(font,"normal");
     pdf.setTextColor(...colors.black);
 
     if (marker) {
@@ -320,8 +324,9 @@ export async function exportToPdf(
   cv: CVContent,
   enabledSections: CVSection[],
   t: (k: string) => string,
-  filename: string = "cv.pdf"
+  filename: string = "cv.pdf",
+  styleId?: string
 ): Promise<void> {
-  const pdf = buildPdf(cv, enabledSections, t);
+  const pdf = buildPdf(cv, enabledSections, t, styleId);
   pdf.save(filename);
 }

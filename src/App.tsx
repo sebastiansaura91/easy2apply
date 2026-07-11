@@ -12,10 +12,7 @@ import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import CVEditor from "./pages/CVEditor";
-import ApplyWizard from "./pages/wizards/ApplyWizard";
-import ImproveWizard from "./pages/wizards/ImproveWizard";
 import CreateWizard from "./pages/wizards/CreateWizard";
-import ExploreWizard from "./pages/wizards/ExploreWizard";
 import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -49,10 +46,11 @@ const App = () => (
                 <Route path="/" element={<Landing />} />
                 <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
                 <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-                <Route path="/wizard/apply" element={<ProtectedRoute><ApplyWizard /></ProtectedRoute>} />
-                <Route path="/wizard/improve" element={<ProtectedRoute><ImproveWizard /></ProtectedRoute>} />
                 <Route path="/wizard/create" element={<ProtectedRoute><CreateWizard /></ProtectedRoute>} />
-                <Route path="/wizard/explore" element={<ProtectedRoute><ExploreWizard /></ProtectedRoute>} />
+                {/* Legacy wizard routes retired — apply → "Rikta CV"; improve/explore → editor insights. */}
+                <Route path="/wizard/apply" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/wizard/improve" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/wizard/explore" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/editor/:id" element={<ProtectedRoute><CVEditor /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />

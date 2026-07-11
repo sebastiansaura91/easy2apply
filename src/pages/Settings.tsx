@@ -27,10 +27,17 @@ const SettingsPage = () => {
 
   const handleDeleteAccount = async () => {
     if (!user) return;
-    // Delete all user data
-    await supabase.from("resumes").delete().eq("user_id", user.id);
-    await supabase.from("job_postings").delete().eq("user_id", user.id);
-    await supabase.from("bullet_bank").delete().eq("user_id", user.id);
+    // M12: full GDPR erasure runs server-side (removes data rows, profile AND the
+    // auth.users record). The client can't delete the auth user itself.
+    const { data, error } = await supabase.functions.invoke("delete-account");
+    if (error || (data as any)?.error) {
+      toast({
+        title: t("settingsDeleteAccount"),
+        description: error?.message || (data as any)?.error,
+        variant: "destructive",
+      });
+      return;
+    }
     await signOut();
     navigate("/");
     toast({ title: t("settingsDeleteAccount") });

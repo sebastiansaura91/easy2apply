@@ -69,6 +69,21 @@ export interface CVMeta {
   tailoredForJob?: string;
   tailoredForCompany?: string;
   createdFrom?: string;
+  /**
+   * Your one true "base profile" — the canonical set of real facts. Role templates are
+   * angled copies of this. Only one resume should carry this flag.
+   */
+  isBaseProfile?: boolean;
+  /**
+   * The role this CV is angled for (e.g. "head-of-commercial"). Same person, different
+   * emphasis. Used to group role templates on the dashboard and to surface role-specific
+   * advice in the editor. Free-text custom roles are allowed.
+   */
+  targetRole?: string;
+  /** Human-readable label for a custom target role that isn't in the preset list. */
+  targetRoleLabel?: string;
+  /** Chosen visual template style id (see lib/templates.ts). Defaults to "classic". */
+  templateStyle?: string;
 }
 
 export interface CVContent {

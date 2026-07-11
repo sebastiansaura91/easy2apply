@@ -1,16 +1,29 @@
 project_id = "suokeaxtmhgakgtgcdwc"
 
+# H7: these functions accept CV text and burn the AI gateway key. They must require a
+# valid Supabase JWT so they can't be called anonymously (cost/DoS + unauth CV text to
+# a 3rd party). CORS is additionally restricted to the app origin inside each function
+# (see _shared/cors.ts). Do NOT set verify_jwt = false here again.
 [functions.optimize-bullets]
-verify_jwt = false
+verify_jwt = true
 
 [functions.bullet-coach]
-verify_jwt = false
+verify_jwt = true
 
 [functions.fix-issue]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-fix-questions]
-verify_jwt = false
+verify_jwt = true
 
 [functions.explain-role]
-verify_jwt = false
+verify_jwt = true
+
+# Full account deletion — must require a valid JWT so a user can only delete their own
+# account (the function derives the user id from the token, never from the request body).
+[functions.delete-account]
+verify_jwt = true
+
+# Role-fit analysis — accepts profile + optional posting; requires a valid JWT.
+[functions.analyze-role-fit]
+verify_jwt = true

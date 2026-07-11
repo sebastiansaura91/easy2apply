@@ -10,11 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target } from "lucide-react";
+import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { InsightsPanel } from "@/components/editor/InsightsPanel";
+import { RoleAdvicePanel } from "@/components/role/RoleAdvicePanel";
+import { RoleFitPanel } from "@/components/role/RoleFitPanel";
+import { roleLabel } from "@/lib/role-advice";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
@@ -24,6 +27,7 @@ import { A4Preview } from "@/components/cv-editor/A4Preview";
 import { SectionFormRenderer } from "@/components/cv-editor/SectionForms";
 import { cvHeadings } from "@/i18n/cvHeadings";
 import { exportToPdf } from "@/lib/export-pdf";
+import { TEMPLATE_STYLES, getTemplateStyle } from "@/lib/templates";
 import { detectCvLanguages } from "@/lib/language-detection";
 
 const CVEditor = () => {
@@ -34,6 +38,8 @@ const CVEditor = () => {
   const flow = useFlow();
   const { toast } = useToast();
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [roleAdviceOpen, setRoleAdviceOpen] = useState(false);
+  const [roleFitOpen, setRoleFitOpen] = useState(false);
   const autoOpenedRef = useRef(false);
 
   const [cv, setCv] = useState<CVContent>(emptyCV);
@@ -200,6 +206,13 @@ const CVEditor = () => {
   const updateExperienceBullets = (expIdx: number, bullets: string[]) =>
     setCv(prev => ({ ...prev, experience: prev.experience.map((e, i) => i === expIdx ? { ...e, bullets } : e) }));
   const updateSkills = (skills: string[]) => updateCv("skills", skills);
+  const applyReframe = (experienceId: string, original: string, suggested: string) =>
+    setCv(prev => ({
+      ...prev,
+      experience: prev.experience.map(e =>
+        e.id === experienceId ? { ...e, bullets: e.bullets.map(b => (b === original ? suggested : b)) } : e
+      ),
+    }));
   const navigateToSection = (sectionType: string) => {
     const idx = enabledSections.findIndex(s => s.type === sectionType);
     if (idx >= 0) { setMode("step"); setStepIdx(idx); }
@@ -207,7 +220,11 @@ const CVEditor = () => {
   };
 
   const safeName = (title || "cv").replace(/[^a-zA-Z0-9åäöÅÄÖ_-]/g, "_");
-  const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
+  const templateStyleId = cv.__meta?.templateStyle;
+  const templateStyle = getTemplateStyle(templateStyleId);
+  const setTemplateStyle = (id: string) =>
+    setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateStyle: id } }));
+  const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
 
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">{t("loading")}</p></div>;
 
@@ -235,6 +252,18 @@ const CVEditor = () => {
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setInsightsOpen(true)}>
               <Target className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Insights" : "Analys"}
             </Button>
+            {(cv.__meta?.targetRole || cv.__meta?.targetRoleLabel) && (
+              <>
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setRoleFitOpen(true)}>
+                  <Target className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Role fit" : "Rollfit"}
+                </Button>
+                {cv.__meta?.targetRole && (
+                  <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setRoleAdviceOpen(true)}>
+                    <UserCog className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Role advice" : "Rollråd"}
+                  </Button>
+                )}
+              </>
+            )}
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setStyleOpen(true)}>
               <Palette className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Style" : "Stil"}
             </Button>
@@ -396,17 +425,61 @@ const CVEditor = () => {
         </SheetContent>
       </Sheet>
 
-      {/* Style dialog (stub) */}
+      {/* Role fit analysis — profile × role (+ optional posting), suggestions you accept */}
+      <Sheet open={roleFitOpen} onOpenChange={setRoleFitOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 overflow-y-auto">
+          <SheetHeader className="p-4 pb-0">
+            <SheetTitle>
+              {cvLanguage === "en" ? "Role fit — " : "Rollfit — "}
+              {roleLabel(cv.__meta?.targetRole, cv.__meta?.targetRoleLabel, cvLanguage)}
+            </SheetTitle>
+          </SheetHeader>
+          <RoleFitPanel cv={cv} cvLanguage={cvLanguage} onApplyReframe={applyReframe} />
+        </SheetContent>
+      </Sheet>
+
+      {/* Role advice dialog — same profile, different emphasis for the target role */}
+      <Dialog open={roleAdviceOpen} onOpenChange={setRoleAdviceOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCog className="h-4 w-4 text-primary" />
+              {cvLanguage === "en" ? "Advice for" : "Råd för"} {roleLabel(cv.__meta?.targetRole, cv.__meta?.targetRoleLabel, cvLanguage)}
+            </DialogTitle>
+          </DialogHeader>
+          <RoleAdvicePanel roleId={cv.__meta?.targetRole} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Style dialog — template picker (drives preview + PDF export) */}
       <Dialog open={styleOpen} onOpenChange={setStyleOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{cvLanguage === "en" ? "Style" : "Stil"}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground -mt-1">
             {cvLanguage === "en"
-              ? "This CV uses a single-column ATS-safe template. Additional style options are coming soon."
-              : "Detta CV använder en enkolumnig ATS-säker mall. Fler stilalternativ kommer snart."}
+              ? "Same content, different look. All styles stay single-column and ATS-safe."
+              : "Samma innehåll, olika utseende. Alla stilar är enkolumniga och ATS-säkra."}
           </p>
+          <div className="space-y-2 mt-1">
+            {TEMPLATE_STYLES.map((s) => {
+              const selected = templateStyle.id === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setTemplateStyle(s.id)}
+                  className={`w-full text-left rounded-lg border p-3 transition-all ${selected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border hover:border-primary/40"}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm" style={{ color: s.accentHex }}>{s.label[cvLanguage]}</span>
+                    {selected && <span className="text-[10px] text-primary">{cvLanguage === "en" ? "Selected" : "Vald"}</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{s.desc[cvLanguage]}</p>
+                </button>
+              );
+            })}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -418,7 +491,7 @@ const CVEditor = () => {
           </DialogHeader>
           <div className="bg-muted/40 p-4 rounded-lg flex justify-center overflow-auto">
             <div className="transform scale-[0.75] origin-top">
-              <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} />
+              <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} style={templateStyle} />
             </div>
           </div>
         </DialogContent>

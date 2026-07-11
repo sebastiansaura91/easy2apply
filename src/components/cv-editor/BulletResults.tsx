@@ -62,16 +62,19 @@ function computeSkarpaScore(bullets: GeneratedBullet[]): number {
 }
 
 export function BulletResults({ result, context, onAccept, onRegenerate }: BulletResultsProps) {
-  const [selectedBullets, setSelectedBullets] = useState<Set<string>>(new Set());
+  // H9: selection is keyed by the bullet's index, NOT its text. Refining replaces a
+  // bullet's text in place; keying by text would drop the selection (and identical
+  // bullets would share state). Index is stable across refinement.
+  const [selectedBullets, setSelectedBullets] = useState<Set<number>>(new Set());
   const [localBullets, setLocalBullets] = useState<GeneratedBullet[]>(result.bullets);
   const [refiningIdx, setRefiningIdx] = useState<number | null>(null);
   const [showRecruiterView, setShowRecruiterView] = useState(false);
   const { toast } = useToast();
 
-  const toggleSelect = (bullet: string) => {
+  const toggleSelect = (idx: number) => {
     const next = new Set(selectedBullets);
-    if (next.has(bullet)) next.delete(bullet);
-    else next.add(bullet);
+    if (next.has(idx)) next.delete(idx);
+    else next.add(idx);
     setSelectedBullets(next);
   };
 
@@ -101,7 +104,7 @@ export function BulletResults({ result, context, onAccept, onRegenerate }: Bulle
   const skarpaScore = computeSkarpaScore(localBullets);
 
   const renderBulletCard = (bullet: GeneratedBullet, globalIdx: number) => {
-    const isSelected = selectedBullets.has(bullet.bullet);
+    const isSelected = selectedBullets.has(globalIdx);
     const isRefining = refiningIdx === globalIdx;
     const needsInput = bullet.needs_user_input.length > 0;
 
@@ -110,7 +113,7 @@ export function BulletResults({ result, context, onAccept, onRegenerate }: Bulle
         <CardContent className="p-3 space-y-2">
           <div className="flex gap-2 items-start">
             <button
-              onClick={() => toggleSelect(bullet.bullet)}
+              onClick={() => toggleSelect(globalIdx)}
               className={`mt-0.5 flex-shrink-0 h-5 w-5 rounded border flex items-center justify-center transition-colors ${isSelected ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/30 hover:border-primary"}`}
             >
               {isSelected && <Check className="h-3 w-3" />}
@@ -256,7 +259,7 @@ export function BulletResults({ result, context, onAccept, onRegenerate }: Bulle
           {selectedBullets.size} bullet{selectedBullets.size !== 1 ? "s" : ""} valda
         </p>
         <Button
-          onClick={() => onAccept(Array.from(selectedBullets))}
+          onClick={() => onAccept(Array.from(selectedBullets).map((i) => localBullets[i].bullet))}
           disabled={selectedBullets.size === 0}
         >
           <Check className="h-4 w-4 mr-1" />

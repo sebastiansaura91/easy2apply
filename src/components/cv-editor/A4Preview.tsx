@@ -1,13 +1,23 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { CVContent, CVSection } from "@/types/cv";
+import { TemplateStyle } from "@/lib/templates";
 
 interface A4PreviewProps {
   cv: CVContent;
   enabledSections: CVSection[];
   t: (k: any) => string;
+  style?: TemplateStyle;
 }
 
-export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4Preview({ cv, enabledSections, t }, ref) {
+export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4Preview({ cv, enabledSections, t, style }, ref) {
+  const styleVars = style
+    ? {
+        "--cv-font": style.cssFont,
+        "--cv-accent": style.accentHex,
+        "--cv-heading-transform": style.uppercaseHeadings ? "uppercase" : "none",
+        "--cv-heading-spacing": style.headingSpacing,
+      }
+    : {};
   const innerRef = useRef<HTMLDivElement | null>(null);
   const [pageCount, setPageCount] = useState(1);
   const [pxPerMm, setPxPerMm] = useState(0);
@@ -43,7 +53,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
         else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
       className="a4-preview"
-      style={{ transform: "scale(0.75)", transformOrigin: "top center", position: "relative" }}
+      style={{ transform: "scale(0.75)", transformOrigin: "top center", position: "relative", ...styleVars } as React.CSSProperties}
     >
       {/* Page break indicators */}
       {pxPerMm > 0 && pageCount > 1 && Array.from({ length: pageCount - 1 }).map((_, i) => {
