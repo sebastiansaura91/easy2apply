@@ -262,4 +262,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-                <div className="space-y-2">{applications.map(renderApp
