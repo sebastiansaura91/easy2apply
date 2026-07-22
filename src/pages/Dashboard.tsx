@@ -5,12 +5,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Copy, Trash2, Edit3, Shield, Settings, LogOut, Briefcase, TrendingUp, UserCircle, Target } from "lucide-react";
+import { FileText, Copy, Trash2, Edit3, Shield, Settings, LogOut, Briefcase, TrendingUp, UserCircle, Target, Star, StarOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { RoleTemplateDialog } from "@/components/role/RoleTemplateDialog";
 import { CVMeta } from "@/types/cv";
-import { getResumeMeta } from "@/lib/resume-grouping";
+import { getResumeMeta, groupResumesByKind } from "@/lib/resume-grouping";
 import { findBaseProfile, profileCandidate } from "@/lib/profile";
 import { roleLabel } from "@/lib/role-advice";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -33,6 +33,8 @@ const Dashboard = () => {
   const [fetchError, setFetchError] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [riktaOpen, setRiktaOpen] = useState(false);
+  const [riktaMode, setRiktaMode] = useState<"application" | "template">("application");
+  const [riktaBaseId, setRiktaBaseId] = useState<string | undefined>(undefined);
   const healing = useRef(false);
 
   const fetchResumes = async () => {
@@ -72,7 +74,25 @@ const Dashboard = () => {
   }, [loading, fetchError, resumes.length]);
 
   const profile = findBaseProfile(resumes) ?? profileCandidate(resumes);
-  const applications = resumes.filter((r) => r.id !== profile?.id);
+  // Carve the profile out by id first, then group the rest into templates vs applications.
+  const rest = resumes.filter((r) => r.id !== profile?.id);
+  const { templates, applications, others } = groupResumesByKind(rest);
+  const otherApps = [...applications, ...others];
+  const baseOptions = [profile, ...templates]
+    .filter((r): r is ResumeRow => !!r)
+    .map((r) => ({ id: r.id, title: r.title, language: r.language }));
+
+  const openTailor = (baseId?: string) => { setRiktaMode("application"); setRiktaBaseId(baseId); setRiktaOpen(true); };
+  const openNewTemplate = () => { setRiktaMode("template"); setRiktaBaseId(profile?.id); setRiktaOpen(true); };
+
+  const setTemplate = async (r: ResumeRow, makeTemplate: boolean) => {
+    if (!user || r.id === profile?.id) return; // never turn the profile into a template
+    const { data } = await supabase.from("resumes").select("content_json").eq("id", r.id).single();
+    const content = { ...((data?.content_json as any) || {}), __meta: { ...getResumeMeta(r), isTemplate: makeTemplate, isBaseProfile: false } };
+    const { error } = await supabase.from("resumes").update({ content_json: content }).eq("id", r.id);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { fetchResumes(); toast({ title: makeTemplate ? (isSv ? "Markerad som mall" : "Marked as template") : (isSv ? "Mallmarkering borttagen" : "Unmarked as template") }); }
+  };
 
   const duplicateResume = async (r: ResumeRow) => {
     if (!user) return;
@@ -120,7 +140,7 @@ const Dashboard = () => {
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <Button size="sm" className="h-8 text-xs" onClick={() => setRiktaOpen(true)}>
+          <Button size="sm" className="h-8 text-xs" onClick={() => openTailor()}>
             <Target className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Rikta CV" : "Tailor a CV"}
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Redigera profil" : "Edit profile"} onClick={() => navigate(`/editor/${r.id}`)}>
@@ -157,8 +177,46 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-0.5 flex-shrink-0">
+            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Markera som mall" : "Mark as template"} onClick={() => setTemplate(r, true)}><Star className="h-3.5 w-3.5" /></Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Redigera" : "Edit"} onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-3.5 w-3.5" /></Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Kopiera" : "Duplicate"} onClick={() => duplicateResume(r)}><Copy className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Radera" : "Delete"} onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderTemplateCard = (r: ResumeRow) => {
+    const meta = getResumeMeta(r);
+    return (
+      <Card key={r.id} className="hover:shadow-md transition-shadow">
+        <CardContent className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={() => navigate(`/editor/${r.id}`)}>
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Star className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium text-sm truncate">{r.title}</h3>
+                {(meta.targetRole || meta.targetRoleLabel) && (
+                  <Badge variant="outline" className="text-[9px] h-4 gap-0.5 text-primary border-primary/30">
+                    <Target className="h-2.5 w-2.5" />
+                    {roleLabel(meta.targetRole, meta.targetRoleLabel, language)}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground truncate">
+                {isSv ? "Mall · " : "Template · "}{format(new Date(r.updated_at), "yyyy-MM-dd HH:mm")} · {r.language.toUpperCase()}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <Button size="sm" className="h-8 text-xs" onClick={() => openTailor(r.id)}>
+              <Target className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Rikta CV" : "Tailor"}
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Redigera" : "Edit"} onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Ta bort mallmarkering" : "Unmark template"} onClick={() => setTemplate(r, false)}><StarOff className="h-3.5 w-3.5" /></Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Radera" : "Delete"} onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
           </div>
         </CardContent>
@@ -209,6 +267,31 @@ const Dashboard = () => {
               </section>
             )}
 
+            {/* Templates */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Star className="h-3.5 w-3.5 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Mallar" : "Templates"}</p>
+                </div>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={openNewTemplate} disabled={!profile}>
+                  <Star className="mr-1 h-3 w-3" />{isSv ? "Ny mall" : "New template"}
+                </Button>
+              </div>
+              {templates.length > 0 ? (
+                <div className="space-y-2">
+                  {templates.map((r) => renderTemplateCard(r))}
+                </div>
+              ) : (
+                <div className="text-center py-8 border border-dashed border-border rounded-lg">
+                  <Star className="mx-auto h-5 w-5 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {isSv ? "Inga mallar än. Skapa en stark mall per roll du söker (t.ex. Head of Commercial, Head of Product)." : "No templates yet. Create a strong master per role you target (e.g. Head of Commercial, Head of Product)."}
+                  </p>
+                </div>
+              )}
+            </section>
+
             {/* Applications */}
             <section>
               <div className="flex items-center justify-between mb-3">
@@ -216,13 +299,13 @@ const Dashboard = () => {
                   <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ansökningar" : "Applications"}</p>
                 </div>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setRiktaOpen(true)}>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openTailor()}>
                   <Target className="mr-1 h-3 w-3" />{isSv ? "Rikta CV" : "Tailor a CV"}
                 </Button>
               </div>
-              {applications.length > 0 ? (
+              {otherApps.length > 0 ? (
                 <div className="space-y-2">
-                  {applications.map((r) => renderApplicationCard(r))}
+                  {otherApps.map((r) => renderApplicationCard(r))}
                 </div>
               ) : (
                 <div className="text-center py-8 border border-dashed border-border rounded-lg">
@@ -240,9 +323,11 @@ const Dashboard = () => {
       <RoleTemplateDialog
         open={riktaOpen}
         onOpenChange={setRiktaOpen}
-        base={profile ?? null}
+        bases={baseOptions}
         userId={user?.id}
         onCreated={fetchResumes}
+        mode={riktaMode}
+        defaultBaseId={riktaBaseId}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>

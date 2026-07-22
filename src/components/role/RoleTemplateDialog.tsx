@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -20,31 +20,46 @@ import { RoleAdvicePanel } from "./RoleAdvicePanel";
 
 const CUSTOM = "__custom__";
 
+/** A CV the user can start a template/application from (profile or an existing template). */
+export interface BaseOption { id: string; title: string; language: string; }
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** The profile the CV is tailored from — its facts stay, emphasis changes. */
-  base: { id: string; title: string; language: string } | null;
+  /** CVs the user can start from — profile first, then templates. */
+  bases: BaseOption[];
   userId: string | undefined;
   onCreated?: () => void;
+  /** "application" tailors a job-specific copy (default); "template" creates a reusable role master. */
+  mode?: "application" | "template";
+  /** Preselect a source (e.g. tailoring from a specific template). */
+  defaultBaseId?: string;
 }
 
 /**
- * "Rikta CV" — the single tailoring flow. From the profile, pick a target role and
- * optionally paste a specific job posting. We copy the profile into a fresh application
- * the user then angles for the role (guided by role-fit). Never mutates the profile.
+ * Create either a reusable role TEMPLATE or a job-tailored APPLICATION from a chosen base
+ * (profile or an existing template). The base's facts are copied; only emphasis/metadata
+ * change. Never mutates the base.
  */
-export function RoleTemplateDialog({ open, onOpenChange, base, userId, onCreated }: Props) {
+export function RoleTemplateDialog({ open, onOpenChange, bases, userId, onCreated, mode = "application", defaultBaseId }: Props) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { language } = useLanguage();
   const flow = useFlow();
   const isSv = language === "sv";
+  const isTemplateMode = mode === "template";
   const [roleId, setRoleId] = useState<string>(ROLE_PRESETS[0].id);
   const [customLabel, setCustomLabel] = useState("");
   const [jobText, setJobText] = useState("");
+  const [selectedBaseId, setSelectedBaseId] = useState<string | undefined>(defaultBaseId ?? bases[0]?.id);
   const [creating, setCreating] = useState(false);
 
+  // Reset the source selection each time the dialog opens.
+  useEffect(() => {
+    if (open) setSelectedBaseId(defaultBaseId ?? bases[0]?.id);
+  }, [open, defaultBaseId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const base = bases.find((b) => b.id === selectedBaseId) ?? bases[0] ?? null;
   const isCustom = roleId === CUSTOM;
   const selectedLabel = isCustom ? (customLabel.trim() || (isSv ? "Egen roll" : "Custom role")) : roleLabel(roleId, null, language);
 
@@ -63,22 +78,23 @@ export function RoleTemplateDialog({ open, onOpenChange, base, userId, onCreated
       const baseContent = (data?.content_json as any) || {};
       const prevMeta = baseContent.__meta || {};
       const newId = uuidv4();
-      const title = `${selectedLabel} – ${base.title}`;
+      const title = isTemplateMode
+        ? `${selectedLabel} (${isSv ? "mall" : "template"})`
+        : `${selectedLabel} – ${base.title}`;
 
       const content = {
         ...baseContent,
         __meta: {
           ...prevMeta,
-          // This is an application (an angled copy), never the profile or a template.
-          isTemplate: false,
+          isTemplate: isTemplateMode,
           isBaseProfile: false,
           createdFrom: base.id,
           targetRole: isCustom ? undefined : roleId,
           targetRoleLabel: isCustom ? customLabel.trim() : undefined,
           tailoredForJob: undefined,
           tailoredForCompany: undefined,
-          // Persist the pasted posting so role-fit still has it after a reload (FlowContext is in-memory only).
-          jobPostingText: jobText.trim() || undefined,
+          // Templates aren't tied to a specific posting; applications persist the pasted one.
+          jobPostingText: isTemplateMode ? undefined : (jobText.trim() || undefined),
         },
       };
 
@@ -88,12 +104,18 @@ export function RoleTemplateDialog({ open, onOpenChange, base, userId, onCreated
       });
       if (error) throw error;
 
-      // Carry the pasted posting into the editor so role-fit can sharpen against it.
-      flow.setResumeId(newId);
-      flow.setJobPostingText(jobText.trim());
+      if (!isTemplateMode) {
+        // Carry the pasted posting into the editor so role-fit can sharpen against it.
+        flow.setResumeId(newId);
+        flow.setJobPostingText(jobText.trim());
+      }
 
       onCreated?.();
-      toast({ title: isSv ? "Ansökan skapad" : "Application created" });
+      toast({
+        title: isTemplateMode
+          ? (isSv ? "Mall skapad" : "Template created")
+          : (isSv ? "Ansökan skapad" : "Application created"),
+      });
       onOpenChange(false);
       navigate(`/editor/${newId}`);
     } catch (err: any) {
@@ -109,16 +131,36 @@ export function RoleTemplateDialog({ open, onOpenChange, base, userId, onCreated
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Target className="h-4 w-4 text-primary" />
-            {isSv ? "Rikta CV" : "Tailor a CV"}
+            {isTemplateMode ? (isSv ? "Ny mall" : "New template") : (isSv ? "Rikta CV" : "Tailor a CV")}
           </DialogTitle>
           <DialogDescription>
-            {isSv
-              ? "Från din profil. Välj en roll och klistra ev. in en jobbannons — vi skapar en ansökan du vinklar mot målet. Dina fakta ändras inte."
-              : "From your profile. Pick a role and optionally paste a posting — we create an application you angle toward the target. Your facts don't change."}
+            {isTemplateMode
+              ? (isSv
+                  ? "Skapa en återanvändbar mall för en roll, byggd på dina fakta. Rikta sedan ansökningar från mallen."
+                  : "Create a reusable master template for a role, built on your facts. Then tailor applications from it.")
+              : (isSv
+                  ? "Välj vad du utgår från och en målroll, klistra ev. in en jobbannons — vi skapar en ansökan du vinklar mot målet. Dina fakta ändras inte."
+                  : "Pick what to start from and a target role, optionally paste a posting — we create an application you angle toward the target. Your facts don't change.")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-1">
+          {bases.length > 1 && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                {isSv ? "Utgå från" : "Start from"}
+              </label>
+              <Select value={selectedBaseId} onValueChange={setSelectedBaseId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {bases.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
               {isSv ? "Målroll" : "Target role"}
@@ -157,17 +199,19 @@ export function RoleTemplateDialog({ open, onOpenChange, base, userId, onCreated
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              {isSv ? "Jobbannons (valfritt)" : "Job posting (optional)"}
-            </label>
-            <Textarea
-              value={jobText}
-              onChange={(e) => setJobText(e.target.value)}
-              placeholder={isSv ? "Klistra in annonsen för att skärpa mot just det jobbet…" : "Paste the posting to sharpen against this specific job…"}
-              className="min-h-[70px] text-sm"
-            />
-          </div>
+          {!isTemplateMode && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                {isSv ? "Jobbannons (valfritt)" : "Job posting (optional)"}
+              </label>
+              <Textarea
+                value={jobText}
+                onChange={(e) => setJobText(e.target.value)}
+                placeholder={isSv ? "Klistra in annonsen för att skärpa mot just det jobbet…" : "Paste the posting to sharpen against this specific job…"}
+                className="min-h-[70px] text-sm"
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -176,7 +220,7 @@ export function RoleTemplateDialog({ open, onOpenChange, base, userId, onCreated
           </Button>
           <Button onClick={create} disabled={creating || !base}>
             {creating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Target className="h-4 w-4 mr-1" />}
-            {isSv ? "Skapa ansökan" : "Create application"}
+            {isTemplateMode ? (isSv ? "Skapa mall" : "Create template") : (isSv ? "Skapa ansökan" : "Create application")}
           </Button>
         </DialogFooter>
       </DialogContent>
