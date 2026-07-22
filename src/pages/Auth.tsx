@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 const Auth = () => {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const [params] = useSearchParams();
+  // Preserve consent-route return path through the magic-link round-trip so external
+  // OAuth clients land back on /.lovable/oauth/consent instead of the app home.
+  const rawNext = params.get("next") ?? "";
+  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/dashboard";
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -22,7 +28,7 @@ const Auth = () => {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: window.location.origin + "/dashboard",
+        emailRedirectTo: window.location.origin + next,
       },
     });
 

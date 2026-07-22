@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import CVEditor from "./pages/CVEditor";
 import CreateWizard from "./pages/wizards/CreateWizard";
 import SettingsPage from "./pages/Settings";
+import OAuthConsent from "./pages/OAuthConsent";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/editor/:id" element={<ProtectedRoute><CVEditor /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </ErrorBoundary>
