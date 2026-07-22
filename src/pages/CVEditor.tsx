@@ -237,7 +237,7 @@ const CVEditor = () => {
       <nav className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-5xl mx-auto flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-2 min-w-0">
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => navigate("/dashboard")}>
+            <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0" onClick={() => navigate("/dashboard")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <Input
@@ -249,22 +249,22 @@ const CVEditor = () => {
             {saving && <span className="text-[10px] text-muted-foreground ml-1">{cvLanguage === "en" ? "Saving…" : "Sparar…"}</span>}
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setInsightsOpen(true)}>
+            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setInsightsOpen(true)}>
               <Target className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Insights" : "Analys"}
             </Button>
             {(cv.__meta?.targetRole || cv.__meta?.targetRoleLabel) && (
               <>
-                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setRoleFitOpen(true)}>
+                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setRoleFitOpen(true)}>
                   <Target className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Role fit" : "Rollfit"}
                 </Button>
                 {cv.__meta?.targetRole && (
-                  <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setRoleAdviceOpen(true)}>
+                  <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setRoleAdviceOpen(true)}>
                     <UserCog className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Role advice" : "Rollråd"}
                   </Button>
                 )}
               </>
             )}
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setStyleOpen(true)}>
+            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setStyleOpen(true)}>
               <Palette className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Style" : "Stil"}
             </Button>
             {/* Mode toggle */}
@@ -272,19 +272,19 @@ const CVEditor = () => {
               <button
                 type="button"
                 onClick={() => setMode("overview")}
-                className={`h-7 px-2.5 text-[11px] rounded inline-flex items-center gap-1 ${mode === "overview" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+                className={`h-9 px-2.5 text-[11px] rounded inline-flex items-center gap-1 ${mode === "overview" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
               >
                 <LayoutList className="h-3 w-3" />{cvLanguage === "en" ? "Overview" : "Översikt"}
               </button>
               <button
                 type="button"
                 onClick={() => setMode("step")}
-                className={`h-7 px-2.5 text-[11px] rounded inline-flex items-center gap-1 ${mode === "step" ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}
+                className={`h-9 px-2.5 text-[11px] rounded inline-flex items-center gap-1 ${mode === "step" ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}
               >
                 <ListChecks className="h-3 w-3" />{cvLanguage === "en" ? "Step-by-step" : "Steg-för-steg"}
               </button>
             </div>
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setPageBreaksOpen(true)}>
+            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setPageBreaksOpen(true)}>
               <FileText className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Page breaks" : "Sidbrytningar"}
             </Button>
             <div className="flex items-center gap-1 ml-1">
@@ -297,7 +297,7 @@ const CVEditor = () => {
                 </SelectContent>
               </Select>
             </div>
-            <Button size="sm" className="h-8 text-xs" onClick={doExport}>
+            <Button size="sm" className="h-9 text-xs" onClick={doExport}>
               <FileDown className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Download PDF" : "Ladda ner PDF"}
             </Button>
           </div>

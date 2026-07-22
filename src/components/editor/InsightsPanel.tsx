@@ -319,7 +319,7 @@ export function InsightsPanel({
       {/* ── Job posting context ── */}
       <Collapsible open={showJob} onOpenChange={setShowJob}>
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="w-full justify-between h-7 text-xs">
+          <Button variant="ghost" size="sm" className="w-full justify-between h-9 text-xs">
             <span>{isSv ? "Jobbannons (för bättre analys)" : "Job posting (for better analysis)"}</span>
             {showJob ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           </Button>
@@ -425,11 +425,11 @@ export function InsightsPanel({
                           />
                           <p className="text-[9px] text-muted-foreground italic">{autoFixPreview.explanation}</p>
                           <div className="flex gap-1.5">
-                            <Button size="sm" className="flex-1 h-7 text-[10px] gap-1" onClick={applyAutoFix}>
+                            <Button size="sm" className="flex-1 h-9 text-[10px] gap-1" onClick={applyAutoFix}>
                               <CheckCircle2 className="h-3 w-3" />
                               {isSv ? "Applicera" : "Apply"}
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => setAutoFixPreview(null)}>
+                            <Button variant="ghost" size="sm" className="h-9 text-[10px]" onClick={() => setAutoFixPreview(null)}>
                               {isSv ? "Avbryt" : "Cancel"}
                             </Button>
                           </div>
@@ -439,7 +439,7 @@ export function InsightsPanel({
                           <Button
                             variant="default"
                             size="sm"
-                            className="flex-1 h-7 text-[10px] gap-1.5"
+                            className="flex-1 h-9 text-[10px] gap-1.5"
                             disabled={autoFixingIdx !== null}
                             onClick={() => runAutoFix(issue, i)}
                           >
@@ -453,7 +453,7 @@ export function InsightsPanel({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-7 text-[10px] gap-1"
+                            className="h-9 text-[10px] gap-1"
                             onClick={() => setFixingIssue(issue)}
                           >
                             <Wrench className="h-3 w-3" />
@@ -486,7 +486,7 @@ export function InsightsPanel({
           {deepResult.bullet_feedback.length > 0 && (
             <Collapsible open={bulletsOpen} onOpenChange={setBulletsOpen}>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="w-full justify-between h-7 text-[10px]">
+                <Button variant="ghost" size="sm" className="w-full justify-between h-9 text-[10px]">
                   <span>{isSv ? "Punktfeedback" : "Bullet feedback"} ({deepResult.bullet_feedback.length})</span>
                   {bulletsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                 </Button>

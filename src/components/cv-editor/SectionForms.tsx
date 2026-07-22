@@ -94,11 +94,11 @@ export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
       <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">{t("sectionProfile")}</CardTitle>
         <div className="flex items-center gap-1.5">
-          <Button size="sm" className="h-7 text-xs" onClick={() => setKitOpen(true)}>
+          <Button size="sm" className="h-9 text-xs" onClick={() => setKitOpen(true)}>
             <Wand2 className="h-3 w-3 mr-1" />
             {isSv ? "Positionera & skriv" : "Position & write"}
           </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={draft} disabled={drafting}>
+          <Button variant="outline" size="sm" className="h-9 text-xs" onClick={draft} disabled={drafting}>
             {drafting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
             {isSv ? "Utkast från erfarenhet" : "Draft from experience"}
           </Button>
@@ -399,7 +399,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 text-xs gap-1"
+                          className="h-9 text-xs gap-1"
                           onClick={() => setExplainExpIdx(idx)}
                         >
                           <MessageSquarePlus className="h-3 w-3" />
@@ -413,7 +413,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 text-xs gap-1"
+                          className="h-9 text-xs gap-1"
                           onClick={() => improveAllBullets(idx)}
                           disabled={improvingAll === idx}
                         >
@@ -428,7 +428,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 text-xs gap-1"
+                          className="h-9 text-xs gap-1"
                           onClick={() => setWizardExpIdx(idx)}
                         >
                           <Wand2 className="h-3 w-3" />
@@ -511,11 +511,11 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                             </div>
                           </div>
                           <div className="flex gap-2 justify-end">
-                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => rejectPreview(idx, bIdx)}>
+                            <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => rejectPreview(idx, bIdx)}>
                               <Undo2 className="h-3 w-3 mr-1" />
                               {isSv ? "Behåll original" : "Keep original"}
                             </Button>
-                            <Button size="sm" className="h-7 text-xs" onClick={() => acceptPreview(idx, bIdx)}>
+                            <Button size="sm" className="h-9 text-xs" onClick={() => acceptPreview(idx, bIdx)}>
                               <Check className="h-3 w-3 mr-1" />
                                {isSv ? "Acceptera" : "Accept"}
                             </Button>

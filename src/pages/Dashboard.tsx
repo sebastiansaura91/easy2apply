@@ -140,10 +140,10 @@ const Dashboard = () => {
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <Button size="sm" className="h-8 text-xs" onClick={() => openTailor()}>
+          <Button size="sm" className="h-9 text-xs" onClick={() => openTailor()}>
             <Target className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Rikta CV" : "Tailor a CV"}
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Redigera profil" : "Edit profile"} onClick={() => navigate(`/editor/${r.id}`)}>
+          <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Redigera profil" : "Edit profile"} onClick={() => navigate(`/editor/${r.id}`)}>
             <Edit3 className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -177,10 +177,10 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-0.5 flex-shrink-0">
-            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Markera som mall" : "Mark as template"} onClick={() => setTemplate(r, true)}><Star className="h-3.5 w-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Redigera" : "Edit"} onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-3.5 w-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Kopiera" : "Duplicate"} onClick={() => duplicateResume(r)}><Copy className="h-3.5 w-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Radera" : "Delete"} onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Markera som mall" : "Mark as template"} onClick={() => setTemplate(r, true)}><Star className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Redigera" : "Edit"} onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Kopiera" : "Duplicate"} onClick={() => duplicateResume(r)}><Copy className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Radera" : "Delete"} onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
           </div>
         </CardContent>
       </Card>
@@ -212,12 +212,12 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-0.5 flex-shrink-0">
-            <Button size="sm" className="h-8 text-xs" onClick={() => openTailor(r.id)}>
+            <Button size="sm" className="h-9 text-xs" onClick={() => openTailor(r.id)}>
               <Target className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Rikta CV" : "Tailor"}
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Redigera" : "Edit"} onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-3.5 w-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Ta bort mallmarkering" : "Unmark template"} onClick={() => setTemplate(r, false)}><StarOff className="h-3.5 w-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title={isSv ? "Radera" : "Delete"} onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Redigera" : "Edit"} onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Ta bort mallmarkering" : "Unmark template"} onClick={() => setTemplate(r, false)}><StarOff className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Radera" : "Delete"} onClick={() => setDeleteId(r.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
           </div>
         </CardContent>
       </Card>
@@ -274,7 +274,7 @@ const Dashboard = () => {
                   <Star className="h-3.5 w-3.5 text-primary" />
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Mallar" : "Templates"}</p>
                 </div>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={openNewTemplate} disabled={!profile}>
+                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={openNewTemplate} disabled={!profile}>
                   <Star className="mr-1 h-3 w-3" />{isSv ? "Ny mall" : "New template"}
                 </Button>
               </div>
@@ -299,7 +299,7 @@ const Dashboard = () => {
                   <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ansökningar" : "Applications"}</p>
                 </div>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openTailor()}>
+                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => openTailor()}>
                   <Target className="mr-1 h-3 w-3" />{isSv ? "Rikta CV" : "Tailor a CV"}
                 </Button>
               </div>

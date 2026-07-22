@@ -209,7 +209,7 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe }: Props) {
                       <Button
                         size="sm"
                         variant={applied.has(i) ? "secondary" : "outline"}
-                        className="h-7 text-xs"
+                        className="h-9 text-xs"
                         disabled={applied.has(i)}
                         onClick={() => {
                           onApplyReframe(r.experience_id, r.original, r.suggested);
