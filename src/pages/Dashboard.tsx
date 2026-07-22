@@ -240,7 +240,9 @@ const Dashboard = () => {
       <RoleTemplateDialog
         open={riktaOpen}
         onOpenChange={setRiktaOpen}
-        baseProfile={profile ?? null}
+        base={profile ?? null}
+        userId={user?.id}
+        onCreated={fetchResumes}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>

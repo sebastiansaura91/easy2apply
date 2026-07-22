@@ -92,7 +92,7 @@ export default function CreateWizard() {
             </div>
 
             <div className="pt-2">
-              <Button variant="ghost" size="sm" onClick={() => createAndOpen(emptyCV(), isSv ? "Nytt CV" : "New CV")}>
+              <Button variant="ghost" size="sm" onClick={() => createAndOpen(emptyCV, isSv ? "Nytt CV" : "New CV")}>
                 {isSv ? "Eller börja från tomt" : "Or start from scratch"} <ArrowRight className="ml-1 h-4 w-4" />
               </Button>
             </div>
@@ -102,9 +102,7 @@ export default function CreateWizard() {
         {mode === "upload" && (
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full">
             <CVUploadZone
-              source={source}
-              language={lang}
-              onParsed={(cv, title) => createAndOpen(cv, title)}
+              onParsed={(cv) => { void createAndOpen(cv); }}
             />
           </motion.div>
         )}
