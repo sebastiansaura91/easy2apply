@@ -189,7 +189,7 @@ const CVEditor = () => {
   // Tailoring analysis carried in from a wizard, scoped to THIS resume so a stale
   // analysis from another CV never shows here.
   const flowScoped = flow.resumeId === id;
-  const seededJob = flowScoped ? (flow.jobPostingText || undefined) : undefined;
+  const seededJob = (flowScoped ? flow.jobPostingText : "") || cv.__meta?.jobPostingText || undefined;
   const seededResult = flowScoped ? flow.analysis : null;
 
   // Auto-open the insights panel once when arriving from a wizard with analysis/job context,
@@ -249,9 +249,6 @@ const CVEditor = () => {
             {saving && <span className="text-[10px] text-muted-foreground ml-1">{cvLanguage === "en" ? "Saving…" : "Sparar…"}</span>}
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => navigate("/wizard/apply")}>
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Tailor for a job" : "Anpassa för jobb"}
-            </Button>
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setInsightsOpen(true)}>
               <Target className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Insights" : "Analys"}
             </Button>

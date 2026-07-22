@@ -33,7 +33,7 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe }: Props) {
   const { toast } = useToast();
   const flow = useFlow();
   // Prefill the posting if one was pasted when the application was created ("Rikta CV").
-  const [jobText, setJobText] = useState(flow.jobPostingText || "");
+  const [jobText, setJobText] = useState(flow.jobPostingText || cv.__meta?.jobPostingText || "");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RoleFitResult | null>(null);
   const [jobAnalysis, setJobAnalysis] = useState<any | null>(null);

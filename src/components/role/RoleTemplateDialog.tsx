@@ -77,6 +77,8 @@ export function RoleTemplateDialog({ open, onOpenChange, base, userId, onCreated
           targetRoleLabel: isCustom ? customLabel.trim() : undefined,
           tailoredForJob: undefined,
           tailoredForCompany: undefined,
+          // Persist the pasted posting so role-fit still has it after a reload (FlowContext is in-memory only).
+          jobPostingText: jobText.trim() || undefined,
         },
       };
 

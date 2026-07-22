@@ -68,6 +68,8 @@ export interface CVMeta {
   isTemplate?: boolean;
   tailoredForJob?: string;
   tailoredForCompany?: string;
+  /** Raw job posting pasted when the application was created — persisted so role-fit context survives a reload. */
+  jobPostingText?: string;
   createdFrom?: string;
   /**
    * Your one true "base profile" — the canonical set of real facts. Role templates are
