@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BulletWizard } from "./BulletWizard";
 import { ExplainWizard } from "./ExplainWizard";
+import { SummaryKitDialog } from "./SummaryKitDialog";
 import { analyzeBullet } from "@/lib/cv-quality";
 
 const bulletTipsSv = [
@@ -67,6 +68,7 @@ export function ContactForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
 export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   const isSv = cvLanguage !== "en";
   const [drafting, setDrafting] = useState(false);
+  const [kitOpen, setKitOpen] = useState(false);
   const { toast } = useToast();
 
   const draft = async () => {
@@ -91,14 +93,21 @@ export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
     <Card>
       <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">{t("sectionProfile")}</CardTitle>
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={draft} disabled={drafting}>
-          {drafting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
-          {isSv ? "Skriv utkast från min erfarenhet" : "Draft from my experience"}
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" className="h-7 text-xs" onClick={() => setKitOpen(true)}>
+            <Wand2 className="h-3 w-3 mr-1" />
+            {isSv ? "Positionera & skriv" : "Position & write"}
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={draft} disabled={drafting}>
+            {drafting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+            {isSv ? "Utkast från erfarenhet" : "Draft from experience"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Textarea rows={4} value={cv.profile} onChange={(e) => updateCv("profile", e.target.value)} placeholder={cvLanguage === "en" ? "Write a short professional summary..." : "Skriv en kort professionell sammanfattning..."} />
       </CardContent>
+      <SummaryKitDialog open={kitOpen} onOpenChange={setKitOpen} cv={cv} cvLanguage={isSv ? "sv" : "en"} onApply={(s) => updateCv("profile", s)} />
     </Card>
   );
 }

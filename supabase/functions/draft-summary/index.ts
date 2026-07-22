@@ -13,7 +13,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { resume_content_json, system_language } = await req.json();
+    const { resume_content_json, system_language, positioning } = await req.json();
     if (!resume_content_json) {
       return new Response(JSON.stringify({ error: "resume_content_json is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -34,15 +34,32 @@ serve(async (req) => {
       `${e.degree}${e.field ? `, ${e.field}` : ""}${e.school ? ` — ${e.school}` : ""}`).join("; ");
     const skills = (resume_content_json.skills || []).join(", ");
 
-    const systemPrompt = `You are a senior executive-CV writer. Write a concise professional summary from the candidate's OWN material only.
+    // Positioning kit (optional): what the candidate wants to highlight and how to position.
+    const p = positioning || {};
+    const posLines = [
+      p.targetRole ? `Position for this role: ${p.targetRole}` : null,
+      p.specialism ? `Known for / specialism: ${p.specialism}` : null,
+      Array.isArray(p.strengths) && p.strengths.length ? `Lead with these strengths: ${p.strengths.join(", ")}` : null,
+      p.signatureAchievement ? `Signature achievement to feature (use only if truthful; keep any numbers EXACTLY as given): ${p.signatureAchievement}` : null,
+      p.industry ? `Target industry/context + keywords to echo: ${p.industry}` : null,
+      p.deemphasize ? `De-emphasise: ${p.deemphasize}` : null,
+    ].filter(Boolean).join("\n");
+
+    const systemPrompt = `You are a senior executive-CV writer. Write a POSITIONING-DRIVEN professional summary — a sharp elevator pitch of the value the candidate OFFERS, NOT a recap of their CV.
+
+## STRUCTURE (3–4 sentences, max ~80 words; 2 sentences is fine for very senior profiles)
+1. Positioning statement: who they are — seniority + specialism/identity (add domain / P&L / team / geography only if evidenced).
+2. Value proposition: the 2–3 strengths they want to lead with, each tied to a concrete outcome — what they DELIVER, never duties.
+3. One quantified proof point (their signature achievement).
+${posLines ? "Use the POSITIONING guidance provided to decide what to emphasise and how to frame them — it outranks raw CV order for emphasis and de-emphasis." : "No positioning guidance was given — infer the strongest angle from the facts."}
 
 ## HARD RULES
-- Use ONLY facts present in the experience, education and skills provided. NEVER invent employers, metrics, titles, dates or claims.
-- 3–4 sentences. Lead with scope (seniority, domain, P&L/team/geography if evidenced). No buzzwords or clichés ("passionate", "results-oriented", "team player").
-- If a compelling number would strengthen it but isn't provided, do NOT fabricate one — write the sentence without it or use "${lang === "sv" ? "[FYLL I]" : "[FILL IN]"}".
-- Write in ${langName}. Return ONLY the summary text — no preamble, no quotes, no markdown.`;
+- Grounded in real facts ONLY. NEVER invent employers, titles, dates, metrics or claims. Numbers may come only from the CV facts or the candidate's stated signature achievement — keep them exactly as given.
+- If a number would strengthen a sentence but isn't provided, omit it or use "${lang === "sv" ? "[FYLL I]" : "[FILL IN]"}". Never fabricate.
+- No clichés or buzzwords ("passionate", "results-oriented", "team player", "dynamic", "proven track record").
+- Write in ${langName}. Return ONLY the summary text — no preamble, quotes or markdown.`;
 
-    const userPrompt = `EXPERIENCE:\n${experiences || "(none)"}\n\nEDUCATION: ${education || "(none)"}\n\nSKILLS: ${skills || "(none)"}\n\nWrite the summary now, in ${langName}.`;
+    const userPrompt = `${posLines ? `POSITIONING (how to frame the candidate):\n${posLines}\n\n` : ""}CANDIDATE FACTS (the factual base — do not exceed these):\nEXPERIENCE:\n${experiences || "(none)"}\n\nEDUCATION: ${education || "(none)"}\n\nSKILLS: ${skills || "(none)"}\n\nWrite the positioning-driven summary now, in ${langName}.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
