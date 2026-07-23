@@ -17,6 +17,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { useFlow } from "@/contexts/FlowContext";
 import { ROLE_PRESETS, roleLabel } from "@/lib/role-advice";
 import { RoleAdvicePanel } from "./RoleAdvicePanel";
+import { RolePicker } from "./RolePicker";
 
 const CUSTOM = "__custom__";
 
@@ -165,15 +166,7 @@ export function RoleTemplateDialog({ open, onOpenChange, bases, userId, onCreate
             <label className="text-xs font-medium text-muted-foreground">
               {isSv ? "Målroll" : "Target role"}
             </label>
-            <Select value={roleId} onValueChange={setRoleId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ROLE_PRESETS.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>{r.label[language]}</SelectItem>
-                ))}
-                <SelectItem value={CUSTOM}>{isSv ? "Egen roll…" : "Custom role…"}</SelectItem>
-              </SelectContent>
-            </Select>
+            <RolePicker value={roleId} onChange={setRoleId} selectedLabel={roleLabel(roleId, null, language)} />
           </div>
 
           {isCustom ? (

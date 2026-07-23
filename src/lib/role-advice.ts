@@ -13,6 +13,10 @@
 
 export type Lang = "sv" | "en";
 
+// Imported after Lang so role-catalog can type-only import Lang from here (no runtime cycle).
+// eslint-disable-next-line import/first
+import { ROLE_CATALOG, ROLE_CATEGORIES } from "./role-catalog";
+
 export interface RoleAdvice {
   /** Stable id stored in CVMeta.targetRole. */
   id: string;
@@ -309,9 +313,36 @@ export function getRoleAdvice(id?: string | null): RoleAdvice | undefined {
   return ROLE_PRESETS.find((r) => r.id === id);
 }
 
-/** Display label for any stored role id, falling back to a custom label or the raw id. */
+/** Display label for any stored role id, falling back to the catalog, a custom label, or the raw id. */
 export function roleLabel(id?: string | null, customLabel?: string | null, lang: Lang = "sv"): string {
   const preset = getRoleAdvice(id);
   if (preset) return preset.label[lang];
+  const cat = ROLE_CATALOG.find((c) => c.id === id);
+  if (cat) return cat.label;
   return customLabel || id || "";
+}
+
+export interface RolePickerGroup {
+  id: string;
+  label: string;
+  roles: { id: string; label: string }[];
+}
+
+/**
+ * All selectable target roles for the picker, grouped by category. Curated senior roles
+ * (with hand-written advice) lead under "Leadership"; the broad catalog follows.
+ */
+export function getAllRoles(lang: Lang): RolePickerGroup[] {
+  const byCat: Record<string, { id: string; label: string }[]> = {};
+  const push = (catId: string, role: { id: string; label: string }) => {
+    if (!byCat[catId]) byCat[catId] = [];
+    byCat[catId].push(role);
+  };
+  for (const p of ROLE_PRESETS) push("leadership", { id: p.id, label: p.label[lang] });
+  for (const c of ROLE_CATALOG) push(c.category, { id: c.id, label: c.label });
+
+  return [...ROLE_CATEGORIES]
+    .sort((a, b) => a.order - b.order)
+    .filter((cat) => byCat[cat.id]?.length)
+    .map((cat) => ({ id: cat.id, label: cat.label[lang], roles: byCat[cat.id] }));
 }
