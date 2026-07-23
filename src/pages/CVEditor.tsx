@@ -14,6 +14,9 @@ import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, File
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TailorPanel } from "@/components/editor/TailorPanel";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronRight, Eye, EyeOff } from "lucide-react";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import { roleLabel } from "@/lib/role-advice";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent,
@@ -43,7 +46,14 @@ const CVEditor = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [translating, setTranslating] = useState(false);
-  const [mode, setMode] = useState<"step" | "overview">("step");
+  const [mode, setMode] = useState<"step" | "overview">("overview");
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const toggleSectionOpen = (id: string) =>
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   const [stepIdx, setStepIdx] = useState(0);
   const [styleOpen, setStyleOpen] = useState(false);
   const [pageBreaksOpen, setPageBreaksOpen] = useState(false);
@@ -227,7 +237,9 @@ const CVEditor = () => {
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">{t("loading")}</p></div>;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen bg-background">
+      <AppSidebar />
+      <div className="flex min-w-0 flex-1 flex-col">
       {/* Top bar */}
       <nav className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-5xl mx-auto flex items-center justify-between h-14 px-4">
@@ -366,15 +378,45 @@ const CVEditor = () => {
       ) : (
         <main className="flex-1">
           <ScrollArea className="h-full">
-            <div className="max-w-3xl mx-auto p-6 space-y-6">
-              {enabledSections.map(section => (
-                <div key={section.id} id={`section-${section.type}`}>
-                  <SectionFormRenderer sectionType={section.type} cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />
-                </div>
-              ))}
+            <div className="max-w-3xl mx-auto p-4 sm:p-6">
+              {/* Collapsible section list */}
+              <div className="overflow-hidden rounded-xl border border-border bg-card divide-y divide-border">
+                {[...cv.sections].sort((a, b) => a.order - b.order).map(section => {
+                  const title = tCv(`section${section.type.charAt(0).toUpperCase() + section.type.slice(1)}`);
+                  const isOpen = openSections.has(section.id);
+                  return (
+                    <Collapsible key={section.id} open={isOpen} onOpenChange={() => toggleSectionOpen(section.id)}>
+                      <div className="flex h-12 items-center gap-2 px-4">
+                        <CollapsibleTrigger className="flex flex-1 items-center gap-2 text-left">
+                          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                          <span className="text-sm font-medium text-primary">{title}</span>
+                          {!section.enabled && (
+                            <span className="text-[10px] text-muted-foreground">({cvLanguage === "en" ? "hidden" : "dold"})</span>
+                          )}
+                        </CollapsibleTrigger>
+                        <button
+                          type="button"
+                          onClick={() => toggleSection(section.id)}
+                          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                          title={section.enabled ? (cvLanguage === "en" ? "Hide from CV" : "Dölj i CV") : (cvLanguage === "en" ? "Show in CV" : "Visa i CV")}
+                          aria-label={section.enabled ? "Hide section" : "Show section"}
+                        >
+                          {section.enabled ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <CollapsibleContent>
+                        <div className="border-t border-border px-4 py-4 [&_.card]:border-0">
+                          <SectionFormRenderer sectionType={section.type} cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
+              </div>
 
-              <div className="border-t border-border pt-6">
-                <p className="text-xs font-semibold uppercase text-muted-foreground mb-3">{cvLanguage === "en" ? "Manage sections" : "Hantera sektioner"}</p>
+              {/* Reorder */}
+              <div className="mt-6">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{cvLanguage === "en" ? "Reorder sections" : "Ordna sektioner"}</p>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={cv.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                     {[...cv.sections].sort((a, b) => a.order - b.order).map(section => (
@@ -467,6 +509,7 @@ const CVEditor = () => {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 };
