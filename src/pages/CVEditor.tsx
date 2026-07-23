@@ -13,10 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { InsightsPanel } from "@/components/editor/InsightsPanel";
-import { RoleAdvicePanel } from "@/components/role/RoleAdvicePanel";
-import { RoleFitPanel } from "@/components/role/RoleFitPanel";
+import { TailorPanel } from "@/components/editor/TailorPanel";
 import { roleLabel } from "@/lib/role-advice";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent,
@@ -37,9 +34,7 @@ const CVEditor = () => {
   const { user } = useAuth();
   const flow = useFlow();
   const { toast } = useToast();
-  const [insightsOpen, setInsightsOpen] = useState(false);
-  const [roleAdviceOpen, setRoleAdviceOpen] = useState(false);
-  const [roleFitOpen, setRoleFitOpen] = useState(false);
+  const [tailorOpen, setTailorOpen] = useState(false);
   const autoOpenedRef = useRef(false);
 
   const [cv, setCv] = useState<CVContent>(emptyCV);
@@ -197,7 +192,7 @@ const CVEditor = () => {
   useEffect(() => {
     if (loading || autoOpenedRef.current) return;
     if (flowScoped && (flow.analysis || (flow.jobPostingText && flow.jobPostingText.trim()))) {
-      setInsightsOpen(true);
+      setTailorOpen(true);
       autoOpenedRef.current = true;
     }
   }, [loading, flowScoped, flow.analysis, flow.jobPostingText]);
@@ -216,7 +211,7 @@ const CVEditor = () => {
   const navigateToSection = (sectionType: string) => {
     const idx = enabledSections.findIndex(s => s.type === sectionType);
     if (idx >= 0) { setMode("step"); setStepIdx(idx); }
-    setInsightsOpen(false);
+    setTailorOpen(false);
   };
 
   const safeName = (title || "cv").replace(/[^a-zA-Z0-9åäöÅÄÖ_-]/g, "_");
@@ -249,21 +244,9 @@ const CVEditor = () => {
             {saving && <span className="text-[10px] text-muted-foreground ml-1">{cvLanguage === "en" ? "Saving…" : "Sparar…"}</span>}
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setInsightsOpen(true)}>
-              <Target className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Insights" : "Analys"}
+            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setTailorOpen(true)}>
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Improve" : "Förbättra"}
             </Button>
-            {(cv.__meta?.targetRole || cv.__meta?.targetRoleLabel) && (
-              <>
-                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setRoleFitOpen(true)}>
-                  <Target className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Role fit" : "Rollfit"}
-                </Button>
-                {cv.__meta?.targetRole && (
-                  <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setRoleAdviceOpen(true)}>
-                    <UserCog className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Role advice" : "Rollråd"}
-                  </Button>
-                )}
-              </>
-            )}
             <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setStyleOpen(true)}>
               <Palette className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Style" : "Stil"}
             </Button>
@@ -405,51 +388,21 @@ const CVEditor = () => {
         </main>
       )}
 
-      {/* Tailoring insights panel */}
-      <Sheet open={insightsOpen} onOpenChange={setInsightsOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md p-0 overflow-y-auto">
-          <SheetHeader className="p-4 pb-0">
-            <SheetTitle>{cvLanguage === "en" ? "Tailoring insights" : "Analys & förbättring"}</SheetTitle>
-          </SheetHeader>
-          <InsightsPanel
-            cv={cv}
-            cvLanguage={cvLanguage}
-            t={t}
-            jobPostingText={seededJob}
-            initialResult={seededResult}
-            onNavigateToSection={navigateToSection}
-            onUpdateProfile={updateProfile}
-            onUpdateExperienceBullets={updateExperienceBullets}
-            onUpdateSkills={updateSkills}
-          />
-        </SheetContent>
-      </Sheet>
-
-      {/* Role fit analysis — profile × role (+ optional posting), suggestions you accept */}
-      <Sheet open={roleFitOpen} onOpenChange={setRoleFitOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md p-0 overflow-y-auto">
-          <SheetHeader className="p-4 pb-0">
-            <SheetTitle>
-              {cvLanguage === "en" ? "Role fit — " : "Rollfit — "}
-              {roleLabel(cv.__meta?.targetRole, cv.__meta?.targetRoleLabel, cvLanguage)}
-            </SheetTitle>
-          </SheetHeader>
-          <RoleFitPanel cv={cv} cvLanguage={cvLanguage} onApplyReframe={applyReframe} />
-        </SheetContent>
-      </Sheet>
-
-      {/* Role advice dialog — same profile, different emphasis for the target role */}
-      <Dialog open={roleAdviceOpen} onOpenChange={setRoleAdviceOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserCog className="h-4 w-4 text-primary" />
-              {cvLanguage === "en" ? "Advice for" : "Råd för"} {roleLabel(cv.__meta?.targetRole, cv.__meta?.targetRoleLabel, cvLanguage)}
-            </DialogTitle>
-          </DialogHeader>
-          <RoleAdvicePanel roleId={cv.__meta?.targetRole} />
-        </DialogContent>
-      </Dialog>
+      {/* Unified tailoring surface — role fit + ATS/keywords + role guide */}
+      <TailorPanel
+        open={tailorOpen}
+        onOpenChange={setTailorOpen}
+        cv={cv}
+        cvLanguage={cvLanguage}
+        t={t}
+        seededJob={seededJob}
+        seededResult={seededResult}
+        onApplyReframe={applyReframe}
+        onNavigateToSection={navigateToSection}
+        onUpdateProfile={updateProfile}
+        onUpdateExperienceBullets={updateExperienceBullets}
+        onUpdateSkills={updateSkills}
+      />
 
       {/* Style dialog — template picker (drives preview + PDF export) */}
       <Dialog open={styleOpen} onOpenChange={setStyleOpen}>
