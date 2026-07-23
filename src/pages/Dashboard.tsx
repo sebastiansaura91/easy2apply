@@ -9,6 +9,7 @@ import { FileText, Copy, Trash2, Edit3, Settings, LogOut, Briefcase, Target, Plu
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { RoleTemplateDialog } from "@/components/role/RoleTemplateDialog";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import { CVMeta } from "@/types/cv";
 import { getResumeMeta, splitTemplatesApplications } from "@/lib/resume-grouping";
 import { roleLabel } from "@/lib/role-advice";
@@ -115,17 +116,9 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <nav className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-sm">
-        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
-          <button className="font-sans text-lg font-semibold tracking-tight" onClick={() => navigate("/")}>CVSäkert</button>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => navigate("/settings")}><Settings className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
-          </div>
-        </div>
-      </nav>
-
+    <div className="flex min-h-screen bg-background">
+      <AppSidebar />
+      <main className="min-w-0 flex-1">
       <div className="mx-auto max-w-3xl px-6 py-12">
         {loading ? (
           <div className="py-20 text-center text-muted-foreground">{isSv ? "Laddar…" : "Loading..."}</div>
@@ -198,6 +191,7 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+      </main>
 
       <RoleTemplateDialog
         open={riktaOpen}
