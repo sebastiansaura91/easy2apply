@@ -310,7 +310,7 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
       {/* ── 3. Recruiter Scan Check ── */}
       <Collapsible open={scanOpen} onOpenChange={setScanOpen}>
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs">
+          <Button variant="ghost" size="sm" className="w-full justify-between h-9 text-xs">
             <span className="flex items-center gap-1.5">
               <Eye className="h-3.5 w-3.5" />
               {isSv ? "Rekryterarskanningskontroll" : "Recruiter Scan Check"}
@@ -341,7 +341,7 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
       {/* ── 4. ATS / Parse Check ── */}
       <Collapsible open={parseOpen} onOpenChange={setParseOpen}>
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs">
+          <Button variant="ghost" size="sm" className="w-full justify-between h-9 text-xs">
             <span className="flex items-center gap-1.5">
               <FileSearch className="h-3.5 w-3.5" />
               ATS / Parse Check
@@ -373,7 +373,7 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
       {hasLangMatch && (
         <Collapsible open={langOpen} onOpenChange={setLangOpen}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs">
+            <Button variant="ghost" size="sm" className="w-full justify-between h-9 text-xs">
               <span className="flex items-center gap-1.5">
                 <Languages className="h-3.5 w-3.5" />
                 {isSv ? "Språkmatchning mot jobbannonsen" : "Job Ad Language Match"}
@@ -427,7 +427,7 @@ export function AtsCheckPanel({ cv, t, cvLanguage, jobPostingText, onNavigateToS
       {result.bullet_feedback.length > 0 && (
         <Collapsible open={bulletsOpen} onOpenChange={setBulletsOpen}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs">
+            <Button variant="ghost" size="sm" className="w-full justify-between h-9 text-xs">
               <span className="flex items-center gap-1.5">
                 <Target className="h-3.5 w-3.5" />
                 {isSv ? "Bullet-feedback" : "Bullet Feedback"} ({result.bullet_feedback.length})

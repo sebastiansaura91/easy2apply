@@ -619,11 +619,11 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                     <p className="text-xs text-muted-foreground italic">{item.reason}</p>
                   </div>
                   <div className="flex gap-2 justify-end">
-                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => rejectSingleFromAll(i)}>
+                    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => rejectSingleFromAll(i)}>
                       <X className="h-3 w-3 mr-1" />
                       {isSv ? "Skippa" : "Skip"}
                     </Button>
-                    <Button size="sm" className="h-6 text-xs" onClick={() => acceptSingleFromAll(i)}>
+                    <Button size="sm" className="h-8 text-xs" onClick={() => acceptSingleFromAll(i)}>
                       <Check className="h-3 w-3 mr-1" />
                        {isSv ? "Acceptera" : "Accept"}
                     </Button>

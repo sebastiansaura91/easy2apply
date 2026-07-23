@@ -420,7 +420,7 @@ export function BulletCoachChat({
                 className="text-xs h-8"
                 disabled={loading}
               />
-              <Button type="submit" size="sm" className="h-8 px-3" disabled={loading || !input.trim()}>
+              <Button type="submit" size="sm" className="h-9 px-3" disabled={loading || !input.trim()}>
                 {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
               </Button>
             </form>

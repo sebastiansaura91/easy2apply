@@ -161,7 +161,7 @@ export function FixIssueWizard({
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2 pb-2 border-b border-border">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={step === "target" ? onClose : () => setStep(step === "suggestion" ? "questions" : "target")}>
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={step === "target" ? onClose : () => setStep(step === "suggestion" ? "questions" : "target")}>
           <ArrowLeft className="h-3.5 w-3.5" />
         </Button>
         <div className="flex-1 min-w-0">
@@ -323,7 +323,7 @@ export function FixIssueWizard({
 
           {/* Alternative toggle */}
           {suggestion.alternative_text && !isEditing && (
-            <Button variant="ghost" size="sm" className="w-full h-6 text-[10px]" onClick={() => {
+            <Button variant="ghost" size="sm" className="w-full h-8 text-[10px]" onClick={() => {
               setShowAlternative(!showAlternative);
               if (!showAlternative) setEditedText(suggestion.alternative_text!);
               else setEditedText(suggestion.suggestion_text);
@@ -341,7 +341,7 @@ export function FixIssueWizard({
                 : targetSection === "experience" ? (isSv ? `Applicera på ${cv.experience[targetExpIdx]?.title || "roll"}` : `Apply to ${cv.experience[targetExpIdx]?.title || "role"}`)
                 : (isSv ? "Lägg till kompetenser" : "Add skills")}
             </Button>
-            <Button variant="outline" onClick={onClose} className="w-full text-xs h-8">
+            <Button variant="outline" onClick={onClose} className="w-full text-xs h-9">
               {isSv ? "Avbryt" : "Cancel"}
             </Button>
           </div>

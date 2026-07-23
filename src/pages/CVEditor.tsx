@@ -294,7 +294,7 @@ const CVEditor = () => {
             <Languages className="h-3.5 w-3.5 text-warning" />
             <span className="text-xs">{mismatchSections.length} section(s) with mixed languages</span>
           </div>
-          <Button variant="outline" size="sm" className="h-6 text-[10px] border-warning/50" onClick={handleTranslateCV} disabled={translating}>
+          <Button variant="outline" size="sm" className="h-8 text-[10px] border-warning/50" onClick={handleTranslateCV} disabled={translating}>
             {translating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Languages className="h-3 w-3 mr-1" />}
             {translating ? "Translating..." : "Convert all"}
           </Button>
