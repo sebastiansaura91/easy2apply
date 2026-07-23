@@ -40,7 +40,7 @@ export default function CreateWizard() {
     <div className="min-h-screen bg-background flex flex-col">
       <nav className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-6">
-          <button onClick={() => mode === "upload" ? setMode("choose") : navigate("/onboarding")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={() => mode === "upload" ? setMode("choose") : navigate("/dashboard")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" /> {isSv ? "Tillbaka" : "Back"}
           </button>
           <div className="flex items-center gap-2">

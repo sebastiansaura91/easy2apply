@@ -9,10 +9,10 @@ import { FlowProvider } from "@/contexts/FlowContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
-import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import CVEditor from "./pages/CVEditor";
 import CreateWizard from "./pages/wizards/CreateWizard";
+// Onboarding removed — first run is handled inline on the dashboard.
 import SettingsPage from "./pages/Settings";
 import OAuthConsent from "./pages/OAuthConsent";
 import NotFound from "./pages/NotFound";
@@ -46,7 +46,6 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
-                <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                 <Route path="/wizard/create" element={<ProtectedRoute><CreateWizard /></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/editor/:id" element={<ProtectedRoute><CVEditor /></ProtectedRoute>} />

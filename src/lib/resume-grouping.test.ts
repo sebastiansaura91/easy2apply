@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getResumeMeta, groupResumesByKind, HasMeta } from "./resume-grouping";
+import { getResumeMeta, isApplication, splitTemplatesApplications, HasMeta } from "./resume-grouping";
 
 const row = (meta?: object): HasMeta => ({ content_json: meta ? { __meta: meta } : {} });
 
@@ -9,32 +9,30 @@ describe("getResumeMeta", () => {
     expect(getResumeMeta({})).toEqual({});
     expect(getResumeMeta({ content_json: {} })).toEqual({});
   });
+});
 
-  it("returns the stored __meta", () => {
-    expect(getResumeMeta(row({ isTemplate: true }))).toEqual({ isTemplate: true });
+describe("isApplication", () => {
+  it("is true when angled at a role or job", () => {
+    expect(isApplication(row({ targetRole: "head-of-commercial" }))).toBe(true);
+    expect(isApplication(row({ targetRoleLabel: "VP CX" }))).toBe(true);
+    expect(isApplication(row({ tailoredForJob: "Head of Product" }))).toBe(true);
+  });
+  it("is false for a plain master template", () => {
+    expect(isApplication(row())).toBe(false);
+    expect(isApplication(row({}))).toBe(false);
   });
 });
 
-describe("groupResumesByKind", () => {
-  it("puts templates, applications and plain CVs in the right buckets", () => {
-    const template = row({ isTemplate: true });
-    const application = row({ tailoredForJob: "Head of Product", tailoredForCompany: "Acme" });
-    const plain = row();
-    const { templates, applications, others } = groupResumesByKind([template, application, plain]);
-    expect(templates).toEqual([template]);
+describe("splitTemplatesApplications", () => {
+  it("puts angled copies under applications and everything else under templates", () => {
+    const master = row();
+    const application = row({ targetRole: "head-of-product", tailoredForJob: "Head of Product" });
+    const { templates, applications } = splitTemplatesApplications([master, application]);
+    expect(templates).toEqual([master]);
     expect(applications).toEqual([application]);
-    expect(others).toEqual([plain]);
-  });
-
-  it("treats a template flag as winning over a tailored marker (never double-listed)", () => {
-    const both = row({ isTemplate: true, tailoredForJob: "Head of Commercial" });
-    const { templates, applications, others } = groupResumesByKind([both]);
-    expect(templates).toEqual([both]);
-    expect(applications).toEqual([]);
-    expect(others).toEqual([]);
   });
 
   it("handles an empty list", () => {
-    expect(groupResumesByKind([])).toEqual({ templates: [], applications: [], others: [] });
+    expect(splitTemplatesApplications([])).toEqual({ templates: [], applications: [] });
   });
 });

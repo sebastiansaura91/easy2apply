@@ -9,24 +9,24 @@ export function getResumeMeta(r: HasMeta): CVMeta {
   return r.content_json?.__meta ?? {};
 }
 
+/** A resume is an APPLICATION once it's been angled at a role/job via "Rikta CV". */
+export function isApplication(r: HasMeta): boolean {
+  const m = getResumeMeta(r);
+  return !!m.targetRole || !!m.targetRoleLabel || !!m.tailoredForJob;
+}
+
 /**
- * Partition resumes into the dashboard's three groups:
- * - templates: explicitly marked as reusable role templates
- * - applications: job-tailored copies (have a tailoredForJob), not templates
- * - others: everything else (plain CVs)
- * A template flag wins over the tailored marker so a template is never double-listed.
+ * Two-tier split for the dashboard:
+ * - templates: your reusable master CVs (one per role you target)
+ * - applications: copies tailored to a specific role/job
+ * A CV is a template by default; it becomes an application only when angled via "Rikta CV".
  */
-export function groupResumesByKind<T extends HasMeta>(rows: T[]): {
+export function splitTemplatesApplications<T extends HasMeta>(rows: T[]): {
   templates: T[];
   applications: T[];
-  others: T[];
 } {
-  const templates = rows.filter((r) => getResumeMeta(r).isTemplate);
-  const applications = rows.filter(
-    (r) => !getResumeMeta(r).isTemplate && !!getResumeMeta(r).tailoredForJob
-  );
-  const others = rows.filter(
-    (r) => !getResumeMeta(r).isTemplate && !getResumeMeta(r).tailoredForJob
-  );
-  return { templates, applications, others };
+  return {
+    templates: rows.filter((r) => !isApplication(r)),
+    applications: rows.filter((r) => isApplication(r)),
+  };
 }

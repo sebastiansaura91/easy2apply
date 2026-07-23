@@ -40,7 +40,7 @@ const Landing = () => {
           200 kopior.
         </p>
         <div className="mt-10">
-          <Button onClick={() => navigate("/onboarding")} size="lg" className="text-base">
+          <Button onClick={() => navigate("/auth")} size="lg" className="text-base">
             Kom igång
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
