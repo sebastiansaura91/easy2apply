@@ -9,10 +9,17 @@ export function getResumeMeta(r: HasMeta): CVMeta {
   return r.content_json?.__meta ?? {};
 }
 
-/** A resume is an APPLICATION once it's been angled at a role/job via "Rikta CV". */
+/**
+ * A resume is an APPLICATION (a job-tailored copy) vs a TEMPLATE (a reusable master).
+ * The explicit `isTemplate` flag wins — this lets a template carry a role for
+ * categorization (e.g. "Head of Product") without being mistaken for an application.
+ * Legacy rows without the flag fall back to "tailored to a specific job = application".
+ */
 export function isApplication(r: HasMeta): boolean {
   const m = getResumeMeta(r);
-  return !!m.targetRole || !!m.targetRoleLabel || !!m.tailoredForJob;
+  if (m.isTemplate === true) return false;
+  if (m.isTemplate === false) return true;
+  return !!m.tailoredForJob;
 }
 
 /**

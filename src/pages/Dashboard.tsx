@@ -5,7 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Copy, Trash2, Edit3, Settings, LogOut, Briefcase, Target, Plus, Star } from "lucide-react";
+import { FileText, Copy, Trash2, Edit3, Settings, LogOut, Briefcase, Target, Plus, Star, Tag } from "lucide-react";
+import { RolePicker, CUSTOM_ROLE } from "@/components/role/RolePicker";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { RoleTemplateDialog } from "@/components/role/RoleTemplateDialog";
@@ -34,6 +37,9 @@ const Dashboard = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [riktaOpen, setRiktaOpen] = useState(false);
   const [riktaBaseId, setRiktaBaseId] = useState<string | undefined>(undefined);
+  const [roleForId, setRoleForId] = useState<string | null>(null);
+  const [roleDraft, setRoleDraft] = useState<string>("");
+  const [roleCustom, setRoleCustom] = useState<string>("");
 
   const fetchResumes = async () => {
     if (!user) return;
@@ -74,6 +80,31 @@ const Dashboard = () => {
     setDeleteId(null);
   };
 
+  const openRole = (r: ResumeRow) => {
+    const m = getResumeMeta(r);
+    setRoleForId(r.id);
+    setRoleDraft(m.targetRoleLabel ? CUSTOM_ROLE : (m.targetRole ?? ""));
+    setRoleCustom(m.targetRoleLabel ?? "");
+  };
+
+  const saveRole = async () => {
+    if (!roleForId) return;
+    const isCustom = roleDraft === CUSTOM_ROLE;
+    const { data } = await supabase.from("resumes").select("content_json").eq("id", roleForId).single();
+    const prev = (data?.content_json as any) || {};
+    const content = {
+      ...prev,
+      __meta: {
+        ...(prev.__meta || {}),
+        targetRole: isCustom ? undefined : (roleDraft || undefined),
+        targetRoleLabel: isCustom ? (roleCustom.trim() || undefined) : undefined,
+      },
+    };
+    const { error } = await supabase.from("resumes").update({ content_json: content }).eq("id", roleForId);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { setRoleForId(null); fetchResumes(); toast({ title: isSv ? "Roll uppdaterad" : "Role updated" }); }
+  };
+
   const renderCard = (r: ResumeRow, kind: "template" | "application") => {
     const meta = getResumeMeta(r);
     const isTemplate = kind === "template";
@@ -106,6 +137,7 @@ const Dashboard = () => {
                 <Target className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Rikta" : "Tailor"}
               </Button>
             )}
+            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Kategorisera roll" : "Set role"} onClick={() => openRole(r)}><Tag className="h-4 w-4" /></Button>
             <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Redigera" : "Edit"} onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-4 w-4" /></Button>
             <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Kopiera" : "Duplicate"} onClick={() => duplicateResume(r)}><Copy className="h-4 w-4" /></Button>
             <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Radera" : "Delete"} onClick={() => setDeleteId(r.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -202,6 +234,32 @@ const Dashboard = () => {
         mode="application"
         defaultBaseId={riktaBaseId}
       />
+
+      <Dialog open={!!roleForId} onOpenChange={(o) => !o && setRoleForId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{isSv ? "Kategorisera roll" : "Categorize role"}</DialogTitle>
+            <DialogDescription>
+              {isSv ? "Välj vilken roll det här CV:t är en mall för." : "Choose which role this CV is a template for."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <RolePicker value={roleDraft} onChange={setRoleDraft} selectedLabel={roleLabel(roleDraft, roleCustom, language)} />
+            {roleDraft === CUSTOM_ROLE && (
+              <Input
+                autoFocus
+                value={roleCustom}
+                onChange={(e) => setRoleCustom(e.target.value)}
+                placeholder={isSv ? "t.ex. VP Customer Experience" : "e.g. VP Customer Experience"}
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoleForId(null)}>{isSv ? "Avbryt" : "Cancel"}</Button>
+            <Button onClick={saveRole}>{isSv ? "Spara" : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>
