@@ -2,8 +2,6 @@ import React, { createContext, useContext, useState } from "react";
 import { CVContent } from "@/types/cv";
 import { AtsCheckResult } from "@/types/ats-check";
 
-export type UserGoal = "apply" | "improve" | "create" | "explore";
-
 export interface JobAnalysis {
   job_title: string;
   company_name: string;
@@ -17,7 +15,6 @@ export interface JobAnalysis {
 }
 
 interface FlowState {
-  goal: UserGoal | null;
   jobPostingText: string;
   jobAnalysis: JobAnalysis | null;
   parsedCV: CVContent | null;
@@ -27,7 +24,6 @@ interface FlowState {
 }
 
 interface FlowContextType extends FlowState {
-  setGoal: (goal: UserGoal) => void;
   setJobPostingText: (text: string) => void;
   setJobAnalysis: (analysis: JobAnalysis) => void;
   setParsedCV: (cv: CVContent) => void;
@@ -36,7 +32,7 @@ interface FlowContextType extends FlowState {
   reset: () => void;
 }
 
-const initial: FlowState = { goal: null, jobPostingText: "", jobAnalysis: null, parsedCV: null, resumeId: null, analysis: null };
+const initial: FlowState = { jobPostingText: "", jobAnalysis: null, parsedCV: null, resumeId: null, analysis: null };
 
 const FlowContext = createContext<FlowContextType | undefined>(undefined);
 
@@ -45,7 +41,6 @@ export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <FlowContext.Provider value={{
       ...s,
-      setGoal: (goal) => setS(p => ({ ...p, goal })),
       setJobPostingText: (jobPostingText) => setS(p => ({ ...p, jobPostingText })),
       setJobAnalysis: (jobAnalysis) => setS(p => ({ ...p, jobAnalysis })),
       setParsedCV: (parsedCV) => setS(p => ({ ...p, parsedCV })),

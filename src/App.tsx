@@ -48,10 +48,6 @@ const App = () => (
                 <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
                 <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                 <Route path="/wizard/create" element={<ProtectedRoute><CreateWizard /></ProtectedRoute>} />
-                {/* Legacy wizard routes retired — apply → "Rikta CV"; improve/explore → editor insights. */}
-                <Route path="/wizard/apply" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/wizard/improve" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/wizard/explore" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/editor/:id" element={<ProtectedRoute><CVEditor /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
