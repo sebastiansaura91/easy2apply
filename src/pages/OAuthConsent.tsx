@@ -56,7 +56,7 @@ export default function OAuthConsent() {
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-6">
           <Shield className="h-7 w-7 text-primary" />
-          <span className="text-xl font-bold font-['Fraunces']">CVSäkert</span>
+          <span className="text-xl font-bold font-sans">CVSäkert</span>
         </div>
         <Card>
           <CardHeader>

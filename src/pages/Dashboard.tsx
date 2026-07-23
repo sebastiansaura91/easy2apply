@@ -118,7 +118,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <nav className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
-          <button className="font-serif text-lg font-semibold tracking-tight" onClick={() => navigate("/")}>CVSäkert</button>
+          <button className="font-sans text-lg font-semibold tracking-tight" onClick={() => navigate("/")}>CVSäkert</button>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => navigate("/settings")}><Settings className="h-4 w-4" /></Button>
             <Button variant="ghost" size="icon" className="h-10 w-10" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
@@ -139,7 +139,7 @@ const Dashboard = () => {
             <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <Star className="h-6 w-6 text-primary" />
             </div>
-            <h1 className="font-serif text-3xl font-semibold tracking-tight">{isSv ? "Skapa din första mall" : "Create your first template"}</h1>
+            <h1 className="font-sans text-3xl font-semibold tracking-tight">{isSv ? "Skapa din första mall" : "Create your first template"}</h1>
             <p className="mx-auto mt-3 max-w-sm text-sm text-muted-foreground">
               {isSv ? "En stark master för en roll du söker. Rikta den sedan mot varje jobb." : "A strong master for a role you target. Then tailor it to each job."}
             </p>
@@ -150,7 +150,7 @@ const Dashboard = () => {
         ) : (
           <div className="space-y-10">
             <div>
-              <h1 className="font-serif text-2xl font-semibold tracking-tight">{isSv ? "Hem" : "Home"}</h1>
+              <h1 className="font-sans text-2xl font-semibold tracking-tight">{isSv ? "Hem" : "Home"}</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 {isSv ? "Dina mallar är grunden. Rikta ett CV när du ska söka något." : "Your templates are the base. Tailor one when you apply."}
               </p>

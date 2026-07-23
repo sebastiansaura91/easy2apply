@@ -49,7 +49,7 @@ const SettingsPage = () => {
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/dashboard")}>
             <Shield className="h-6 w-6 text-primary" />
-            <span className="text-lg font-bold font-['Fraunces']">CVSäkert</span>
+            <span className="text-lg font-bold font-sans">CVSäkert</span>
           </div>
         </div>
       </nav>
@@ -60,7 +60,7 @@ const SettingsPage = () => {
           {t("navDashboard")}
         </Button>
 
-        <h1 className="text-3xl font-bold font-['Fraunces'] mb-8">{t("settingsTitle")}</h1>
+        <h1 className="text-3xl font-bold font-sans mb-8">{t("settingsTitle")}</h1>
 
         <div className="space-y-6">
           <Card>

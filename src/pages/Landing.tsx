@@ -20,7 +20,7 @@ const Landing = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <nav className="mx-auto flex h-16 w-full max-w-4xl items-center justify-between px-6">
-        <span className="font-serif text-lg font-semibold tracking-tight">CVSäkert</span>
+        <span className="font-sans text-lg font-semibold tracking-tight">CVSäkert</span>
         <button
           onClick={() => navigate("/auth")}
           className="text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -30,7 +30,7 @@ const Landing = () => {
       </nav>
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-6 pb-24">
-        <h1 className="font-serif text-4xl font-semibold leading-[1.1] tracking-tight sm:text-6xl">
+        <h1 className="font-sans text-4xl font-semibold leading-[1.1] tracking-tight sm:text-6xl">
           Ett CV.
           <br />
           <span className="text-primary">Riktat för varje jobb.</span>
