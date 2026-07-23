@@ -3,8 +3,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,17 +45,10 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <nav className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto flex items-center justify-between h-16 px-4">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/dashboard")}>
-            <Shield className="h-6 w-6 text-primary" />
-            <span className="text-lg font-bold font-sans">CVSäkert</span>
-          </div>
-        </div>
-      </nav>
-
-      <div className="container mx-auto px-4 py-10 max-w-2xl">
+    <div className="flex min-h-screen bg-background">
+      <AppSidebar />
+      <main className="min-w-0 flex-1">
+      <div className="mx-auto max-w-2xl px-6 py-10">
         <Button variant="ghost" className="mb-6" onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           {t("navDashboard")}
@@ -104,6 +98,7 @@ const SettingsPage = () => {
           </Card>
         </div>
       </div>
+      </main>
     </div>
   );
 };
