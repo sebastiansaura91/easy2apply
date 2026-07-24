@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { RoleTemplateDialog } from "@/components/role/RoleTemplateDialog";
+import { ApplyFlow } from "@/components/apply/ApplyFlow";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { CVMeta } from "@/types/cv";
 import { getResumeMeta, splitTemplatesApplications } from "@/lib/resume-grouping";
@@ -35,8 +35,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [riktaOpen, setRiktaOpen] = useState(false);
-  const [riktaBaseId, setRiktaBaseId] = useState<string | undefined>(undefined);
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [applyRoleId, setApplyRoleId] = useState<string | undefined>(undefined);
   const [roleForId, setRoleForId] = useState<string | null>(null);
   const [roleDraft, setRoleDraft] = useState<string>("");
   const [roleCustom, setRoleCustom] = useState<string>("");
@@ -56,8 +56,7 @@ const Dashboard = () => {
   useEffect(() => { fetchResumes(); }, [user]);
 
   const { templates, applications } = splitTemplatesApplications(resumes);
-  const baseOptions = templates.map((r) => ({ id: r.id, title: r.title, language: r.language }));
-  const openTailor = (baseId?: string) => { setRiktaBaseId(baseId ?? baseOptions[0]?.id); setRiktaOpen(true); };
+  const openApply = (roleId?: string) => { setApplyRoleId(roleId); setApplyOpen(true); };
 
   const duplicateResume = async (r: ResumeRow) => {
     if (!user) return;
@@ -133,8 +132,8 @@ const Dashboard = () => {
           </button>
           <div className="flex flex-shrink-0 items-center gap-0.5">
             {isTemplate && (
-              <Button size="sm" className="h-9 text-xs" onClick={() => openTailor(r.id)}>
-                <Target className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Rikta" : "Tailor"}
+              <Button size="sm" className="h-9 text-xs" onClick={() => openApply(getResumeMeta(r).targetRole)}>
+                <Target className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Sök" : "Apply"}
               </Button>
             )}
             <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Kategorisera roll" : "Set role"} onClick={() => openRole(r)}><Tag className="h-4 w-4" /></Button>
@@ -208,8 +207,8 @@ const Dashboard = () => {
                   <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ansökningar" : "Applications"}</p>
                 </div>
-                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => openTailor()} disabled={templates.length === 0}>
-                  <Target className="mr-1 h-3.5 w-3.5" />{isSv ? "Rikta CV" : "Tailor a CV"}
+                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => openApply()} disabled={templates.length === 0}>
+                  <Target className="mr-1 h-3.5 w-3.5" />{isSv ? "Sök en tjänst" : "Apply for a role"}
                 </Button>
               </div>
               {applications.length > 0 ? (
@@ -225,14 +224,14 @@ const Dashboard = () => {
       </div>
       </main>
 
-      <RoleTemplateDialog
-        open={riktaOpen}
-        onOpenChange={setRiktaOpen}
-        bases={baseOptions}
+      <ApplyFlow
+        key={`${applyOpen}-${applyRoleId ?? ""}`}
+        open={applyOpen}
+        onOpenChange={setApplyOpen}
+        templates={templates}
         userId={user?.id}
         onCreated={fetchResumes}
-        mode="application"
-        defaultBaseId={riktaBaseId}
+        initialRoleId={applyRoleId}
       />
 
       <Dialog open={!!roleForId} onOpenChange={(o) => !o && setRoleForId(null)}>
