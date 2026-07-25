@@ -15,7 +15,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Schibsted Grotesk", "system-ui", "sans-serif"],
-        serif: ["Fraunces", "Georgia", "serif"],
+        serif: ["Newsreader", "Georgia", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",

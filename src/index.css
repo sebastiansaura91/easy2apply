@@ -2,105 +2,105 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    /* Teal-inspired palette: clean near-white surfaces, deep teal primary, cool neutrals. */
-    --background: 180 20% 99%;
-    --foreground: 200 24% 15%;
+    /* "Atelier": warm bone paper, ink text, one deep muted bottle-green, editorial not SaaS. */
+    --background: 43 18% 91%;
+    --foreground: 100 7% 11%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 200 24% 15%;
+    --card: 42 26% 96%;
+    --card-foreground: 100 7% 11%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 200 24% 15%;
+    --popover: 42 30% 97%;
+    --popover-foreground: 100 7% 11%;
 
-    --primary: 174 64% 31%;
-    --primary-foreground: 0 0% 100%;
-    --primary-hover: 174 64% 26%;
+    --primary: 165 32% 20%;
+    --primary-foreground: 42 30% 96%;
+    --primary-hover: 165 32% 16%;
 
-    --secondary: 180 16% 95%;
-    --secondary-foreground: 200 22% 24%;
+    --secondary: 43 16% 88%;
+    --secondary-foreground: 100 10% 20%;
 
-    --muted: 185 16% 95%;
-    --muted-foreground: 200 10% 42%;
+    --muted: 43 16% 89%;
+    --muted-foreground: 80 4% 41%;
 
-    --accent: 174 40% 92%;
-    --accent-foreground: 174 62% 20%;
+    --accent: 165 22% 86%;
+    --accent-foreground: 165 32% 20%;
 
-    --destructive: 4 68% 48%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 8 50% 42%;
+    --destructive-foreground: 42 30% 96%;
 
-    --border: 190 14% 88%;
-    --input: 190 14% 88%;
-    --ring: 174 64% 31%;
+    --border: 43 17% 83%;
+    --input: 43 17% 83%;
+    --ring: 165 32% 20%;
 
-    --radius: 0.5rem;
+    --radius: 0.4rem;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 200 18% 30%;
-    --sidebar-primary: 174 64% 31%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 174 40% 94%;
-    --sidebar-accent-foreground: 174 62% 22%;
-    --sidebar-border: 190 14% 90%;
-    --sidebar-ring: 174 64% 31%;
+    --sidebar-background: 42 24% 94%;
+    --sidebar-foreground: 90 6% 30%;
+    --sidebar-primary: 165 32% 20%;
+    --sidebar-primary-foreground: 42 30% 96%;
+    --sidebar-accent: 165 22% 88%;
+    --sidebar-accent-foreground: 165 32% 20%;
+    --sidebar-border: 43 17% 85%;
+    --sidebar-ring: 165 32% 20%;
 
-    --success: 150 55% 32%;
-    --success-foreground: 0 0% 100%;
-    --warning: 32 88% 46%;
-    --warning-foreground: 0 0% 100%;
+    --success: 141 34% 37%;
+    --success-foreground: 42 30% 96%;
+    --warning: 35 61% 43%;
+    --warning-foreground: 42 30% 96%;
 
-    --surface-alt: 0 0% 100%;
+    --surface-alt: 42 26% 96%;
   }
 
   .dark {
-    /* Teal-tinted charcoal + brighter teal — cohesive with light mode. */
-    --background: 200 26% 8%;
-    --foreground: 180 16% 92%;
+    /* Warm forest-ink night: deep green-black ground, bone text, brighter green accent. */
+    --background: 95 19% 7%;
+    --foreground: 45 17% 90%;
 
-    --card: 200 22% 11%;
-    --card-foreground: 180 16% 92%;
+    --card: 96 15% 11%;
+    --card-foreground: 45 17% 90%;
 
-    --popover: 200 22% 11%;
-    --popover-foreground: 180 16% 92%;
+    --popover: 96 15% 11%;
+    --popover-foreground: 45 17% 90%;
 
-    --primary: 172 58% 46%;
-    --primary-foreground: 200 30% 9%;
-    --primary-hover: 172 58% 52%;
+    --primary: 154 27% 49%;
+    --primary-foreground: 100 20% 6%;
+    --primary-hover: 154 27% 55%;
 
-    --secondary: 200 16% 16%;
-    --secondary-foreground: 180 14% 88%;
+    --secondary: 96 12% 16%;
+    --secondary-foreground: 45 15% 86%;
 
-    --muted: 200 16% 15%;
-    --muted-foreground: 190 12% 62%;
+    --muted: 96 12% 15%;
+    --muted-foreground: 90 5% 56%;
 
-    --accent: 200 18% 18%;
-    --accent-foreground: 180 16% 92%;
+    --accent: 154 20% 16%;
+    --accent-foreground: 45 17% 90%;
 
-    --destructive: 4 60% 48%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 8 46% 50%;
+    --destructive-foreground: 42 30% 96%;
 
-    --border: 200 14% 20%;
-    --input: 200 14% 20%;
-    --ring: 172 58% 46%;
+    --border: 90 11% 16%;
+    --input: 90 11% 16%;
+    --ring: 154 27% 49%;
 
-    --sidebar-background: 200 24% 10%;
-    --sidebar-foreground: 180 14% 86%;
-    --sidebar-primary: 172 58% 46%;
-    --sidebar-primary-foreground: 200 30% 9%;
-    --sidebar-accent: 200 16% 15%;
-    --sidebar-accent-foreground: 180 14% 88%;
-    --sidebar-border: 200 14% 20%;
-    --sidebar-ring: 172 58% 46%;
+    --sidebar-background: 95 18% 8%;
+    --sidebar-foreground: 45 12% 82%;
+    --sidebar-primary: 154 27% 49%;
+    --sidebar-primary-foreground: 100 20% 6%;
+    --sidebar-accent: 96 12% 15%;
+    --sidebar-accent-foreground: 45 15% 86%;
+    --sidebar-border: 90 11% 16%;
+    --sidebar-ring: 154 27% 49%;
 
-    --success: 150 50% 46%;
-    --success-foreground: 0 0% 100%;
-    --warning: 34 80% 56%;
-    --warning-foreground: 200 30% 9%;
+    --success: 141 30% 56%;
+    --success-foreground: 100 20% 6%;
+    --warning: 38 57% 55%;
+    --warning-foreground: 100 20% 6%;
 
-    --surface-alt: 200 22% 11%;
+    --surface-alt: 96 15% 11%;
   }
 }
 
@@ -116,11 +116,14 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  h1, h2, h3 {
-    font-family: 'Schibsted Grotesk', system-ui, sans-serif;
-    font-weight: 600;
-    letter-spacing: -0.015em;
+  /* Editorial serif for headings + figures; UI stays in the grotesque. */
+  h1, h2, h3, .font-display {
+    font-family: 'Newsreader', Georgia, serif;
+    font-weight: 500;
+    letter-spacing: -0.005em;
   }
+
+  .tnum { font-variant-numeric: tabular-nums; }
 }
 
 /* A4 Preview Styles */
