@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Copy, Trash2, Edit3, Settings, LogOut, Briefcase, Target, Plus, Star, Tag } from "lucide-react";
+import { FileText, Copy, Trash2, Edit3, Settings, LogOut, Briefcase, Target, Plus, Star, Tag, ArrowRight } from "lucide-react";
 import { RolePicker, CUSTOM_ROLE } from "@/components/role/RolePicker";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -163,7 +163,7 @@ const Dashboard = () => {
             <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <Star className="h-6 w-6 text-primary" />
             </div>
-            <h1 className="font-sans text-3xl font-semibold tracking-tight">{isSv ? "Skapa din första mall" : "Create your first template"}</h1>
+            <h1 className="font-serif text-3xl font-medium tracking-tight">{isSv ? "Skapa din första mall" : "Create your first template"}</h1>
             <p className="mx-auto mt-3 max-w-sm text-sm text-muted-foreground">
               {isSv ? "En stark master för en roll du söker. Rikta den sedan mot varje jobb." : "A strong master for a role you target. Then tailor it to each job."}
             </p>
@@ -172,13 +172,22 @@ const Dashboard = () => {
             </Button>
           </div>
         ) : (
-          <div className="space-y-10">
-            <div>
-              <h1 className="font-sans text-2xl font-semibold tracking-tight">{isSv ? "Hem" : "Home"}</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {isSv ? "Dina mallar är grunden. Rikta ett CV när du ska söka något." : "Your templates are the base. Tailor one when you apply."}
-              </p>
-            </div>
+          <div className="space-y-8">
+            <h1 className="font-serif text-3xl font-medium tracking-tight">{isSv ? "Hem" : "Home"}</h1>
+
+            {/* Hero action — the one move that matters */}
+            <section className="flex flex-col gap-4 rounded-xl border border-border bg-accent/50 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+              <div className="max-w-md">
+                <h2 className="font-serif text-2xl font-medium tracking-tight">{isSv ? "Ska du söka en tjänst?" : "Applying for a role?"}</h2>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  {isSv ? "Välj roll — vi hämtar din mall, kollar mot annonsen och öppnar ett riktat CV på två steg." : "Pick a role — we pull your template, check it against the ad, and open a tailored CV in two steps."}
+                </p>
+              </div>
+              <Button size="lg" className="h-12 shrink-0 px-6 text-base" onClick={() => openApply()} disabled={templates.length === 0}>
+                <Target className="mr-2 h-4 w-4" />{isSv ? "Sök en ny tjänst" : "Apply for a new position"}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </section>
 
             {/* Templates */}
             <section>
