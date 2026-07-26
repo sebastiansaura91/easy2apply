@@ -6,13 +6,14 @@ import { useFlow } from "@/contexts/FlowContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CVContent, emptyCV } from "@/types/cv";
 import { convertLanguageLevels } from "@/lib/language-level-mapping";
+import { syncStructure } from "@/lib/sync-structure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog } from "lucide-react";
+import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { TailorPanel } from "@/components/editor/TailorPanel";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronRight, Eye, EyeOff } from "lucide-react";
@@ -38,6 +39,8 @@ const CVEditor = () => {
   const flow = useFlow();
   const { toast } = useToast();
   const [tailorOpen, setTailorOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const autoOpenedRef = useRef(false);
 
   const [cv, setCv] = useState<CVContent>(emptyCV);
@@ -234,6 +237,27 @@ const CVEditor = () => {
     setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateAccent: hex } }));
   const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
 
+  // Propagate a structural fix (dates, company, contact, education…) to the master template
+  // and every application in this lineage. Tailored profile/bullets/skills are left untouched.
+  const syncFacts = async () => {
+    if (!user || !id) return;
+    setSyncing(true);
+    const masterId = cv.__meta?.createdFrom || id;
+    const { data } = await supabase.from("resumes").select("id, content_json").eq("user_id", user.id);
+    const targets = (data || []).filter((r: any) =>
+      r.id !== id && (r.id === masterId || r.content_json?.__meta?.createdFrom === masterId));
+    let n = 0;
+    for (const tg of targets) {
+      const merged = syncStructure(cv, (tg.content_json as unknown as CVContent) || emptyCV);
+      const { error } = await supabase.from("resumes")
+        .update({ content_json: merged as any, updated_at: new Date().toISOString() }).eq("id", tg.id);
+      if (!error) n++;
+    }
+    setSyncing(false);
+    setSyncOpen(false);
+    toast({ title: cvLanguage === "en" ? `Facts synced to ${n} CV${n === 1 ? "" : "s"}` : `Fakta synkade till ${n} CV:n` });
+  };
+
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">{t("loading")}</p></div>;
 
   return (
@@ -261,6 +285,9 @@ const CVEditor = () => {
             </Button>
             <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setStyleOpen(true)}>
               <Palette className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Style" : "Stil"}
+            </Button>
+            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setSyncOpen(true)}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Sync facts" : "Synka fakta"}
             </Button>
             {/* Mode toggle */}
             <div className="flex items-center gap-0 rounded-md border border-border p-0.5 bg-muted/30">
@@ -445,6 +472,27 @@ const CVEditor = () => {
         onUpdateExperienceBullets={updateExperienceBullets}
         onUpdateSkills={updateSkills}
       />
+
+      {/* Sync structural facts across the whole lineage */}
+      <Dialog open={syncOpen} onOpenChange={setSyncOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{cvLanguage === "en" ? "Sync facts to all your CVs" : "Synka fakta till alla dina CV:n"}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {cvLanguage === "en"
+              ? "Copies the structural facts from this CV — contact, role dates & companies, education, certifications, languages — to your master template and every application built from it. Your tailored profile, bullets and skills are left untouched."
+              : "Kopierar de strukturella fakta från det här CV:t — kontakt, roll-datum & företag, utbildning, certifieringar, språk — till din master och alla ansökningar som byggts från den. Din skräddarsydda profil, punkter och kompetenser rörs inte."}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSyncOpen(false)} disabled={syncing}>{cvLanguage === "en" ? "Cancel" : "Avbryt"}</Button>
+            <Button onClick={syncFacts} disabled={syncing}>
+              {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              {cvLanguage === "en" ? "Sync facts" : "Synka fakta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Style dialog — template picker (drives preview + PDF export) */}
       <Dialog open={styleOpen} onOpenChange={setStyleOpen}>
