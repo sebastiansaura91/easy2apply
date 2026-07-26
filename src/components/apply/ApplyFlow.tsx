@@ -217,6 +217,12 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
             </DialogHeader>
 
             <div className="space-y-4 py-1">
+              {base && (
+                <div className="rounded-md border border-border bg-accent/40 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">{isSv ? "Vi utgår från din mall: " : "Working from your template: "}</span>
+                  <span className="font-medium">{base.title}</span>
+                </div>
+              )}
               {report?.kind === "job" ? (
                 <>
                   <div className="flex items-baseline gap-3">

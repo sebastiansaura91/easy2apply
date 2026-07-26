@@ -228,8 +228,17 @@ export function InsightsPanel({
     <div className="p-4 space-y-4">
       {/* ── Health overview ── */}
       <div className="text-center pb-3 border-b border-border">
-        <div className={`text-3xl font-bold font-sans ${healthColor}`}>{healthScore}</div>
-        <p className={`text-xs font-semibold ${healthColor}`}>{healthLabel}</p>
+        {deepResult ? (
+          <>
+            <div className={`font-serif text-4xl font-medium ${scoreColor(deepResult.overall_score)}`}>{Math.round(deepResult.overall_score)}</div>
+            <p className={`text-xs font-semibold ${scoreColor(deepResult.overall_score)}`}>{isSv ? "Betyg" : "Grade"} {deepResult.grade}</p>
+          </>
+        ) : (
+          <>
+            <div className={`font-serif text-4xl font-medium ${healthColor}`}>{healthScore}</div>
+            <p className={`text-xs font-semibold ${healthColor}`}>{healthLabel}</p>
+          </>
+        )}
         <div className="flex justify-center gap-3 mt-2">
           {errorCount > 0 && (
             <span className="flex items-center gap-1 text-[10px] text-destructive">
@@ -372,13 +381,7 @@ export function InsightsPanel({
       {/* ── Deep results ── */}
       {deepResult && (
         <div className="space-y-3 pt-3 border-t border-border">
-          <div className="text-center">
-            <div className={`text-3xl font-bold font-sans ${scoreColor(deepResult.overall_score)}`}>
-              {Math.round(deepResult.overall_score)}
-            </div>
-            <div className={`text-xs font-semibold ${scoreColor(deepResult.overall_score)}`}>Grade {deepResult.grade}</div>
-            <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">{deepResult.summary}</p>
-          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{deepResult.summary}</p>
 
           <div className="space-y-1.5">
             {([["Parse", deepResult.subscores.parse, 30], ["Scan", deepResult.subscores.scanability, 30], [isSv ? "Relevans" : "Relevance", deepResult.subscores.relevance, 25], [isSv ? "Evidens" : "Evidence", deepResult.subscores.evidence, 15]] as const).map(([l, v, m]) => (
