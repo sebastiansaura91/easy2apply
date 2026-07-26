@@ -252,7 +252,7 @@ const Dashboard = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-1">
-            <RolePicker value={roleDraft} onChange={setRoleDraft} selectedLabel={roleLabel(roleDraft, roleCustom, language)} />
+            <RolePicker value={roleDraft} onChange={setRoleDraft} selectedLabel={roleLabel(roleDraft, roleCustom, language)} onCustomLabel={(l) => setRoleCustom(l)} />
             {roleDraft === CUSTOM_ROLE && (
               <Input
                 autoFocus

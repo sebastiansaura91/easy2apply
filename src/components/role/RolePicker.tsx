@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronsUpDown, Target } from "lucide-react";
+import { Check, ChevronsUpDown, Target, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
@@ -17,17 +17,27 @@ interface Props {
   onChange: (value: string) => void;
   /** Display label for the current selection (ignored when custom). */
   selectedLabel: string;
+  /** Called with a typed label when the user adds a bucket that isn't in the catalog. */
+  onCustomLabel?: (label: string) => void;
 }
 
 /**
  * Searchable, category-grouped role picker covering the full role catalog. Replaces a
  * flat select that couldn't scale to 100+ roles — type to filter across all categories.
  */
-export function RolePicker({ value, onChange, selectedLabel }: Props) {
+export function RolePicker({ value, onChange, selectedLabel, onCustomLabel }: Props) {
   const { language } = useLanguage();
   const isSv = language === "sv";
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const groups = getAllRoles(language);
+  const q = query.trim();
+
+  const addCustom = (label: string) => {
+    onChange(CUSTOM_ROLE);
+    onCustomLabel?.(label);
+    setOpen(false);
+  };
 
   const triggerLabel =
     value === CUSTOM_ROLE
@@ -47,7 +57,7 @@ export function RolePicker({ value, onChange, selectedLabel }: Props) {
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
-          <CommandInput placeholder={isSv ? "Sök roll…" : "Search role…"} />
+          <CommandInput value={query} onValueChange={setQuery} placeholder={isSv ? "Sök roll…" : "Search role…"} />
           <CommandList className="max-h-72">
             <CommandEmpty>{isSv ? "Ingen roll hittad." : "No role found."}</CommandEmpty>
             {groups.map((g) => (
@@ -65,6 +75,12 @@ export function RolePicker({ value, onChange, selectedLabel }: Props) {
               </CommandGroup>
             ))}
             <CommandGroup heading={isSv ? "Annat" : "Other"}>
+              {q && (
+                <CommandItem value={`__add__ ${q}`} onSelect={() => addCustom(q)}>
+                  <Plus className="mr-2 h-3.5 w-3.5 text-primary" />
+                  {isSv ? `Lägg till "${q}"` : `Add "${q}"`}
+                </CommandItem>
+              )}
               <CommandItem
                 value={isSv ? "egen roll custom" : "custom role"}
                 onSelect={() => { onChange(CUSTOM_ROLE); setOpen(false); }}

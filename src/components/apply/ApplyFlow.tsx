@@ -181,10 +181,13 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
             <div className="space-y-4 py-1">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">{isSv ? "Vilken roll söker du?" : "What role are you applying for?"}</label>
-                <RolePicker value={roleId} onChange={setRoleId} selectedLabel={roleId ? label : ""} />
+                <RolePicker value={roleId} onChange={setRoleId} selectedLabel={roleId ? label : ""} onCustomLabel={(l) => setCustomLabel(l)} />
                 {isCustom && (
-                  <Input autoFocus value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder={isSv ? "t.ex. VP Customer Experience" : "e.g. VP Customer Experience"} />
+                  <Input autoFocus value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder={isSv ? "t.ex. Commercial Excellence" : "e.g. Commercial Excellence"} />
                 )}
+                <p className="text-xs text-muted-foreground">
+                  {isSv ? "Välj en bred roll — den exakta titeln tas från annonsen, så en mall räcker för många jobb." : "Pick a broad role — the exact title comes from the ad, so one template covers many jobs."}
+                </p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">{isSv ? "Jobbannons" : "Job ad"} <span className="font-normal text-muted-foreground">({isSv ? "valfritt" : "optional"})</span></label>
