@@ -54,7 +54,7 @@ const SettingsPage = () => {
           {t("navDashboard")}
         </Button>
 
-        <h1 className="text-3xl font-bold font-sans mb-8">{t("settingsTitle")}</h1>
+        <h1 className="font-serif text-3xl font-medium mb-8">{t("settingsTitle")}</h1>
 
         <div className="space-y-6">
           <Card>

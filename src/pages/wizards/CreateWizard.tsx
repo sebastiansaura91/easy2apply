@@ -56,7 +56,7 @@ export default function CreateWizard() {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full space-y-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-semibold font-sans">{isSv ? "Var vill du börja?" : "Where do you want to start?"}</h2>
+                <h2 className="font-serif text-2xl font-medium">{isSv ? "Var vill du börja?" : "Where do you want to start?"}</h2>
                 <p className="text-sm text-muted-foreground mt-1">{isSv ? "Välj det som passar dig bäst." : "Pick the option that works best for you."}</p>
               </div>
               <div className="flex flex-col items-end gap-1">
