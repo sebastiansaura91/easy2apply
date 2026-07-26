@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,8 @@ interface Props {
   cvLanguage: "sv" | "en";
   /** Apply a truthful reframe: replace `original` bullet text with `suggested` in that experience. */
   onApplyReframe: (experienceId: string, original: string, suggested: string) => void;
+  /** Run the analysis automatically on open (e.g. the ad was already provided in the Apply flow). */
+  autoRun?: boolean;
 }
 
 const actionMeta: Record<EmphasisAction, { icon: JSX.Element; cls: string }> = {
@@ -28,7 +30,8 @@ const actionMeta: Record<EmphasisAction, { icon: JSX.Element; cls: string }> = {
  * Runs the role-fit analysis for the CV's target role (optionally sharpened by a pasted
  * job posting) and renders suggestion-only output. The user applies each reframe manually.
  */
-export function RoleFitPanel({ cv, cvLanguage, onApplyReframe }: Props) {
+export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun }: Props) {
+  const didAuto = useRef(false);
   const isSv = cvLanguage === "sv";
   const { toast } = useToast();
   const flow = useFlow();
@@ -91,6 +94,15 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe }: Props) {
       setLoading(false);
     }
   };
+
+  // Auto-run once when arriving with the ad already provided — no manual re-scan.
+  useEffect(() => {
+    if (autoRun && !didAuto.current && !result && !loading) {
+      didAuto.current = true;
+      run();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun]);
 
   const scoreColor = (s: number) => (s >= 75 ? "text-green-600" : s >= 50 ? "text-amber-600" : "text-red-600");
 

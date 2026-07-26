@@ -41,7 +41,7 @@ export function TailorPanel({
         <SheetHeader className="p-4 pb-2">
           <SheetTitle>{isSv ? "Förbättra CV:t" : "Improve this CV"}</SheetTitle>
         </SheetHeader>
-        <Tabs defaultValue={hasRole ? "fit" : "ats"} className="flex-1">
+        <Tabs defaultValue={seededResult ? "ats" : hasRole ? "fit" : "ats"} className="flex-1">
           <TabsList className="mx-4 grid grid-cols-3">
             <TabsTrigger value="fit" disabled={!hasRole}>{isSv ? "Rollfit" : "Role fit"}</TabsTrigger>
             <TabsTrigger value="ats">{isSv ? "ATS & ord" : "ATS & words"}</TabsTrigger>
@@ -50,7 +50,7 @@ export function TailorPanel({
 
           <TabsContent value="fit" className="mt-0">
             {hasRole ? (
-              <RoleFitPanel cv={cv} cvLanguage={cvLanguage} onApplyReframe={onApplyReframe} />
+              <RoleFitPanel cv={cv} cvLanguage={cvLanguage} onApplyReframe={onApplyReframe} autoRun={!!seededJob} />
             ) : (
               <p className="p-4 text-sm text-muted-foreground">
                 {isSv ? "Rikta CV:t mot en roll för att se rollfit." : "Tailor this CV to a role to see role fit."}
