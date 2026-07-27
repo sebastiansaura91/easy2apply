@@ -199,6 +199,13 @@ export function buildPdf(
           let titleLine = exp.title;
           if (exp.company) titleLine += `, ${exp.company}`;
           if (exp.location) titleLine += ` – ${exp.location}`;
+          // Never break inside the role title: if the combined line would wrap, split at
+          // the comma instead — title on its own line, company – location beneath it.
+          const companyLine = [exp.company, exp.location].filter(Boolean).join(" – ");
+          pdf.setFontSize(10.5);
+          pdf.setFont(font, "bold");
+          const titleFitsOneLine = pdf.splitTextToSize(titleLine, contentW).length === 1;
+          const splitTitle = !titleFitsOneLine && !!companyLine;
           const dateLine = formatCvDateRange(exp.startDate, exp.endDate, exp.isPresent, dateLang, t("present") || "Nuvarande");
 
           // A role must never split across pages: measure its FULL height (wrapped lines
@@ -210,7 +217,10 @@ export function buildPdf(
             pdf.setFont(font, "normal");
             return pdf.splitTextToSize(text, width).length;
           };
-          let fullH = mm(10.5, linesOf(titleLine, 10.5, contentW)) + mm(9, 1) + 1;
+          let fullH = splitTitle
+            ? mm(10.5, linesOf(exp.title, 10.5, contentW)) + mm(9.5, linesOf(companyLine, 9.5, contentW))
+            : mm(10.5, linesOf(titleLine, 10.5, contentW));
+          fullH += mm(9, 1) + 1;
           if (metaLine) fullH += mm(9, linesOf(metaLine, 9, contentW)) + 0.5;
           if (exp.roleScope) fullH += mm(9.5, linesOf(exp.roleScope, 9.5, contentW)) + 1;
           for (const b of validBullets) fullH += mm(10, linesOf(b, 10, contentW - 7)) + 0.5;
@@ -222,7 +232,12 @@ export function buildPdf(
             y = marginTop;
           }
 
-          drawH3(titleLine);
+          if (splitTitle) {
+            drawH3(exp.title);
+            drawText(companyLine, marginL, y, { fontSize: 9.5, color: colors.gray });
+          } else {
+            drawH3(titleLine);
+          }
           drawText(dateLine, marginL, y, { fontSize: 9, color: colors.gray });
           y += 1;
 

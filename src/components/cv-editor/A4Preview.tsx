@@ -124,8 +124,16 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
                 {cv.experience.map((exp) => (
                   <div key={exp.id} style={{ marginBottom: "10pt" }}>
                     <h3>
-                      {exp.title}{exp.company ? `, ${exp.company}` : ""}
-                      {exp.location ? ` – ${exp.location}` : ""}
+                      {/* Each chunk is unbreakable, so a long line wraps at the comma — never inside the title. */}
+                      <span style={{ whiteSpace: "nowrap" }}>{exp.title}</span>
+                      {(exp.company || exp.location) && (
+                        <>
+                          {", "}
+                          <span style={{ whiteSpace: "nowrap" }}>
+                            {[exp.company, exp.location].filter(Boolean).join(" – ")}
+                          </span>
+                        </>
+                      )}
                     </h3>
                     <p className="contact-line">
                       {formatCvDateRange(exp.startDate, exp.endDate, exp.isPresent, dateLang, t("present"))}
