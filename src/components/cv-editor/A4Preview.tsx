@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CVContent, CVSection } from "@/types/cv";
 import { TemplateStyle } from "@/lib/templates";
 import { formatCvDateRange } from "@/lib/format-date";
@@ -33,6 +33,26 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
     setPxPerMm(probe.getBoundingClientRect().height / 100);
     document.body.removeChild(probe);
   }, []);
+
+  // Mirror the PDF's keep-together rule: a role/project block that would straddle a
+  // page boundary is pushed below it (plus the next page's top margin), so the dashed
+  // page line never cuts through the middle of a role.
+  useLayoutEffect(() => {
+    const el = innerRef.current;
+    if (!el || pxPerMm === 0) return;
+    const pageHpx = 297 * pxPerMm;
+    const padTop = 20 * pxPerMm;
+    const blocks = el.querySelectorAll<HTMLElement>("[data-keep]");
+    blocks.forEach((b) => { b.style.marginTop = ""; });
+    blocks.forEach((b) => {
+      const top = b.offsetTop; // layout value — unaffected by the preview's CSS scale
+      const bottom = top + b.offsetHeight;
+      const boundary = (Math.floor(top / pageHpx) + 1) * pageHpx;
+      if (bottom > boundary && b.offsetHeight < pageHpx * 0.9) {
+        b.style.marginTop = `${boundary - top + padTop}px`;
+      }
+    });
+  }, [pxPerMm, cv, enabledSections, style]);
 
   useEffect(() => {
     const el = innerRef.current;
@@ -122,7 +142,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
               <div key={section.id}>
                 <h2>{t("sectionExperience")}</h2>
                 {cv.experience.map((exp) => (
-                  <div key={exp.id} style={{ marginBottom: "10pt" }}>
+                  <div key={exp.id} data-keep style={{ marginBottom: "10pt" }}>
                     <h3>
                       {/* Each chunk is unbreakable, so a long line wraps at the comma — never inside the title. */}
                       <span style={{ whiteSpace: "nowrap" }}>{exp.title}</span>
@@ -200,7 +220,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
               <div key={section.id}>
                 <h2>{t("sectionProjects")}</h2>
                 {cv.projects.map((p) => (
-                  <div key={p.id}>
+                  <div key={p.id} data-keep>
                     <h3>{p.name}</h3>
                     <p>{p.description}</p>
                     {p.bullets.filter(Boolean).length > 0 && <ul>{p.bullets.filter(Boolean).map((b, i) => <li key={i}>{b}</li>)}</ul>}
