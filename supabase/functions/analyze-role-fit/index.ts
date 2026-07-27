@@ -98,6 +98,8 @@ Return everything via the role_fit_result tool.`;
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
+        // Deterministic: same CV + role + posting must yield the same fit score and gaps.
+        temperature: 0,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

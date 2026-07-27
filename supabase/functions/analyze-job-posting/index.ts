@@ -25,6 +25,8 @@ serve(async (req) => {
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
+        // Deterministic extraction: the same posting must parse the same way every time.
+        temperature: 0,
         messages: [
           {
             role: "system",
