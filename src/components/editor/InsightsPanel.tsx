@@ -30,6 +30,8 @@ interface Props {
   onUpdateProfile?: (text: string) => void;
   onUpdateExperienceBullets?: (expIdx: number, bullets: string[]) => void;
   onUpdateSkills?: (skills: string[]) => void;
+  /** Persist the deep score onto the CV so the same number shows everywhere and survives reloads. */
+  onPersistScore?: (score: number, grade: string) => void;
 }
 
 function severityIcon(severity: CvIssue["severity"]) {
@@ -50,7 +52,7 @@ function severityBorder(severity: CvIssue["severity"]) {
 
 export function InsightsPanel({
   cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
-  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills,
+  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore,
 }: Props) {
   const { toast } = useToast();
   const [deepResult, setDeepResult] = useState<AtsCheckResult | null>(initialResult ?? null);
@@ -87,18 +89,8 @@ export function InsightsPanel({
   const langCheck = useMemo(() => detectCvLanguages(cv, cvLanguage), [cv, cvLanguage]);
   const mismatchSections = langCheck.detected_sections.filter(s => s.language !== "unknown" && s.language !== cvLanguage && s.confidence > 0.5);
 
-  // Overall health
-  const healthScore = useMemo(() => {
-    let score = 100;
-    score -= errorCount * 15;
-    score -= warningCount * 5;
-    score -= weakBullets * 3;
-    score -= mismatchSections.length * 5;
-    return Math.max(0, Math.min(100, score));
-  }, [errorCount, warningCount, weakBullets, mismatchSections.length]);
-
-  const healthColor = healthScore >= 80 ? "text-green-600" : healthScore >= 60 ? "text-warning" : "text-destructive";
-  const healthLabel = healthScore >= 80 ? (isSv ? "Bra grund" : "Good foundation") : healthScore >= 60 ? (isSv ? "Behöver justeringar" : "Needs adjustments") : (isSv ? "Kräver uppmärksamhet" : "Needs attention");
+  // The local heuristic score was removed: it produced a second, conflicting number.
+  // The panel shows only the deep ATS score (live or persisted on the CV).
 
   // Stale detection — has the CV changed since last analysis?
   const cvSignature = useMemo(() => JSON.stringify(cv) + "|" + jobText.trim(), [cv, jobText]);
@@ -115,6 +107,7 @@ export function InsightsPanel({
       if (data?.error) throw new Error(data.error);
       const newResult = data as AtsCheckResult;
       setDeepResult(newResult);
+      onPersistScore?.(Math.round(newResult.overall_score), newResult.grade);
       setAnalyzedSnapshot(cvSignature);
       setAnalyzedAt(new Date());
       if (prevScore !== null) {
@@ -233,11 +226,15 @@ export function InsightsPanel({
             <div className={`font-serif text-4xl font-medium ${scoreColor(deepResult.overall_score)}`}>{Math.round(deepResult.overall_score)}</div>
             <p className={`text-xs font-semibold ${scoreColor(deepResult.overall_score)}`}>{isSv ? "Betyg" : "Grade"} {deepResult.grade}</p>
           </>
-        ) : (
+        ) : cv.__meta?.lastAtsScore ? (
           <>
-            <div className={`font-serif text-4xl font-medium ${healthColor}`}>{healthScore}</div>
-            <p className={`text-xs font-semibold ${healthColor}`}>{healthLabel}</p>
+            <div className={`font-serif text-4xl font-medium ${scoreColor(cv.__meta.lastAtsScore.score)}`}>{cv.__meta.lastAtsScore.score}</div>
+            <p className="text-xs font-semibold text-muted-foreground">
+              {isSv ? "Senaste analys" : "Last analysis"} · {isSv ? "betyg" : "grade"} {cv.__meta.lastAtsScore.grade}
+            </p>
           </>
+        ) : (
+          <p className="text-sm text-muted-foreground">{isSv ? "Ingen analys körd än." : "No analysis run yet."}</p>
         )}
         <div className="flex justify-center gap-3 mt-2">
           {errorCount > 0 && (

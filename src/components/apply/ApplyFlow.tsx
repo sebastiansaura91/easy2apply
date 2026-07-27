@@ -138,6 +138,9 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
           tailoredForJob: report?.kind === "job" ? report.jobTitle : undefined,
           tailoredForCompany: report?.kind === "job" ? report.company : undefined,
           jobPostingText: jobText.trim() || undefined,
+          lastAtsScore: report?.kind === "job"
+            ? { score: Math.round(report.ats.overall_score), grade: report.ats.grade, at: new Date().toISOString() }
+            : undefined,
         },
       };
       const { error } = await supabase.from("resumes").insert({
