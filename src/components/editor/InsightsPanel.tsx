@@ -31,7 +31,13 @@ interface Props {
   onUpdateExperienceBullets?: (expIdx: number, bullets: string[]) => void;
   onUpdateSkills?: (skills: string[]) => void;
   /** Persist the deep score onto the CV so the same number shows everywhere and survives reloads. */
-  onPersistScore?: (score: number, grade: string) => void;
+  onPersistScore?: (score: number, grade: string, subscores?: AtsCheckResult["subscores"]) => void;
+}
+
+interface SinceLast {
+  overall: number;
+  subs: { label: string; delta: number }[];
+  resolved: string[];
 }
 
 function severityIcon(severity: CvIssue["severity"]) {
@@ -64,6 +70,7 @@ export function InsightsPanel({
   const [analyzedSnapshot, setAnalyzedSnapshot] = useState<string | null>(null);
   const [analyzedAt, setAnalyzedAt] = useState<Date | null>(null);
   const [lastDelta, setLastDelta] = useState<number | null>(null);
+  const [sinceLast, setSinceLast] = useState<SinceLast | null>(null);
   const [autoFixingIdx, setAutoFixingIdx] = useState<number | null>(null);
   const [autoFixPreview, setAutoFixPreview] = useState<{
     issueIdx: number;
@@ -98,7 +105,11 @@ export function InsightsPanel({
 
   const runDeep = async () => {
     setLoading(true);
-    const prevScore = deepResult?.overall_score ?? null;
+    // Previous state to diff against: the in-session result, else the score persisted on the CV.
+    const prevFull = deepResult;
+    const prevPersisted = cv.__meta?.lastAtsScore;
+    const prevScore = prevFull?.overall_score ?? prevPersisted?.score ?? null;
+    const prevSubs = prevFull?.subscores ?? prevPersisted?.subscores ?? null;
     try {
       const { data, error } = await supabase.functions.invoke("ats-check", {
         body: { resume_content_json: cv, job_posting_text: jobText.trim() || undefined, locale: cvLanguage },
@@ -107,12 +118,23 @@ export function InsightsPanel({
       if (data?.error) throw new Error(data.error);
       const newResult = data as AtsCheckResult;
       setDeepResult(newResult);
-      onPersistScore?.(Math.round(newResult.overall_score), newResult.grade);
+      onPersistScore?.(Math.round(newResult.overall_score), newResult.grade, newResult.subscores);
       setAnalyzedSnapshot(cvSignature);
       setAnalyzedAt(new Date());
       if (prevScore !== null) {
         const delta = Math.round(newResult.overall_score - prevScore);
         setLastDelta(delta);
+        // What improved: per-subscore deltas + issues that disappeared since last scan.
+        const subLabels: [keyof AtsCheckResult["subscores"], string][] = [
+          ["parse", "Parse"], ["scanability", "Scan"], ["relevance", isSv ? "Relevans" : "Relevance"], ["evidence", isSv ? "Evidens" : "Evidence"],
+        ];
+        const subs = prevSubs
+          ? subLabels.map(([k, label]) => ({ label, delta: Math.round(newResult.subscores[k] - prevSubs[k]) })).filter(s => s.delta !== 0)
+          : [];
+        const resolved = prevFull
+          ? prevFull.first_scan_issues.map(i => i.title).filter(t => !newResult.first_scan_issues.some(n => n.title === t))
+          : [];
+        setSinceLast({ overall: delta, subs, resolved });
         const sign = delta > 0 ? "+" : "";
         toast({
           title: isSv ? "Analys uppdaterad" : "Analysis updated",
@@ -122,6 +144,7 @@ export function InsightsPanel({
         });
       } else {
         setLastDelta(null);
+        setSinceLast(null);
       }
     } catch (e: any) {
       toast({ title: "Analysis failed", description: e.message, variant: "destructive" });
@@ -235,6 +258,29 @@ export function InsightsPanel({
           </>
         ) : (
           <p className="text-sm text-muted-foreground">{isSv ? "Ingen analys körd än." : "No analysis run yet."}</p>
+        )}
+        {/* What changed since the previous scan */}
+        {sinceLast && (
+          <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-left">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {isSv ? "Sedan förra analysen" : "Since last scan"}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <span className={`text-xs font-semibold ${sinceLast.overall > 0 ? "text-green-600" : sinceLast.overall < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                {sinceLast.overall > 0 ? "+" : ""}{sinceLast.overall} {isSv ? "totalt" : "overall"}
+              </span>
+              {sinceLast.subs.map(s => (
+                <span key={s.label} className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${s.delta > 0 ? "border-green-200 text-green-600" : "border-destructive/30 text-destructive"}`}>
+                  {s.label} {s.delta > 0 ? "+" : ""}{s.delta}
+                </span>
+              ))}
+            </div>
+            {sinceLast.resolved.length > 0 && (
+              <p className="mt-1.5 text-[11px] text-green-700 dark:text-green-500">
+                ✓ {isSv ? "Lösta problem:" : "Resolved:"} {sinceLast.resolved.join(" · ")}
+              </p>
+            )}
+          </div>
         )}
         <div className="flex justify-center gap-3 mt-2">
           {errorCount > 0 && (

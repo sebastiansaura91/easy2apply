@@ -71,7 +71,13 @@ export interface CVMeta {
   /** Raw job posting pasted when the application was created — persisted so role-fit context survives a reload. */
   jobPostingText?: string;
   /** Last deep ATS score for THIS CV — the one score shown everywhere, surviving reloads. */
-  lastAtsScore?: { score: number; grade: string; at: string };
+  lastAtsScore?: {
+    score: number;
+    grade: string;
+    at: string;
+    /** Subscores kept so the next scan can show what improved. */
+    subscores?: { parse: number; scanability: number; relevance: number; evidence: number };
+  };
   createdFrom?: string;
   /**
    * Your one true "base profile" — the canonical set of real facts. Role templates are

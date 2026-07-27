@@ -19,7 +19,7 @@ interface Props {
   onUpdateProfile: (text: string) => void;
   onUpdateExperienceBullets: (expIdx: number, bullets: string[]) => void;
   onUpdateSkills: (skills: string[]) => void;
-  onPersistScore?: (score: number, grade: string) => void;
+  onPersistScore?: (score: number, grade: string, subscores?: AtsCheckResult["subscores"]) => void;
 }
 
 /**

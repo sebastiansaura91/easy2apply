@@ -139,7 +139,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
           tailoredForCompany: report?.kind === "job" ? report.company : undefined,
           jobPostingText: jobText.trim() || undefined,
           lastAtsScore: report?.kind === "job"
-            ? { score: Math.round(report.ats.overall_score), grade: report.ats.grade, at: new Date().toISOString() }
+            ? { score: Math.round(report.ats.overall_score), grade: report.ats.grade, at: new Date().toISOString(), subscores: report.ats.subscores }
             : undefined,
         },
       };

@@ -482,8 +482,8 @@ const CVEditor = () => {
         onUpdateProfile={updateProfile}
         onUpdateExperienceBullets={updateExperienceBullets}
         onUpdateSkills={updateSkills}
-        onPersistScore={(score, grade) =>
-          setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastAtsScore: { score, grade, at: new Date().toISOString() } } }))}
+        onPersistScore={(score, grade, subscores) =>
+          setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastAtsScore: { score, grade, at: new Date().toISOString(), subscores } } }))}
       />
 
       {/* Sync structural facts across the whole lineage */}
