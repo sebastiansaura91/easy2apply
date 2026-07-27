@@ -213,13 +213,28 @@ const CVEditor = () => {
   const updateExperienceBullets = (expIdx: number, bullets: string[]) =>
     setCv(prev => ({ ...prev, experience: prev.experience.map((e, i) => i === expIdx ? { ...e, bullets } : e) }));
   const updateSkills = (skills: string[]) => updateCv("skills", skills);
-  const applyReframe = (experienceId: string, original: string, suggested: string) =>
-    setCv(prev => ({
-      ...prev,
-      experience: prev.experience.map(e =>
-        e.id === experienceId ? { ...e, bullets: e.bullets.map(b => (b === original ? suggested : b)) } : e
-      ),
-    }));
+  // Replace a bullet with its reframe. Matches tolerantly (trimmed, then across all
+  // experiences as a fallback) and reports whether anything actually changed, so the
+  // panel never claims "Applied" when nothing was. The change autosaves like any edit.
+  const applyReframe = (experienceId: string, original: string, suggested: string): boolean => {
+    const norm = (s: string) => s.trim().toLowerCase();
+    let changed = false;
+    const replaceIn = (bullets: string[]) =>
+      bullets.map(b => {
+        if (!changed && norm(b) === norm(original)) { changed = true; return suggested; }
+        return b;
+      });
+    let next = {
+      ...cv,
+      experience: cv.experience.map(e => (e.id === experienceId ? { ...e, bullets: replaceIn(e.bullets) } : e)),
+    };
+    if (!changed) {
+      // The AI sometimes returns a slightly-off experience id — fall back to any experience.
+      next = { ...cv, experience: cv.experience.map(e => ({ ...e, bullets: replaceIn(e.bullets) })) };
+    }
+    if (changed) setCv(next);
+    return changed;
+  };
   const navigateToSection = (sectionType: string) => {
     const idx = enabledSections.findIndex(s => s.type === sectionType);
     if (idx >= 0) { setMode("step"); setStepIdx(idx); }

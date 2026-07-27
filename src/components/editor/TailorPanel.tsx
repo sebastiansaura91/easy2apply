@@ -14,7 +14,7 @@ interface Props {
   t: (k: string) => string;
   seededJob?: string;
   seededResult?: AtsCheckResult | null;
-  onApplyReframe: (experienceId: string, original: string, suggested: string) => void;
+  onApplyReframe: (experienceId: string, original: string, suggested: string) => boolean;
   onNavigateToSection: (sectionType: string) => void;
   onUpdateProfile: (text: string) => void;
   onUpdateExperienceBullets: (expIdx: number, bullets: string[]) => void;

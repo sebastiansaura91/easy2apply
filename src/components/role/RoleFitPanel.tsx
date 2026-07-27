@@ -16,8 +16,8 @@ import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 interface Props {
   cv: CVContent;
   cvLanguage: "sv" | "en";
-  /** Apply a truthful reframe: replace `original` bullet text with `suggested` in that experience. */
-  onApplyReframe: (experienceId: string, original: string, suggested: string) => void;
+  /** Apply a truthful reframe; returns whether the original bullet was found and replaced. */
+  onApplyReframe: (experienceId: string, original: string, suggested: string) => boolean;
   /** Run the analysis automatically on open (e.g. the ad was already provided in the Apply flow). */
   autoRun?: boolean;
   /** Callbacks that let a gap's "Do I have this?" flow write a truthful reframe into the CV. */
@@ -184,12 +184,25 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
         <div className="space-y-5 pt-1">
           {/* Score + summary */}
           <div className="flex items-start gap-3 rounded-lg border border-border p-3">
-            <div className={`text-3xl font-bold ${scoreColor(result.fit_score)}`}>{result.fit_score}</div>
+            <div className={`font-serif text-3xl font-medium ${applied.size > 0 ? "text-muted-foreground/60" : scoreColor(result.fit_score)}`}>{result.fit_score}</div>
             <div className="text-sm">
               <p className="font-medium">{isSv ? "Fit-score" : "Fit score"}</p>
               <p className="text-muted-foreground leading-snug">{result.summary}</p>
             </div>
           </div>
+
+          {/* Applied changes make the score stale — offer a one-tap re-run */}
+          {applied.size > 0 && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 dark:bg-amber-950/20">
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                {isSv ? `${applied.size} ändring${applied.size === 1 ? "" : "ar"} applicerad${applied.size === 1 ? "" : "e"} — poängen är inaktuell.` : `${applied.size} change${applied.size === 1 ? "" : "s"} applied — the score is out of date.`}
+              </p>
+              <Button size="sm" className="h-9 flex-shrink-0 text-xs" onClick={run} disabled={loading}>
+                {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                {isSv ? "Uppdatera poängen" : "Update the score"}
+              </Button>
+            </div>
+          )}
 
           {/* Keyword coverage */}
           <div>
@@ -253,9 +266,13 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
                         className="h-9 text-xs"
                         disabled={applied.has(i)}
                         onClick={() => {
-                          onApplyReframe(r.experience_id, r.original, r.suggested);
+                          const ok = onApplyReframe(r.experience_id, r.original, r.suggested);
+                          if (!ok) {
+                            toast({ title: isSv ? "Hittade inte punkten" : "Couldn't find that bullet", description: isSv ? "Punkten kan ha ändrats sedan analysen. Kör om analysen." : "The bullet may have changed since the analysis. Re-run the analysis.", variant: "destructive" });
+                            return;
+                          }
                           setApplied((prev) => new Set(prev).add(i));
-                          toast({ title: isSv ? "Använd" : "Applied" });
+                          toast({ title: isSv ? "Använd — sparas i CV:t" : "Applied — saved to the CV" });
                         }}
                       >
                         <Check className="h-3 w-3 mr-1" />
