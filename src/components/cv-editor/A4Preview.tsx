@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { CVContent, CVSection } from "@/types/cv";
 import { TemplateStyle } from "@/lib/templates";
+import { formatCvDateRange } from "@/lib/format-date";
 
 interface A4PreviewProps {
   cv: CVContent;
@@ -10,6 +11,8 @@ interface A4PreviewProps {
 }
 
 export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4Preview({ cv, enabledSections, t, style }, ref) {
+  // Same detection as the PDF export: keep preview and export dates identical.
+  const dateLang: "sv" | "en" = t("present") === "Nuvarande" ? "sv" : "en";
   const styleVars = style
     ? {
         "--cv-font": style.cssFont,
@@ -102,13 +105,8 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
                   {cv.contact.name || t("yourName")}
                 </p>
                 <p style={{ margin: "4pt 0 0 0", fontSize: "9.5pt", lineHeight: 1.4 }}>
-                  {[
-                    cv.contact.email && `${t("contactEmail")}: ${cv.contact.email}`,
-                    cv.contact.phone && `${t("contactPhone")}: ${cv.contact.phone}`,
-                    cv.contact.city && `${t("contactAddress")}: ${cv.contact.city}`,
-                    cv.contact.linkedin && `${t("contactLinkedin")}: ${cv.contact.linkedin}`,
-                    cv.contact.website && `${t("contactWebsite")}: ${cv.contact.website}`,
-                  ].filter(Boolean).join(" · ")}
+                  {[cv.contact.email, cv.contact.phone, cv.contact.city, cv.contact.linkedin, cv.contact.website]
+                    .filter(Boolean).join("  ·  ")}
                 </p>
               </div>
             );
@@ -130,7 +128,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
                       {exp.location ? ` – ${exp.location}` : ""}
                     </h3>
                     <p className="contact-line">
-                      {exp.startDate} – {exp.isPresent ? t("present") : exp.endDate}
+                      {formatCvDateRange(exp.startDate, exp.endDate, exp.isPresent, dateLang, t("present"))}
                     </p>
                     {(exp.pnlSize || exp.headcount || exp.revenueImpact) && (
                       <p className="role-meta">
@@ -168,7 +166,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
                 {cv.education.map((edu) => (
                   <div key={edu.id} style={{ marginBottom: "8pt" }}>
                     <h3>{edu.degree}{edu.field ? `, ${edu.field}` : ""}</h3>
-                    <p className="contact-line">{edu.school} · {edu.startDate} – {edu.endDate}</p>
+                    <p className="contact-line">{edu.school} · {formatCvDateRange(edu.startDate, edu.endDate, false, dateLang, "")}</p>
                   </div>
                 ))}
               </div>

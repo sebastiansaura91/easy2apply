@@ -249,7 +249,7 @@ const CVEditor = () => {
     setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateStyle: id } }));
   const setTemplateAccent = (hex: string) =>
     setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateAccent: hex } }));
-  const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
+  const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent, cvLanguage).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
 
   // Propagate a structural fix (dates, company, contact, education…) to the master template
   // and every application in this lineage. Tailored profile/bullets/skills are left untouched.

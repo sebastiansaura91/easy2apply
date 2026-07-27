@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import { CVContent, CVSection } from "@/types/cv";
 import { getTemplateStyle, withAccent } from "./templates";
+import { formatCvDateRange } from "./format-date";
 
 /**
  * Renders CV data directly to PDF using jsPDF text rendering.
@@ -14,8 +15,11 @@ export function buildPdf(
   enabledSections: CVSection[],
   t: (k: string) => string,
   styleId?: string,
-  accentHex?: string
+  accentHex?: string,
+  lang?: "sv" | "en"
 ): jsPDF {
+  // Fall back to detecting the CV language from the translated "present" label.
+  const dateLang: "sv" | "en" = lang ?? (t("present") === "Nuvarande" ? "sv" : "en");
   const tpl = withAccent(getTemplateStyle(styleId), accentHex);
   const font = tpl.pdfFont;
   const pdf = new jsPDF("p", "mm", "a4");
@@ -162,17 +166,13 @@ export function buildPdf(
           fontSize: 18,
           fontStyle: "bold",
         });
-        y += 2;
-        const contactFields = [
-          cv.contact.email ? `${t("contactEmail")}: ${cv.contact.email}` : null,
-          cv.contact.phone ? `${t("contactPhone")}: ${cv.contact.phone}` : null,
-          cv.contact.linkedin ? `${t("contactLinkedin")}: ${cv.contact.linkedin}` : null,
-          cv.contact.website ? `${t("contactWebsite")}: ${cv.contact.website}` : null,
-          cv.contact.city ? `${t("contactAddress")}: ${cv.contact.city}` : null,
-        ].filter(Boolean);
-        for (const field of contactFields) {
-          drawCenteredText(field!, { fontSize: 9, color: colors.gray });
-        }
+        y += 1.5;
+        // One compact line — values only, no "Email:" labels. Recruiters and ATS
+        // recognize an address/phone on sight; labels just eat vertical space.
+        const contactLine = [
+          cv.contact.email, cv.contact.phone, cv.contact.city, cv.contact.linkedin, cv.contact.website,
+        ].filter(Boolean).join("   ·   ");
+        if (contactLine) drawCenteredText(contactLine, { fontSize: 9, color: colors.gray });
         y += 2;
         break;
       }
@@ -189,33 +189,40 @@ export function buildPdf(
         if (cv.experience.length === 0) break;
         drawH2(t("sectionExperience"));
         for (const exp of cv.experience) {
-          // Keep role header together with at least its date + first bullet.
-          // If they don't fit on the current page, start a new page first.
           const validBullets = exp.bullets.filter(Boolean);
           const metaLine = [
             exp.pnlSize ? `${t("labelPnl")}: ${exp.pnlSize}` : null,
             exp.headcount ? `${t("labelTeam")}: ${exp.headcount}` : null,
             exp.revenueImpact ? `${t("labelRevenue")}: ${exp.revenueImpact}` : null,
           ].filter(Boolean).join("   ·   ");
-          const lineH = 10 * 1.4 * 0.3528;
-          const headerH = lineH; // h3 line
-          const dateH = 9 * 1.4 * 0.3528;
-          const metaH = metaLine ? dateH : 0;
-          const scopeH = exp.roleScope ? lineH : 0;
-          const firstBulletH = validBullets.length > 0 ? lineH : 0;
-          const needed = headerH + dateH + metaH + scopeH + firstBulletH + 2;
-          if (y + needed > pageH - marginBottom) {
-            pdf.addPage();
-            y = marginTop;
-          }
-          // Title line
+
           let titleLine = exp.title;
           if (exp.company) titleLine += `, ${exp.company}`;
           if (exp.location) titleLine += ` – ${exp.location}`;
-          drawH3(titleLine);
+          const dateLine = formatCvDateRange(exp.startDate, exp.endDate, exp.isPresent, dateLang, t("present") || "Nuvarande");
 
-          // Date line
-          const dateLine = `${exp.startDate} – ${exp.isPresent ? (t("present") || "Nuvarande") : exp.endDate}`;
+          // A role must never split across pages: measure its FULL height (wrapped lines
+          // included) and start a fresh page when it doesn't fit — unless the role alone
+          // is taller than a page, in which case it has to flow.
+          const mm = (pt: number, lines: number) => pt * 1.4 * 0.3528 * lines;
+          const linesOf = (text: string, pt: number, width: number) => {
+            pdf.setFontSize(pt);
+            pdf.setFont(font, "normal");
+            return pdf.splitTextToSize(text, width).length;
+          };
+          let fullH = mm(10.5, linesOf(titleLine, 10.5, contentW)) + mm(9, 1) + 1;
+          if (metaLine) fullH += mm(9, linesOf(metaLine, 9, contentW)) + 0.5;
+          if (exp.roleScope) fullH += mm(9.5, linesOf(exp.roleScope, 9.5, contentW)) + 1;
+          for (const b of validBullets) fullH += mm(10, linesOf(b, 10, contentW - 7)) + 0.5;
+          fullH += 2;
+          const spaceLeft = pageH - marginBottom - y;
+          const fullPage = pageH - marginTop - marginBottom;
+          if (fullH > spaceLeft && fullH <= fullPage) {
+            pdf.addPage();
+            y = marginTop;
+          }
+
+          drawH3(titleLine);
           drawText(dateLine, marginL, y, { fontSize: 9, color: colors.gray });
           y += 1;
 
@@ -249,7 +256,7 @@ export function buildPdf(
           if (edu.field) titleLine += `, ${edu.field}`;
           drawH3(titleLine);
 
-          const dateLine = `${edu.school}  ·  ${edu.startDate} – ${edu.endDate}`;
+          const dateLine = `${edu.school}  ·  ${formatCvDateRange(edu.startDate, edu.endDate, false, dateLang, "")}`;
           drawText(dateLine, marginL, y, { fontSize: 9, color: colors.gray });
           y += 3;
         }
@@ -327,8 +334,9 @@ export async function exportToPdf(
   t: (k: string) => string,
   filename: string = "cv.pdf",
   styleId?: string,
-  accentHex?: string
+  accentHex?: string,
+  lang?: "sv" | "en"
 ): Promise<void> {
-  const pdf = buildPdf(cv, enabledSections, t, styleId, accentHex);
+  const pdf = buildPdf(cv, enabledSections, t, styleId, accentHex, lang);
   pdf.save(filename);
 }
