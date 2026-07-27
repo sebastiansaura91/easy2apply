@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw, MoreHorizontal, Check, Eye, ListOrdered } from "lucide-react";
+import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw, MoreHorizontal, Check, Eye, ListOrdered, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -251,6 +251,14 @@ const CVEditor = () => {
     setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateAccent: hex } }));
   const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent, cvLanguage).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
 
+  // Explicit save (autosave still runs) — cancels any pending debounce and saves now.
+  const manualSave = async () => {
+    if (saveTimeout.current) { clearTimeout(saveTimeout.current); saveTimeout.current = null; }
+    dirtyRef.current = false;
+    await saveCV();
+    toast({ title: cvLanguage === "en" ? "Saved" : "Sparat" });
+  };
+
   // Live page count from the real PDF engine (debounced), so the editor always shows
   // exactly what export will produce — with a warning past two pages.
   const [pageCount, setPageCount] = useState<number | null>(null);
@@ -340,6 +348,9 @@ const CVEditor = () => {
             </Button>
             <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => setPageBreaksOpen(true)}>
               <Eye className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Preview" : "Förhandsgranska"}
+            </Button>
+            <Button variant="outline" size="icon" className="h-9 w-9" title={cvLanguage === "en" ? "Save" : "Spara"} onClick={manualSave} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             </Button>
             <Button size="sm" className="h-9 whitespace-nowrap text-xs" onClick={doExport}>
               <FileDown className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Download PDF" : "Ladda ner PDF"}
