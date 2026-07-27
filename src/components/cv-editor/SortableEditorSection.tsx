@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronRight, Eye, EyeOff, GripVertical } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ChevronRight, GripVertical } from "lucide-react";
 import { CVSection } from "@/types/cv";
 
 interface Props {
@@ -50,15 +51,13 @@ export function SortableEditorSection({
             <span className="truncate text-sm font-medium text-primary">{title}</span>
             {!section.enabled && <span className="flex-shrink-0 text-[10px] text-muted-foreground">({hiddenLabel})</span>}
           </CollapsibleTrigger>
-          <button
-            type="button"
-            onClick={onToggleEnabled}
+          <Switch
+            checked={section.enabled}
+            onCheckedChange={onToggleEnabled}
             title={toggleTitle}
             aria-label={toggleTitle}
-            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            {section.enabled ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-          </button>
+            className="mr-1 flex-shrink-0"
+          />
         </div>
         <CollapsibleContent>
           <div className="border-t border-border px-4 py-4 [&_.card]:border-0">{children}</div>
