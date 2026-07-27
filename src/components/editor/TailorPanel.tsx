@@ -50,7 +50,16 @@ export function TailorPanel({
 
           <TabsContent value="fit" className="mt-0">
             {hasRole ? (
-              <RoleFitPanel cv={cv} cvLanguage={cvLanguage} onApplyReframe={onApplyReframe} autoRun={!!seededJob} />
+              <RoleFitPanel
+                cv={cv}
+                cvLanguage={cvLanguage}
+                onApplyReframe={onApplyReframe}
+                autoRun={!!seededJob}
+                onUpdateProfile={onUpdateProfile}
+                onUpdateExperienceBullets={onUpdateExperienceBullets}
+                onUpdateSkills={onUpdateSkills}
+                onNavigateToSection={onNavigateToSection}
+              />
             ) : (
               <p className="p-4 text-sm text-muted-foreground">
                 {isSv ? "Rikta CV:t mot en roll för att se rollfit." : "Tailor this CV to a role to see role fit."}

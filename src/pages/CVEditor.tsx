@@ -11,19 +11,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw } from "lucide-react";
+import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw, MoreHorizontal, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { TailorPanel } from "@/components/editor/TailorPanel";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronRight, Eye, EyeOff } from "lucide-react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { roleLabel } from "@/lib/role-advice";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { SortableSectionItem } from "@/components/cv-editor/SortableSectionItem";
+import { SortableEditorSection } from "@/components/cv-editor/SortableEditorSection";
 import { A4Preview } from "@/components/cv-editor/A4Preview";
 import { SectionFormRenderer } from "@/components/cv-editor/SectionForms";
 import { cvHeadings } from "@/i18n/cvHeadings";
@@ -279,49 +278,38 @@ const CVEditor = () => {
             />
             {saving && <span className="text-[10px] text-muted-foreground ml-1">{cvLanguage === "en" ? "Saving…" : "Sparar…"}</span>}
           </div>
-          <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setTailorOpen(true)}>
+          <div className="flex flex-shrink-0 items-center gap-1.5">
+            {/* Mode toggle — icon only */}
+            <div className="flex items-center rounded-md border border-border p-0.5 bg-muted/30">
+              <button type="button" title={cvLanguage === "en" ? "Overview" : "Översikt"} onClick={() => setMode("overview")}
+                className={`grid h-8 w-8 place-items-center rounded ${mode === "overview" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
+                <LayoutList className="h-4 w-4" />
+              </button>
+              <button type="button" title={cvLanguage === "en" ? "Step-by-step" : "Steg-för-steg"} onClick={() => setMode("step")}
+                className={`grid h-8 w-8 place-items-center rounded ${mode === "step" ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
+                <ListChecks className="h-4 w-4" />
+              </button>
+            </div>
+            <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => setTailorOpen(true)}>
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Improve" : "Förbättra"}
             </Button>
-            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setStyleOpen(true)}>
-              <Palette className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Style" : "Stil"}
-            </Button>
-            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setSyncOpen(true)}>
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Sync facts" : "Synka fakta"}
-            </Button>
-            {/* Mode toggle */}
-            <div className="flex items-center gap-0 rounded-md border border-border p-0.5 bg-muted/30">
-              <button
-                type="button"
-                onClick={() => setMode("overview")}
-                className={`h-9 px-2.5 text-[11px] rounded inline-flex items-center gap-1 ${mode === "overview" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-              >
-                <LayoutList className="h-3 w-3" />{cvLanguage === "en" ? "Overview" : "Översikt"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("step")}
-                className={`h-9 px-2.5 text-[11px] rounded inline-flex items-center gap-1 ${mode === "step" ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}
-              >
-                <ListChecks className="h-3 w-3" />{cvLanguage === "en" ? "Step-by-step" : "Steg-för-steg"}
-              </button>
-            </div>
-            <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setPageBreaksOpen(true)}>
-              <FileText className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Page breaks" : "Sidbrytningar"}
-            </Button>
-            <div className="flex items-center gap-1 ml-1">
-              <Globe className="h-3 w-3 text-muted-foreground" />
-              <Select value={cvLanguage} onValueChange={(v: "sv" | "en") => setCvLanguage(v)}>
-                <SelectTrigger className="h-8 w-20 text-[11px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sv">Svenska</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button size="sm" className="h-9 text-xs" onClick={doExport}>
+            <Button size="sm" className="h-9 whitespace-nowrap text-xs" onClick={doExport}>
               <FileDown className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Download PDF" : "Ladda ner PDF"}
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-9 w-9" title={cvLanguage === "en" ? "More" : "Mer"}><MoreHorizontal className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setStyleOpen(true)}><Palette className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Style" : "Stil"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSyncOpen(true)}><RefreshCw className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Sync facts" : "Synka fakta"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPageBreaksOpen(true)}><FileText className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Page breaks" : "Sidbrytningar"}</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Globe className="h-3 w-3" />{cvLanguage === "en" ? "Language" : "Språk"}</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => setCvLanguage("sv")}>Svenska {cvLanguage === "sv" && <Check className="ml-auto h-4 w-4" />}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setCvLanguage("en")}>English {cvLanguage === "en" && <Check className="ml-auto h-4 w-4" />}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </nav>
@@ -406,52 +394,27 @@ const CVEditor = () => {
         <main className="flex-1">
           <ScrollArea className="h-full">
             <div className="max-w-3xl mx-auto p-4 sm:p-6">
-              {/* Collapsible section list */}
-              <div className="overflow-hidden rounded-xl border border-border bg-card divide-y divide-border">
-                {[...cv.sections].sort((a, b) => a.order - b.order).map(section => {
-                  const title = tCv(`section${section.type.charAt(0).toUpperCase() + section.type.slice(1)}`);
-                  const isOpen = openSections.has(section.id);
-                  return (
-                    <Collapsible key={section.id} open={isOpen} onOpenChange={() => toggleSectionOpen(section.id)}>
-                      <div className="flex h-12 items-center gap-2 px-4">
-                        <CollapsibleTrigger className="flex flex-1 items-center gap-2 text-left">
-                          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`} />
-                          <span className="text-sm font-medium text-primary">{title}</span>
-                          {!section.enabled && (
-                            <span className="text-[10px] text-muted-foreground">({cvLanguage === "en" ? "hidden" : "dold"})</span>
-                          )}
-                        </CollapsibleTrigger>
-                        <button
-                          type="button"
-                          onClick={() => toggleSection(section.id)}
-                          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                          title={section.enabled ? (cvLanguage === "en" ? "Hide from CV" : "Dölj i CV") : (cvLanguage === "en" ? "Show in CV" : "Visa i CV")}
-                          aria-label={section.enabled ? "Hide section" : "Show section"}
-                        >
-                          {section.enabled ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      <CollapsibleContent>
-                        <div className="border-t border-border px-4 py-4 [&_.card]:border-0">
-                          <SectionFormRenderer sectionType={section.type} cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  );
-                })}
-              </div>
-
-              {/* Reorder */}
-              <div className="mt-6">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{cvLanguage === "en" ? "Reorder sections" : "Ordna sektioner"}</p>
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={cv.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+              {/* Unified section list: drag to reorder, chevron to edit, eye to show/hide */}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={[...cv.sections].sort((a, b) => a.order - b.order).map(s => s.id)} strategy={verticalListSortingStrategy}>
+                  <div className="overflow-hidden rounded-xl border border-border bg-card divide-y divide-border">
                     {[...cv.sections].sort((a, b) => a.order - b.order).map(section => (
-                      <SortableSectionItem key={section.id} section={section} t={t} onToggle={toggleSection} />
+                      <SortableEditorSection
+                        key={section.id}
+                        section={section}
+                        title={tCv(`section${section.type.charAt(0).toUpperCase() + section.type.slice(1)}`)}
+                        isOpen={openSections.has(section.id)}
+                        onToggleOpen={() => toggleSectionOpen(section.id)}
+                        onToggleEnabled={() => toggleSection(section.id)}
+                        hiddenLabel={cvLanguage === "en" ? "hidden" : "dold"}
+                        toggleTitle={section.enabled ? (cvLanguage === "en" ? "Hide from CV" : "Dölj i CV") : (cvLanguage === "en" ? "Show in CV" : "Visa i CV")}
+                      >
+                        <SectionFormRenderer sectionType={section.type} cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />
+                      </SortableEditorSection>
                     ))}
-                  </SortableContext>
-                </DndContext>
-              </div>
+                  </div>
+                </SortableContext>
+              </DndContext>
             </div>
           </ScrollArea>
         </main>

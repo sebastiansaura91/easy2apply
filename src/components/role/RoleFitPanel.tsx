@@ -9,7 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useFlow } from "@/contexts/FlowContext";
 import { CVContent } from "@/types/cv";
 import { RoleFitResult, EmphasisAction } from "@/types/role-fit";
+import { FirstScanIssue } from "@/types/ats-check";
 import { getRoleAdvice, roleLabel } from "@/lib/role-advice";
+import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 
 interface Props {
   cv: CVContent;
@@ -18,6 +20,11 @@ interface Props {
   onApplyReframe: (experienceId: string, original: string, suggested: string) => void;
   /** Run the analysis automatically on open (e.g. the ad was already provided in the Apply flow). */
   autoRun?: boolean;
+  /** Callbacks that let a gap's "Do I have this?" flow write a truthful reframe into the CV. */
+  onUpdateProfile?: (text: string) => void;
+  onUpdateExperienceBullets?: (expIdx: number, bullets: string[]) => void;
+  onUpdateSkills?: (skills: string[]) => void;
+  onNavigateToSection?: (sectionType: string) => void;
 }
 
 const actionMeta: Record<EmphasisAction, { icon: JSX.Element; cls: string }> = {
@@ -30,7 +37,7 @@ const actionMeta: Record<EmphasisAction, { icon: JSX.Element; cls: string }> = {
  * Runs the role-fit analysis for the CV's target role (optionally sharpened by a pasted
  * job posting) and renders suggestion-only output. The user applies each reframe manually.
  */
-export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun }: Props) {
+export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onNavigateToSection }: Props) {
   const didAuto = useRef(false);
   const isSv = cvLanguage === "sv";
   const { toast } = useToast();
@@ -41,6 +48,9 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun }: Props)
   const [result, setResult] = useState<RoleFitResult | null>(null);
   const [jobAnalysis, setJobAnalysis] = useState<any | null>(null);
   const [applied, setApplied] = useState<Set<number>>(new Set());
+  // A gap the user wants to interrogate ("do I actually have this?") — reuses FixIssueWizard.
+  const [gapIssue, setGapIssue] = useState<FirstScanIssue | null>(null);
+  const canCoach = !!onUpdateProfile && !!onUpdateExperienceBullets && !!onUpdateSkills;
 
   const roleId = cv.__meta?.targetRole;
   const label = roleLabel(roleId, cv.__meta?.targetRoleLabel, cvLanguage);
@@ -105,6 +115,25 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun }: Props)
   }, [autoRun]);
 
   const scoreColor = (s: number) => (s >= 75 ? "text-green-600" : s >= 50 ? "text-amber-600" : "text-red-600");
+
+  // Interrogate a gap: questions → truthful reframe → add to CV (reuses the coached fix flow).
+  if (gapIssue && canCoach) {
+    return (
+      <div className="p-4">
+        <FixIssueWizard
+          issue={gapIssue}
+          cv={cv}
+          cvLanguage={cvLanguage}
+          jobPostingText={jobText || undefined}
+          onApplyToProfile={onUpdateProfile}
+          onApplyToExperience={onUpdateExperienceBullets}
+          onApplyToSkills={onUpdateSkills}
+          onClose={() => setGapIssue(null)}
+          onNavigateToSection={onNavigateToSection}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 space-y-4">
@@ -251,6 +280,12 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun }: Props)
                     <p className="font-medium text-amber-700 dark:text-amber-400">{g.requirement}</p>
                     <p className="text-muted-foreground text-xs mt-0.5">{g.why}</p>
                     <p className="text-xs mt-1">→ {g.suggestion}</p>
+                    {canCoach && (
+                      <Button variant="outline" size="sm" className="mt-2 h-8 text-xs"
+                        onClick={() => setGapIssue({ title: g.requirement, why_it_matters: g.why, fix: g.suggestion })}>
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Har jag detta egentligen?" : "Do I actually have this?"}
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
