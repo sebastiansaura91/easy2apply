@@ -106,12 +106,20 @@ export interface CVContent {
   __meta?: CVMeta;
 }
 
+/**
+ * ATS-recommended section order (hybrid format): summary and core competencies first —
+ * the parser weights them heaviest — then reverse-chronological experience.
+ */
+export const atsSectionOrder: CVSection["type"][] = [
+  "contact", "profile", "skills", "experience", "education", "certifications", "projects", "languages", "other",
+];
+
 export const defaultSections: CVSection[] = [
   { id: "contact", type: "contact", enabled: true, order: 0 },
   { id: "profile", type: "profile", enabled: true, order: 1 },
-  { id: "experience", type: "experience", enabled: true, order: 2 },
-  { id: "education", type: "education", enabled: true, order: 3 },
-  { id: "skills", type: "skills", enabled: true, order: 4 },
+  { id: "skills", type: "skills", enabled: true, order: 2 },
+  { id: "experience", type: "experience", enabled: true, order: 3 },
+  { id: "education", type: "education", enabled: true, order: 4 },
   { id: "certifications", type: "certifications", enabled: false, order: 5 },
   { id: "projects", type: "projects", enabled: false, order: 6 },
   { id: "languages", type: "languages", enabled: true, order: 7 },

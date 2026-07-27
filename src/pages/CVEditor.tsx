@@ -4,14 +4,14 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFlow } from "@/contexts/FlowContext";
 import { supabase } from "@/integrations/supabase/client";
-import { CVContent, emptyCV } from "@/types/cv";
+import { CVContent, emptyCV, atsSectionOrder } from "@/types/cv";
 import { convertLanguageLevels } from "@/lib/language-level-mapping";
 import { syncStructure } from "@/lib/sync-structure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw, MoreHorizontal, Check } from "lucide-react";
+import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw, MoreHorizontal, Check, Eye, ListOrdered } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -26,7 +26,7 @@ import { SortableEditorSection } from "@/components/cv-editor/SortableEditorSect
 import { A4Preview } from "@/components/cv-editor/A4Preview";
 import { SectionFormRenderer } from "@/components/cv-editor/SectionForms";
 import { cvHeadings } from "@/i18n/cvHeadings";
-import { exportToPdf } from "@/lib/export-pdf";
+import { exportToPdf, buildPdf } from "@/lib/export-pdf";
 import { TEMPLATE_STYLES, getTemplateStyle, withAccent, ACCENT_PRESETS } from "@/lib/templates";
 import { detectCvLanguages } from "@/lib/language-detection";
 
@@ -251,6 +251,26 @@ const CVEditor = () => {
     setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateAccent: hex } }));
   const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent, cvLanguage).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
 
+  // Live page count from the real PDF engine (debounced), so the editor always shows
+  // exactly what export will produce — with a warning past two pages.
+  const [pageCount, setPageCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (loading) return;
+    const id = window.setTimeout(() => {
+      try {
+        setPageCount(buildPdf(cv, enabledSections, tCv, templateStyleId, templateAccent, cvLanguage).getNumberOfPages());
+      } catch { /* counting must never break editing */ }
+    }, 800);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cv, loading, cvLanguage, templateStyleId, templateAccent]);
+
+  // One-tap ATS-recommended order: summary + core competencies up top, then experience.
+  const applyAtsOrder = () => {
+    updateCv("sections", cv.sections.map(s => ({ ...s, order: atsSectionOrder.indexOf(s.type) })));
+    toast({ title: cvLanguage === "en" ? "Sections arranged for ATS" : "Sektioner ordnade för ATS" });
+  };
+
   // Propagate a structural fix (dates, company, contact, education…) to the master template
   // and every application in this lineage. Tailored profile/bullets/skills are left untouched.
   const syncFacts = async () => {
@@ -292,6 +312,16 @@ const CVEditor = () => {
               placeholder={cvLanguage === "en" ? "Untitled resume" : "Namnlöst CV"}
             />
             {saving && <span className="text-[10px] text-muted-foreground ml-1">{cvLanguage === "en" ? "Saving…" : "Sparar…"}</span>}
+            {pageCount !== null && (
+              <span
+                className={`ml-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+                  pageCount > 2 ? "border-warning/50 bg-warning/10 text-warning" : "border-border text-muted-foreground"
+                }`}
+                title={pageCount > 2 ? (cvLanguage === "en" ? "Aim for max 2 pages — shorten the longest bullets." : "Sikta på max 2 sidor — korta de längsta punkterna.") : undefined}
+              >
+                {pageCount} {cvLanguage === "en" ? (pageCount === 1 ? "page" : "pages") : (pageCount === 1 ? "sida" : "sidor")}{pageCount > 2 ? " ⚠" : ""}
+              </span>
+            )}
           </div>
           <div className="flex flex-shrink-0 items-center gap-1.5">
             {/* Mode toggle — icon only */}
@@ -308,6 +338,9 @@ const CVEditor = () => {
             <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => setTailorOpen(true)}>
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Improve" : "Förbättra"}
             </Button>
+            <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => setPageBreaksOpen(true)}>
+              <Eye className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Preview" : "Förhandsgranska"}
+            </Button>
             <Button size="sm" className="h-9 whitespace-nowrap text-xs" onClick={doExport}>
               <FileDown className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Download PDF" : "Ladda ner PDF"}
             </Button>
@@ -318,7 +351,7 @@ const CVEditor = () => {
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={() => setStyleOpen(true)}><Palette className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Style" : "Stil"}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSyncOpen(true)}><RefreshCw className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Sync facts" : "Synka fakta"}</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setPageBreaksOpen(true)}><FileText className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Page breaks" : "Sidbrytningar"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={applyAtsOrder}><ListOrdered className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Arrange for ATS" : "Ordna för ATS"}</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Globe className="h-3 w-3" />{cvLanguage === "en" ? "Language" : "Språk"}</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => setCvLanguage("sv")}>Svenska {cvLanguage === "sv" && <Check className="ml-auto h-4 w-4" />}</DropdownMenuItem>
@@ -528,8 +561,15 @@ const CVEditor = () => {
       <Dialog open={pageBreaksOpen} onOpenChange={setPageBreaksOpen}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{cvLanguage === "en" ? "Page breaks preview" : "Förhandsgranskning av sidbrytningar"}</DialogTitle>
+            <DialogTitle>{cvLanguage === "en" ? "Preview" : "Förhandsgranskning"}</DialogTitle>
           </DialogHeader>
+          {pageCount !== null && (
+            <p className={`text-xs ${pageCount > 2 ? "text-warning" : "text-muted-foreground"}`}>
+              {cvLanguage === "en"
+                ? `${pageCount} ${pageCount === 1 ? "page" : "pages"} in the exported PDF${pageCount > 2 ? " — aim for max 2. Shorten the longest bullets or hide a section." : "."}`
+                : `${pageCount} ${pageCount === 1 ? "sida" : "sidor"} i exporterad PDF${pageCount > 2 ? " — sikta på max 2. Korta de längsta punkterna eller dölj en sektion." : "."}`}
+            </p>
+          )}
           <div className="bg-muted/40 p-4 rounded-lg flex justify-center overflow-auto">
             <div className="transform scale-[0.75] origin-top">
               <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} style={templateStyle} />
