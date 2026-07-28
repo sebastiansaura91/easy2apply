@@ -41,7 +41,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
     const el = innerRef.current;
     if (!el || pxPerMm === 0) return;
     const pageHpx = 297 * pxPerMm;
-    const padTop = 20 * pxPerMm;
+    const padTop = 17 * pxPerMm;
     const blocks = el.querySelectorAll<HTMLElement>("[data-keep]");
     blocks.forEach((b) => { b.style.marginTop = ""; });
     blocks.forEach((b) => {
@@ -119,12 +119,12 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
         switch (section.type) {
           case "contact":
             return (
-              <div key={section.id} style={{ marginBottom: "10pt" }}>
+              <div key={section.id} style={{ marginBottom: "7pt" }}>
                 {/* Name + contact rendered as body flow text (not header) so ATS + recruiters parse it on the first scan line. */}
                 <p style={{ fontSize: "16pt", fontWeight: 700, margin: 0, lineHeight: 1.1 }}>
                   {cv.contact.name || t("yourName")}
                 </p>
-                <p style={{ margin: "4pt 0 0 0", fontSize: "9.5pt", lineHeight: 1.4 }}>
+                <p style={{ margin: "3pt 0 0 0", fontSize: "9.5pt", lineHeight: 1.4 }}>
                   {[cv.contact.email, cv.contact.phone, cv.contact.city, cv.contact.linkedin, cv.contact.website]
                     .filter(Boolean).join("  ·  ")}
                 </p>

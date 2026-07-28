@@ -130,7 +130,7 @@
 .a4-preview {
   width: 210mm;
   min-height: 297mm;
-  padding: 20mm 25mm;
+  padding: 17mm 25mm;
   background: white;
   color: #1a1a1a;
   font-family: var(--cv-font, 'Inter', sans-serif);
@@ -154,8 +154,8 @@
   color: var(--cv-accent, #1a1a1a);
   border-bottom: 1.5pt solid var(--cv-accent, #1a1a1a);
   padding-bottom: 3pt;
-  margin-top: 14pt;
-  margin-bottom: 8pt;
+  margin-top: 12pt;
+  margin-bottom: 7pt;
   font-family: var(--cv-font, 'Inter', sans-serif);
 }
 

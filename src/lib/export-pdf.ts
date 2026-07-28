@@ -27,8 +27,9 @@ export function buildPdf(
   const pageH = 297;
   const marginL = 25;
   const marginR = 25;
-  const marginTop = 20;
-  const marginBottom = 20;
+  // 17mm keeps a safe print margin while buying ~2 lines of content per page.
+  const marginTop = 17;
+  const marginBottom = 17;
   const contentW = pageW - marginL - marginR;
   let y = marginTop;
 
@@ -108,7 +109,7 @@ export function buildPdf(
   }
 
   function drawH2(text: string) {
-    y += 3;
+    y += 2.5;
     checkPage(8);
     pdf.setFontSize(11);
     pdf.setFont(font,"bold");
@@ -120,7 +121,7 @@ export function buildPdf(
     pdf.setDrawColor(...tpl.accentRgb);
     pdf.setLineWidth(0.4);
     pdf.line(marginL, y, marginL + contentW, y);
-    y += 4;
+    y += 3.5;
   }
 
   function drawH3(text: string) {
@@ -166,14 +167,14 @@ export function buildPdf(
           fontSize: 18,
           fontStyle: "bold",
         });
-        y += 1.5;
+        y += 1;
         // One compact line — values only, no "Email:" labels. Recruiters and ATS
         // recognize an address/phone on sight; labels just eat vertical space.
         const contactLine = [
           cv.contact.email, cv.contact.phone, cv.contact.city, cv.contact.linkedin, cv.contact.website,
         ].filter(Boolean).join("   ·   ");
         if (contactLine) drawCenteredText(contactLine, { fontSize: 9, color: colors.gray });
-        y += 2;
+        y += 1;
         break;
       }
 
