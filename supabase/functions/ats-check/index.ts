@@ -31,6 +31,12 @@ serve(async (req) => {
     userPrompt += `- A date in year ${todayYear} is in the future only if its month > ${todayMonth}.\n`;
     userPrompt += `- "Present"/"Pågående"/"Nuvarande" combined with a past start date is NORMAL (current employment). Do NOT flag this as a future employment date.\n`;
     userPrompt += `- Before raising any "future date" issue, recompute: is the start date strictly after ${todayStr}? If not, do NOT include the issue.\n\n`;
+    userPrompt += `## RENDERING GUARANTEES (the export engine enforces these — NEVER flag them)\n`;
+    userPrompt += `- Strict single-column layout; no tables, text boxes, columns, images, icons or graphics.\n`;
+    userPrompt += `- Name + contact details are rendered as plain body text at the very top of page 1 (NOT in a document header/footer). Do not raise "contact info placement" issues.\n`;
+    userPrompt += `- Standard fonts, selectable vector text, no embedded objects; the PDF is fully machine-readable.\n`;
+    userPrompt += `- Dates are printed in a consistent "mon YYYY – mon YYYY" format; role titles never split across pages.\n`;
+    userPrompt += `- Therefore: only flag CONTENT issues (wording, keywords, metrics, ordering of sections, gaps, inconsistent data) — never layout/file-format speculation.\n\n`;
     userPrompt += `## CV DATA (JSON)\n\`\`\`json\n${JSON.stringify(resume_content_json, null, 2)}\n\`\`\`\n\n`;
     userPrompt += `## RENDERED PLAIN TEXT (what ATS sees)\n\`\`\`\n${renderedText}\n\`\`\`\n\n`;
     userPrompt += `## BULLETS WITH IDS\n\`\`\`json\n${JSON.stringify(bulletList, null, 2)}\n\`\`\`\n\n`;
@@ -108,6 +114,17 @@ serve(async (req) => {
       result.first_scan_issues = result.first_scan_issues.filter((iss: any) => {
         const hay = `${iss?.title || ""} ${iss?.why_it_matters || ""} ${iss?.fix || ""}`.toLowerCase();
         return !(hay.includes("future") || hay.includes("framtid"));
+      });
+    }
+
+    // Deterministic guard: the export engine guarantees single-column body-text layout
+    // (contact at the very top, no headers/tables/images), so layout speculation from
+    // the model is always a false positive. Drop those issues.
+    if (Array.isArray(result?.first_scan_issues)) {
+      const layoutNoise = /contact info placement|kontaktuppgifternas placering|header or separate block|document header|sidhuvud|multi-?column|flera kolumner|text box|textruta|\btable\b|\btabell\b|image|bild|graphic|grafik|file format|filformat/;
+      result.first_scan_issues = result.first_scan_issues.filter((iss: any) => {
+        const hay = `${iss?.title || ""} ${iss?.why_it_matters || ""} ${iss?.fix || ""}`.toLowerCase();
+        return !layoutNoise.test(hay);
       });
     }
 

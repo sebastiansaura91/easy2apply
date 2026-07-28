@@ -4,7 +4,6 @@ import { AtsCheckResult, FirstScanIssue } from "@/types/ats-check";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -65,12 +64,14 @@ export function InsightsPanel({
   const [loading, setLoading] = useState(false);
   const [jobText, setJobText] = useState(jobPostingText || "");
   const [showJob, setShowJob] = useState(false);
-  const [bulletsOpen, setBulletsOpen] = useState(false);
   const [fixingIssue, setFixingIssue] = useState<FirstScanIssue | null>(null);
   const [analyzedSnapshot, setAnalyzedSnapshot] = useState<string | null>(null);
   const [analyzedAt, setAnalyzedAt] = useState<Date | null>(null);
   const [lastDelta, setLastDelta] = useState<number | null>(null);
   const [sinceLast, setSinceLast] = useState<SinceLast | null>(null);
+  const [openBuckets, setOpenBuckets] = useState<Set<string>>(new Set(["keywords"]));
+  const toggleBucket = (k: string) =>
+    setOpenBuckets(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; });
   const [autoFixingIdx, setAutoFixingIdx] = useState<number | null>(null);
   const [autoFixPreview, setAutoFixPreview] = useState<{
     issueIdx: number;
@@ -240,6 +241,218 @@ export function InsightsPanel({
     );
   }
 
+  // ── ATS buckets: group every finding by the kind of fix it needs ──
+  type BucketKey = "keywords" | "bullets" | "formatting" | "language" | "other";
+  const catOf = (txt: string): BucketKey => {
+    const s = txt.toLowerCase();
+    if (/keyword|nyckelord|phrase|fras|terminolog/.test(s)) return "keywords";
+    if (/bullet|punkt|metric|siffr|quantif|mätbar|verb|achievement|resultat/.test(s)) return "bullets";
+    if (/language|språk|spell|stav|grammar|grammatik/.test(s)) return "language";
+    if (/format|layout|kolumn|column|datum|date|struktur|structure|sektion|section|parse|överlapp|overlap|kontakt|contact|längd|length|sida|page/.test(s)) return "formatting";
+    return "other";
+  };
+  const localBy: Record<BucketKey, CvIssue[]> = { keywords: [], bullets: [], formatting: [], language: [], other: [] };
+  issues.forEach(i => localBy[catOf(`${i.id} ${i.title} ${i.description}`)].push(i));
+  const deepIssues = (deepResult?.first_scan_issues ?? []).map((iss, i) => ({ iss, i, cat: catOf(`${iss.title} ${iss.why_it_matters} ${iss.fix}`) }));
+  const deepBy = (k: BucketKey) => deepIssues.filter(d => d.cat === k);
+  const scanFails = deepResult ? [...deepResult.scanability_check, ...deepResult.parse_check].filter(c => c.status !== "pass") : [];
+  const missingKw = deepResult?.job_language_match.missing_phrases ?? [];
+  const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
+  const weakFeedback = (deepResult?.bullet_feedback ?? []).filter(b => b.score < 7);
+
+  const renderLocalIssue = (issue: CvIssue) => (
+    <button
+      key={issue.id}
+      className={`w-full text-left rounded-lg border p-3 space-y-1 transition-colors hover:shadow-sm ${severityBorder(issue.severity)}`}
+      onClick={() => onNavigateToSection?.(issue.section)}
+    >
+      <div className="flex items-start gap-2">
+        {severityIcon(issue.severity)}
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold">{issue.title}</p>
+          <p className="text-[10px] text-muted-foreground leading-relaxed">{issue.description}</p>
+          <p className="text-[10px] font-medium text-primary mt-1 flex items-center gap-1">
+            <ArrowRight className="h-2.5 w-2.5" /> {issue.fix}
+          </p>
+        </div>
+      </div>
+    </button>
+  );
+
+  const renderDeepIssue = (issue: FirstScanIssue, i: number) => (
+    <div key={`d${i}`} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-2">
+      <p className="text-xs font-bold">{issue.title}</p>
+      <p className="text-[10px] text-muted-foreground leading-relaxed">{issue.why_it_matters}</p>
+      <p className="text-[10px] font-medium text-primary flex items-center gap-1">
+        <ArrowRight className="h-2.5 w-2.5" /> {issue.fix}
+      </p>
+      {canFix && (
+        autoFixPreview?.issueIdx === i ? (
+          <div className="space-y-2 mt-1 rounded-md border border-primary/30 bg-background p-2">
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-primary flex items-center gap-1">
+              <Sparkles className="h-2.5 w-2.5" />
+              {isSv ? "Förslag" : "Suggestion"} →{" "}
+              {autoFixPreview.target === "profile" ? (isSv ? "Profil" : "Profile")
+                : autoFixPreview.target === "skills" ? (isSv ? "Kompetenser" : "Skills")
+                : (cv.experience[autoFixPreview.targetIdx ?? 0]?.title || "Experience")}
+            </span>
+            <Textarea
+              value={autoFixPreview.text}
+              onChange={e => setAutoFixPreview(p => p ? { ...p, text: e.target.value } : p)}
+              rows={4}
+              className="text-[10px] leading-relaxed"
+            />
+            <p className="text-[9px] text-muted-foreground italic">{autoFixPreview.explanation}</p>
+            <div className="flex gap-1.5">
+              <Button size="sm" className="flex-1 h-9 text-[10px] gap-1" onClick={applyAutoFix}>
+                <CheckCircle2 className="h-3 w-3" />{isSv ? "Applicera" : "Apply"}
+              </Button>
+              <Button variant="ghost" size="sm" className="h-9 text-[10px]" onClick={() => setAutoFixPreview(null)}>
+                {isSv ? "Avbryt" : "Cancel"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-1.5 mt-1">
+            <Button variant="default" size="sm" className="flex-1 h-9 text-[10px] gap-1.5" disabled={autoFixingIdx !== null} onClick={() => runAutoFix(issue, i)}>
+              {autoFixingIdx === i ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+              {autoFixingIdx === i ? (isSv ? "Fixar..." : "Fixing...") : (isSv ? "Auto-fixa" : "Auto-fix")}
+            </Button>
+            <Button variant="outline" size="sm" className="h-9 text-[10px] gap-1" onClick={() => setFixingIssue(issue)}>
+              <Wrench className="h-3 w-3" />{isSv ? "Anpassa" : "Refine"}
+            </Button>
+          </div>
+        )
+      )}
+    </div>
+  );
+
+  const buckets: { key: BucketKey; title: string; count: number; body: React.ReactNode }[] = [
+    {
+      key: "keywords",
+      title: isSv ? "Nyckelord" : "Keywords",
+      count: missingKw.length + genericKw.length + localBy.keywords.length + deepBy("keywords").length,
+      body: (
+        <>
+          {missingKw.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Saknade nyckelord" : "Missing keywords"}</p>
+              <div className="flex flex-wrap gap-1">{missingKw.map(p => <Badge key={p} variant="destructive" className="text-[9px] h-5">{p}</Badge>)}</div>
+            </div>
+          )}
+          {genericKw.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Generiska fraser att byta ut" : "Generic phrases to replace"}</p>
+              <div className="flex flex-wrap gap-1">{genericKw.map(p => <Badge key={p} variant="outline" className="text-[9px] h-5">{p}</Badge>)}</div>
+            </div>
+          )}
+          {localBy.keywords.map(renderLocalIssue)}
+          {deepBy("keywords").map(d => renderDeepIssue(d.iss, d.i))}
+          {!deepResult && (
+            <p className="text-[10px] text-muted-foreground">{isSv ? "Klistra in jobbannonsen och kör analysen för nyckelordstäckning." : "Paste the job posting and run the analysis for keyword coverage."}</p>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "bullets",
+      title: isSv ? "Svaga punkter" : "Weak bullets",
+      count: weakBullets + weakFeedback.length + localBy.bullets.length + deepBy("bullets").length,
+      body: (
+        <>
+          {totalBullets > 0 && (
+            <div className="rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium flex items-center gap-1.5"><Target className="h-3.5 w-3.5" />{isSv ? "Punktkvalitet" : "Bullet quality"}</span>
+                <span className="text-[10px] text-muted-foreground">{totalBullets} totalt</span>
+              </div>
+              <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
+                {goodBullets > 0 && <div className="bg-green-500" style={{ width: `${(goodBullets / totalBullets) * 100}%` }} />}
+                {(totalBullets - goodBullets - weakBullets) > 0 && <div className="bg-yellow-400" style={{ width: `${((totalBullets - goodBullets - weakBullets) / totalBullets) * 100}%` }} />}
+                {weakBullets > 0 && <div className="bg-destructive" style={{ width: `${(weakBullets / totalBullets) * 100}%` }} />}
+              </div>
+              <div className="flex justify-between mt-1.5">
+                <span className="text-[9px] text-green-600">● {goodBullets} {isSv ? "starka" : "strong"}</span>
+                <span className="text-[9px] text-yellow-600">● {totalBullets - goodBullets - weakBullets} {isSv ? "okej" : "okay"}</span>
+                <span className="text-[9px] text-destructive">● {weakBullets} {isSv ? "svaga" : "weak"}</span>
+              </div>
+            </div>
+          )}
+          {localBy.bullets.map(renderLocalIssue)}
+          {deepBy("bullets").map(d => renderDeepIssue(d.iss, d.i))}
+          {weakFeedback.map((b, i) => (
+            <div key={`bf${i}`} className="text-[10px] p-2 rounded border border-border">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Badge variant={b.score < 4 ? "destructive" : "outline"} className="text-[8px] h-3.5">{b.score}/10</Badge>
+                <span className="text-muted-foreground truncate">{b.bullet_id}</span>
+              </div>
+              <p className="text-muted-foreground">{b.recruiter_comment}</p>
+              {b.suggestions.length > 0 && b.suggestions[0].rewrite && onApplyBullet && (
+                <Button variant="ghost" size="sm" className="h-6 text-[9px] mt-1 text-primary" onClick={() => onApplyBullet(b.bullet_id, b.suggestions[0].rewrite)}>
+                  {isSv ? "Applicera förslag" : "Apply suggestion"}
+                </Button>
+              )}
+            </div>
+          ))}
+        </>
+      ),
+    },
+    {
+      key: "formatting",
+      title: isSv ? "Formatering & struktur" : "Formatting & structure",
+      count: scanFails.length + localBy.formatting.length + deepBy("formatting").length,
+      body: (
+        <>
+          {scanFails.map((c, i) => (
+            <div key={`sf${i}`} className={`rounded-lg border p-3 ${severityBorder(c.status === "fail" ? "error" : "warning")}`}>
+              <p className="text-xs font-semibold">{c.dimension.replace(/_/g, " ")}</p>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">{c.why_it_matters}</p>
+              <p className="text-[10px] font-medium text-primary mt-1">→ {c.recommendation}</p>
+            </div>
+          ))}
+          {localBy.formatting.map(renderLocalIssue)}
+          {deepBy("formatting").map(d => renderDeepIssue(d.iss, d.i))}
+        </>
+      ),
+    },
+    {
+      key: "language",
+      title: isSv ? "Språk & stavning" : "Language & spelling",
+      count: mismatchSections.length + localBy.language.length + deepBy("language").length,
+      body: (
+        <>
+          {mismatchSections.length > 0 && (
+            <div className={`rounded-lg border p-3 ${severityBorder("warning")}`}>
+              <div className="flex items-center gap-2 mb-1">
+                <Languages className="h-3.5 w-3.5 text-warning" />
+                <span className="text-xs font-semibold">{isSv ? "Blandade språk" : "Mixed languages"}</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                {isSv
+                  ? `${mismatchSections.length} sektion(er) verkar vara på fel språk: ${mismatchSections.map(s => s.section).join(", ")}`
+                  : `${mismatchSections.length} section(s) appear to be in the wrong language: ${mismatchSections.map(s => s.section).join(", ")}`}
+              </p>
+              <p className="text-[10px] font-medium text-primary mt-1">→ {isSv ? "Använd 'Konvertera alla' i verktygsfältet" : "Use 'Convert all' in the toolbar"}</p>
+            </div>
+          )}
+          {localBy.language.map(renderLocalIssue)}
+          {deepBy("language").map(d => renderDeepIssue(d.iss, d.i))}
+        </>
+      ),
+    },
+    {
+      key: "other",
+      title: isSv ? "Övrigt" : "Other",
+      count: localBy.other.length + deepBy("other").length,
+      body: (
+        <>
+          {localBy.other.map(renderLocalIssue)}
+          {deepBy("other").map(d => renderDeepIssue(d.iss, d.i))}
+        </>
+      ),
+    },
+  ];
+
   return (
     <div className="p-4 space-y-4">
       {/* ── Health overview ── */}
@@ -301,72 +514,34 @@ export function InsightsPanel({
         </div>
       </div>
 
-      {/* ── Actionable issues list ── */}
-      {issues.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {isSv ? "Vad du bör åtgärda" : "What to fix"}
-          </p>
-          {issues.map(issue => (
-            <button
-              key={issue.id}
-              className={`w-full text-left rounded-lg border p-3 space-y-1 transition-colors hover:shadow-sm ${severityBorder(issue.severity)}`}
-              onClick={() => onNavigateToSection?.(issue.section)}
-            >
-              <div className="flex items-start gap-2">
-                {severityIcon(issue.severity)}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold">{issue.title}</p>
-                  <p className="text-[10px] text-muted-foreground leading-relaxed">{issue.description}</p>
-                  <p className="text-[10px] font-medium text-primary mt-1 flex items-center gap-1">
-                    <ArrowRight className="h-2.5 w-2.5" /> {issue.fix}
-                  </p>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ── Bullet quality summary ── */}
-      {totalBullets > 0 && (
-        <Card><CardContent className="p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium flex items-center gap-1.5">
-              <Target className="h-3.5 w-3.5" /> {isSv ? "Punktkvalitet" : "Bullet quality"}
-            </span>
-            <span className="text-[10px] text-muted-foreground">{totalBullets} totalt</span>
-          </div>
-          <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
-            {goodBullets > 0 && <div className="bg-green-500 transition-all" style={{ width: `${(goodBullets / totalBullets) * 100}%` }} />}
-            {(totalBullets - goodBullets - weakBullets) > 0 && <div className="bg-yellow-400 transition-all" style={{ width: `${((totalBullets - goodBullets - weakBullets) / totalBullets) * 100}%` }} />}
-            {weakBullets > 0 && <div className="bg-destructive transition-all" style={{ width: `${(weakBullets / totalBullets) * 100}%` }} />}
-          </div>
-          <div className="flex justify-between mt-1.5">
-            <span className="text-[9px] text-green-600">● {goodBullets} {isSv ? "starka" : "strong"}</span>
-            <span className="text-[9px] text-yellow-600">● {totalBullets - goodBullets - weakBullets} {isSv ? "okej" : "okay"}</span>
-            <span className="text-[9px] text-destructive">● {weakBullets} {isSv ? "svaga" : "weak"}</span>
-          </div>
-        </CardContent></Card>
-      )}
-
-      {/* ── Language mismatch ── */}
-      {mismatchSections.length > 0 && (
-        <Card className={`${severityBorder("warning")}`}><CardContent className="p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Languages className="h-3.5 w-3.5 text-warning" />
-            <span className="text-xs font-semibold">{isSv ? "Blandade språk" : "Mixed languages"}</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground leading-relaxed">
-            {isSv
-              ? `${mismatchSections.length} sektion(er) verkar vara på fel språk: ${mismatchSections.map(s => s.section).join(", ")}`
-              : `${mismatchSections.length} section(s) appear to be in the wrong language: ${mismatchSections.map(s => s.section).join(", ")}`}
-          </p>
-          <p className="text-[10px] font-medium text-primary mt-1">
-            → {isSv ? "Använd 'Konvertera alla' i verktygsfältet" : "Use 'Convert all' in the toolbar"}
-          </p>
-        </CardContent></Card>
-      )}
+      {/* ── What to fix: ATS buckets ── */}
+      <div className="space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {isSv ? "Vad du bör åtgärda" : "What to fix"}
+        </p>
+        {buckets.map(b => (
+          <Collapsible key={b.key} open={openBuckets.has(b.key)} onOpenChange={() => toggleBucket(b.key)}>
+            <CollapsibleTrigger asChild>
+              <button className="flex h-11 w-full items-center justify-between rounded-lg border border-border px-3 text-left transition-colors hover:bg-accent/50">
+                <span className="flex items-center gap-2 text-xs font-semibold">
+                  {openBuckets.has(b.key) ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                  {b.title}
+                </span>
+                {b.count > 0 ? (
+                  <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold text-warning">{b.count}</span>
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                )}
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-2 pt-2">
+              {b.count > 0 || b.key === "keywords" ? b.body : (
+                <p className="px-1 text-[10px] text-muted-foreground">{isSv ? "Inga problem hittade." : "No issues found."}</p>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        ))}
+      </div>
 
       {/* ── Job posting context ── */}
       <Collapsible open={showJob} onOpenChange={setShowJob}>
@@ -436,125 +611,6 @@ export function InsightsPanel({
             ))}
           </div>
 
-          {/* Top issues — NOW WITH FIX BUTTONS */}
-          {deepResult.first_scan_issues.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <AlertTriangle className="h-3 w-3 text-warning" />
-                {isSv ? "Vad en rekryterare märker" : "Top issues a recruiter would notice"}
-              </p>
-              {deepResult.first_scan_issues.map((issue, i) => (
-                <div key={i} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-2">
-                  <p className="text-xs font-bold">{issue.title}</p>
-                  <p className="text-[10px] text-muted-foreground leading-relaxed">{issue.why_it_matters}</p>
-                  <p className="text-[10px] font-medium text-primary flex items-center gap-1">
-                    <ArrowRight className="h-2.5 w-2.5" /> {issue.fix}
-                  </p>
-                  {canFix && (
-                    <>
-                      {autoFixPreview?.issueIdx === i ? (
-                        <div className="space-y-2 mt-1 rounded-md border border-primary/30 bg-background p-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-semibold uppercase tracking-wider text-primary flex items-center gap-1">
-                              <Sparkles className="h-2.5 w-2.5" />
-                              {isSv ? "Förslag" : "Suggestion"} →{" "}
-                              {autoFixPreview.target === "profile" ? (isSv ? "Profil" : "Profile")
-                                : autoFixPreview.target === "skills" ? (isSv ? "Kompetenser" : "Skills")
-                                : (cv.experience[autoFixPreview.targetIdx ?? 0]?.title || "Experience")}
-                            </span>
-                          </div>
-                          <Textarea
-                            value={autoFixPreview.text}
-                            onChange={e => setAutoFixPreview(p => p ? { ...p, text: e.target.value } : p)}
-                            rows={4}
-                            className="text-[10px] leading-relaxed"
-                          />
-                          <p className="text-[9px] text-muted-foreground italic">{autoFixPreview.explanation}</p>
-                          <div className="flex gap-1.5">
-                            <Button size="sm" className="flex-1 h-9 text-[10px] gap-1" onClick={applyAutoFix}>
-                              <CheckCircle2 className="h-3 w-3" />
-                              {isSv ? "Applicera" : "Apply"}
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-9 text-[10px]" onClick={() => setAutoFixPreview(null)}>
-                              {isSv ? "Avbryt" : "Cancel"}
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex gap-1.5 mt-1">
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="flex-1 h-9 text-[10px] gap-1.5"
-                            disabled={autoFixingIdx !== null}
-                            onClick={() => runAutoFix(issue, i)}
-                          >
-                            {autoFixingIdx === i
-                              ? <Loader2 className="h-3 w-3 animate-spin" />
-                              : <Zap className="h-3 w-3" />}
-                            {autoFixingIdx === i
-                              ? (isSv ? "Fixar..." : "Fixing...")
-                              : (isSv ? "Auto-fixa" : "Auto-fix")}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-9 text-[10px] gap-1"
-                            onClick={() => setFixingIssue(issue)}
-                          >
-                            <Wrench className="h-3 w-3" />
-                            {isSv ? "Anpassa" : "Refine"}
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Missing keywords */}
-          {deepResult.job_language_match.missing_phrases.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {isSv ? "Saknade nyckelord" : "Missing keywords"}
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {deepResult.job_language_match.missing_phrases.map(p => (
-                  <Badge key={p} variant="destructive" className="text-[9px] h-5">{p}</Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Bullet feedback */}
-          {deepResult.bullet_feedback.length > 0 && (
-            <Collapsible open={bulletsOpen} onOpenChange={setBulletsOpen}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="w-full justify-between h-9 text-[10px]">
-                  <span>{isSv ? "Punktfeedback" : "Bullet feedback"} ({deepResult.bullet_feedback.length})</span>
-                  {bulletsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-1.5 mt-1">
-                {deepResult.bullet_feedback.map((b, i) => (
-                  <div key={i} className="text-[10px] p-2 rounded border border-border">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <Badge variant={b.score < 4 ? "destructive" : b.score < 7 ? "outline" : "secondary"} className="text-[8px] h-3.5">{b.score}/10</Badge>
-                      <span className="text-muted-foreground truncate">{b.bullet_id}</span>
-                    </div>
-                    <p className="text-muted-foreground">{b.recruiter_comment}</p>
-                    {b.suggestions.length > 0 && b.suggestions[0].rewrite && onApplyBullet && (
-                      <Button variant="ghost" size="sm" className="h-5 text-[9px] mt-1 text-primary" onClick={() => onApplyBullet(b.bullet_id, b.suggestions[0].rewrite)}>
-                        {isSv ? "Applicera förslag" : "Apply suggestion"}
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
         </div>
       )}
     </div>
