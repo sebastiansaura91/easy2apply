@@ -157,11 +157,17 @@ serve(async (req) => {
         }
       }
     }
-    // contact_info: placement is guaranteed; only flag it when contact data is actually missing.
+    // contact_info: placement is guaranteed; only flag it when contact data is actually
+    // missing. Applies to BOTH scanability and parse checks (dimension wording varies).
     const hasContact = !!(resume_content_json?.contact?.email && resume_content_json?.contact?.phone);
-    if (hasContact && Array.isArray(result?.scanability_check)) {
-      for (const c of result.scanability_check) {
-        if (String(c?.dimension || "") === "contact_info" && c?.status && c.status !== "pass") c.status = "pass";
+    if (hasContact) {
+      for (const arr of [result?.scanability_check, result?.parse_check]) {
+        if (!Array.isArray(arr)) continue;
+        for (const c of arr) {
+          if (/contact|kontakt/.test(String(c?.dimension || "").toLowerCase()) && c?.status && c.status !== "pass") {
+            c.status = "pass";
+          }
+        }
       }
     }
 
@@ -228,7 +234,23 @@ serve(async (req) => {
       return false;
     };
     if (Array.isArray(result?.job_language_match?.missing_phrases)) {
-      result.job_language_match.missing_phrases = result.job_language_match.missing_phrases.filter((p: string) => !isPresent(p));
+      // Junk filters: soft traits aren't keywords, verb-led requirement sentences aren't
+      // keywords, and real ATS keywords are short (≤4 words).
+      const SOFT_TRAITS = new Set([
+        "resultat", "results", "analytisk", "affärsmässig", "affärsmässig och analytisk",
+        "analytical", "business minded", "engagemang", "kommunikativ", "driven", "prestigelös",
+        "self starter", "team player", "lagspelare", "högt tempo", "eget driv",
+      ]);
+      const verbLed = /^(driva|leda|skapa|utveckla|bygga|säkerställa|arbeta|vara|drive|lead|create|develop|build|ensure|work)\b/;
+      result.job_language_match.missing_phrases = result.job_language_match.missing_phrases
+        .filter((p: string) => !isPresent(p))
+        .filter((p: string) => {
+          const n = normalize(p);
+          if (!n || SOFT_TRAITS.has(n)) return false;
+          if (verbLed.test(n)) return false;
+          if (n.split(" ").length > 4) return false;
+          return true;
+        });
     }
 
     return new Response(JSON.stringify(result), {
