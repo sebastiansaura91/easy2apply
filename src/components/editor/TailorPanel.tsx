@@ -5,6 +5,7 @@ import { RoleFitPanel } from "@/components/role/RoleFitPanel";
 import { RoleAdvicePanel } from "@/components/role/RoleAdvicePanel";
 import { CVContent } from "@/types/cv";
 import { AtsCheckResult } from "@/types/ats-check";
+import { RoleFitResult } from "@/types/role-fit";
 
 interface Props {
   open: boolean;
@@ -21,6 +22,7 @@ interface Props {
   onUpdateSkills: (skills: string[]) => void;
   onPersistScore?: (score: number, grade: string, subscores?: AtsCheckResult["subscores"]) => void;
   onPersistResult?: (hash: string, result: AtsCheckResult) => void;
+  onPersistRoleFit?: (hash: string, result: RoleFitResult) => void;
 }
 
 /**
@@ -31,7 +33,7 @@ interface Props {
  */
 export function TailorPanel({
   open, onOpenChange, cv, cvLanguage, t, seededJob, seededResult,
-  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult,
+  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit,
 }: Props) {
   const isSv = cvLanguage === "sv";
   const hasRole = !!(cv.__meta?.targetRole || cv.__meta?.targetRoleLabel);
@@ -62,6 +64,7 @@ export function TailorPanel({
                 onUpdateExperienceBullets={onUpdateExperienceBullets}
                 onUpdateSkills={onUpdateSkills}
                 onNavigateToSection={onNavigateToSection}
+                onPersistRoleFit={onPersistRoleFit}
               />
             ) : (
               <p className="p-4 text-sm text-muted-foreground">

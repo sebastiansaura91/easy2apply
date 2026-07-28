@@ -11,6 +11,7 @@ import { CVContent } from "@/types/cv";
 import { RoleFitResult, EmphasisAction } from "@/types/role-fit";
 import { FirstScanIssue } from "@/types/ats-check";
 import { getRoleAdvice, roleLabel } from "@/lib/role-advice";
+import { cvScanSignature } from "@/lib/cv-signature";
 import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 
 interface Props {
@@ -25,6 +26,8 @@ interface Props {
   onUpdateExperienceBullets?: (expIdx: number, bullets: string[]) => void;
   onUpdateSkills?: (skills: string[]) => void;
   onNavigateToSection?: (sectionType: string) => void;
+  /** Persist the analysis + input hash on the CV so unchanged input reuses the stored result. */
+  onPersistRoleFit?: (hash: string, result: RoleFitResult) => void;
 }
 
 const actionMeta: Record<EmphasisAction, { icon: JSX.Element; cls: string }> = {
@@ -37,15 +40,23 @@ const actionMeta: Record<EmphasisAction, { icon: JSX.Element; cls: string }> = {
  * Runs the role-fit analysis for the CV's target role (optionally sharpened by a pasted
  * job posting) and renders suggestion-only output. The user applies each reframe manually.
  */
-export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onNavigateToSection }: Props) {
+export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onNavigateToSection, onPersistRoleFit }: Props) {
   const didAuto = useRef(false);
   const isSv = cvLanguage === "sv";
   const { toast } = useToast();
   const flow = useFlow();
   // Prefill the posting if one was pasted when the application was created ("Rikta CV").
-  const [jobText, setJobText] = useState(flow.jobPostingText || cv.__meta?.jobPostingText || "");
+  const initialJob = flow.jobPostingText || cv.__meta?.jobPostingText || "";
+  const [jobText, setJobText] = useState(initialJob);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<RoleFitResult | null>(null);
+  // Restore the stored analysis when the input hasn't changed — same stability contract
+  // as the ATS scan: the model re-samples, our cache doesn't.
+  const fitSig = (job: string) =>
+    cvScanSignature(cv, job) + "|role:" + (cv.__meta?.targetRole || cv.__meta?.targetRoleLabel || "");
+  const storedFit = cv.__meta?.lastRoleFit;
+  const [result, setResult] = useState<RoleFitResult | null>(
+    storedFit && storedFit.hash === fitSig(initialJob) ? (storedFit.result as RoleFitResult) : null
+  );
   const [jobAnalysis, setJobAnalysis] = useState<any | null>(null);
   const [applied, setApplied] = useState<Set<number>>(new Set());
   // A gap the user wants to interrogate ("do I actually have this?") — reuses FixIssueWizard.
@@ -55,7 +66,16 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
   const roleId = cv.__meta?.targetRole;
   const label = roleLabel(roleId, cv.__meta?.targetRoleLabel, cvLanguage);
 
-  const run = async () => {
+  const run = async (opts?: { silent?: boolean }) => {
+    // Unchanged input → reuse the stored analysis instead of re-sampling the model.
+    const sig = fitSig(jobText);
+    if (cv.__meta?.lastRoleFit?.hash === sig && result) {
+      if (!opts?.silent) toast({
+        title: isSv ? "Inget har ändrats" : "Nothing changed",
+        description: isSv ? "Samma underlag ger samma rollfit — visar den sparade analysen." : "Same input gives the same role fit — showing the stored analysis.",
+      });
+      return;
+    }
     setLoading(true);
     setResult(null);
     setJobAnalysis(null);
@@ -98,6 +118,7 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       setResult(data as RoleFitResult);
+      onPersistRoleFit?.(sig, data as RoleFitResult);
     } catch (err: any) {
       toast({ title: isSv ? "Analysen misslyckades" : "Analysis failed", description: err.message, variant: "destructive" });
     } finally {
@@ -109,7 +130,7 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
   useEffect(() => {
     if (autoRun && !didAuto.current && !result && !loading) {
       didAuto.current = true;
-      run();
+      run({ silent: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRun]);

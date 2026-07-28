@@ -84,6 +84,8 @@ export interface CVMeta {
    * stored result instead of re-sampling — stability by construction.
    */
   lastAtsResult?: { hash: string; at: string; result: unknown };
+  /** Same stability contract for the role-fit analysis. */
+  lastRoleFit?: { hash: string; at: string; result: unknown };
   createdFrom?: string;
   /**
    * Your one true "base profile" — the canonical set of real facts. Role templates are

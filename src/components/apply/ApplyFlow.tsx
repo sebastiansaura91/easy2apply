@@ -14,6 +14,7 @@ import { useFlow } from "@/contexts/FlowContext";
 import { RolePicker, CUSTOM_ROLE } from "@/components/role/RolePicker";
 import { roleLabel, getRoleAdvice } from "@/lib/role-advice";
 import { getResumeMeta } from "@/lib/resume-grouping";
+import { cvScanSignature } from "@/lib/cv-signature";
 import { CVMeta } from "@/types/cv";
 import { AtsCheckResult } from "@/types/ats-check";
 
@@ -140,6 +141,10 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
           jobPostingText: jobText.trim() || undefined,
           lastAtsScore: report?.kind === "job"
             ? { score: Math.round(report.ats.overall_score), grade: report.ats.grade, at: new Date().toISOString(), subscores: report.ats.subscores }
+            : undefined,
+          // Cache hash too, so the editor reuses this exact analysis instead of re-scanning.
+          lastAtsResult: report?.kind === "job"
+            ? { hash: cvScanSignature(cv, jobText.trim()), at: new Date().toISOString(), result: report.ats }
             : undefined,
         },
       };

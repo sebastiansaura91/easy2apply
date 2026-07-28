@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { runAtsCheck } from "@/components/cv-editor/AtsCheck";
 import { detectCvLanguages } from "@/lib/language-detection";
 import { findCvIssues, analyzeAllBullets, CvIssue } from "@/lib/cv-quality";
+import { cvScanSignature } from "@/lib/cv-signature";
 import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 import {
   CheckCircle2, AlertTriangle, AlertOctagon, Loader2, ChevronDown, ChevronRight,
@@ -115,10 +116,7 @@ export function InsightsPanel({
 
   // Stale detection — has the CV changed since last analysis? __meta is excluded so
   // persisting the analysis itself never marks the result stale.
-  const cvSignature = useMemo(
-    () => JSON.stringify({ ...cv, __meta: undefined }) + "|" + jobText.trim(),
-    [cv, jobText]
-  );
+  const cvSignature = useMemo(() => cvScanSignature(cv, jobText), [cv, jobText]);
   const isStale = !!deepResult && analyzedSnapshot !== null && analyzedSnapshot !== cvSignature;
 
   const runDeep = async (opts?: { silent?: boolean }) => {
