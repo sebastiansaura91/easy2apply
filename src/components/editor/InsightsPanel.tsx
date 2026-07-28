@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CVContent } from "@/types/cv";
 import { AtsCheckResult, FirstScanIssue } from "@/types/ats-check";
 import { supabase } from "@/integrations/supabase/client";
@@ -222,25 +222,6 @@ export function InsightsPanel({
     setAutoFixPreview(null);
   };
 
-  // ── Fix issue wizard overlay ──
-  if (fixingIssue && canFix) {
-    return (
-      <div className="p-4">
-        <FixIssueWizard
-          issue={fixingIssue}
-          cv={cv}
-          cvLanguage={cvLanguage}
-          jobPostingText={jobText || jobPostingText}
-          onApplyToProfile={onUpdateProfile}
-          onApplyToExperience={onUpdateExperienceBullets}
-          onApplyToSkills={onUpdateSkills}
-          onClose={() => setFixingIssue(null)}
-          onNavigateToSection={onNavigateToSection}
-        />
-      </div>
-    );
-  }
-
   // ── ATS buckets: group every finding by the kind of fix it needs ──
   type BucketKey = "keywords" | "bullets" | "formatting" | "language" | "other";
   const catOf = (txt: string): BucketKey => {
@@ -259,6 +240,45 @@ export function InsightsPanel({
   const missingKw = deepResult?.job_language_match.missing_phrases ?? [];
   const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
   const weakFeedback = (deepResult?.bullet_feedback ?? []).filter(b => b.score < 7);
+
+  const bucketCounts: Record<BucketKey, number> = {
+    keywords: missingKw.length + genericKw.length + localBy.keywords.length + deepBy("keywords").length,
+    bullets: weakBullets + weakFeedback.length + localBy.bullets.length + deepBy("bullets").length,
+    formatting: scanFails.length + localBy.formatting.length + deepBy("formatting").length,
+    language: mismatchSections.length + localBy.language.length + deepBy("language").length,
+    other: localBy.other.length + deepBy("other").length,
+  };
+
+  // Auto-expand any bucket that has findings (the user can still collapse it manually;
+  // it only re-opens when its count changes).
+  const countsKey = (Object.keys(bucketCounts) as BucketKey[]).map(k => `${k}:${bucketCounts[k]}`).join("|");
+  useEffect(() => {
+    setOpenBuckets(prev => {
+      const n = new Set(prev);
+      (Object.keys(bucketCounts) as BucketKey[]).forEach(k => { if (bucketCounts[k] > 0) n.add(k); });
+      return n;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countsKey]);
+
+  // ── Fix issue wizard overlay ──
+  if (fixingIssue && canFix) {
+    return (
+      <div className="p-4">
+        <FixIssueWizard
+          issue={fixingIssue}
+          cv={cv}
+          cvLanguage={cvLanguage}
+          jobPostingText={jobText || jobPostingText}
+          onApplyToProfile={onUpdateProfile}
+          onApplyToExperience={onUpdateExperienceBullets}
+          onApplyToSkills={onUpdateSkills}
+          onClose={() => setFixingIssue(null)}
+          onNavigateToSection={onNavigateToSection}
+        />
+      </div>
+    );
+  }
 
   const renderLocalIssue = (issue: CvIssue) => (
     <button

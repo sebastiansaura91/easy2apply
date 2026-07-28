@@ -128,6 +128,43 @@ serve(async (req) => {
       });
     }
 
+    // Renderer-guaranteed format dimensions can never fail: the export engine enforces
+    // single-column plain-text layout, so scan/parse checks about it are forced to pass.
+    const guaranteedDim = /single_column|plain_text|clean_vs_cluttered|column|layout|font|table|image|header|footer/;
+    for (const arr of [result?.scanability_check, result?.parse_check]) {
+      if (!Array.isArray(arr)) continue;
+      for (const c of arr) {
+        if (guaranteedDim.test(String(c?.dimension || "").toLowerCase()) && c?.status && c.status !== "pass") {
+          c.status = "pass";
+        }
+      }
+    }
+    // contact_info: placement is guaranteed; only flag it when contact data is actually missing.
+    const hasContact = !!(resume_content_json?.contact?.email && resume_content_json?.contact?.phone);
+    if (hasContact && Array.isArray(result?.scanability_check)) {
+      for (const c of result.scanability_check) {
+        if (String(c?.dimension || "") === "contact_info" && c?.status && c.status !== "pass") c.status = "pass";
+      }
+    }
+
+    // A language listed on the CV can never be a "missing language" issue.
+    const cvLangs = (resume_content_json?.languages || [])
+      .map((l: any) => String(l?.language || "").toLowerCase().trim()).filter(Boolean);
+    const LANG_MAP: string[][] = [
+      ["svenska", "swedish"], ["engelska", "english"], ["norska", "norwegian"], ["danska", "danish"],
+      ["finska", "finnish"], ["tyska", "german"], ["franska", "french"], ["spanska", "spanish"],
+      ["italienska", "italian"], ["kinesiska", "chinese", "mandarin"], ["japanska", "japanese"], ["ryska", "russian"],
+    ];
+    const langAliases = new Set<string>(cvLangs);
+    for (const group of LANG_MAP) if (group.some(g => cvLangs.includes(g))) group.forEach(g => langAliases.add(g));
+    if (langAliases.size && Array.isArray(result?.first_scan_issues)) {
+      const langCtx = /language|språk|proficien|fluen|flytande|modersmål|native|cefr/;
+      result.first_scan_issues = result.first_scan_issues.filter((iss: any) => {
+        const hay = `${iss?.title || ""} ${iss?.why_it_matters || ""} ${iss?.fix || ""}`.toLowerCase();
+        return !(langCtx.test(hay) && [...langAliases].some(a => hay.includes(a)));
+      });
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -89,6 +89,10 @@ Return everything via the role_fit_result tool.`;
     }
     userPrompt += `## CANDIDATE PROFILE\nProfile summary:\n${resume_content_json.profile || "(none)"}\n\n`;
     userPrompt += `Skills: ${(resume_content_json.skills || []).join(", ") || "(none)"}\n\n`;
+    const cvLanguages = (resume_content_json.languages || [])
+      .map((l: any) => `${l.language}${l.level ? ` (${l.level})` : ""}`).filter(Boolean);
+    userPrompt += `Languages on the CV: ${cvLanguages.length ? cvLanguages.join(", ") : "(none listed)"}\n`;
+    userPrompt += `RULE: if the posting requires a language that appears in this list, it is COVERED — never raise it as a gap or missing requirement.\n\n`;
     userPrompt += `Education (weigh lightly for senior roles — only relevant when it clearly maps to the role): ${education.length ? JSON.stringify(education) : "(none)"}\n\n`;
     userPrompt += `Experience (with ids and bullets) — this is the primary basis for the fit:\n\`\`\`json\n${JSON.stringify(experiences, null, 2)}\n\`\`\`\n\n`;
     userPrompt += `Analyse the fit and return the result via the tool. Remember: suggestions only, never fabricate. Output all text in ${langName}.`;
@@ -194,6 +198,33 @@ Return everything via the role_fit_result tool.`;
     const result = typeof toolCall.function.arguments === "string"
       ? JSON.parse(toolCall.function.arguments)
       : toolCall.function.arguments;
+
+    // Deterministic guard: a language listed on the CV can never be a gap. The model
+    // occasionally misses the languages section — drop any language-proficiency gap
+    // whose language the CV explicitly lists.
+    const LANG_ALIASES: Record<string, string[]> = {
+      svenska: ["svenska", "swedish"], engelska: ["engelska", "english"], norska: ["norska", "norwegian"],
+      danska: ["danska", "danish"], finska: ["finska", "finnish"], tyska: ["tyska", "german"],
+      franska: ["franska", "french"], spanska: ["spanska", "spanish"], italienska: ["italienska", "italian"],
+      portugisiska: ["portugisiska", "portuguese"], nederländska: ["nederländska", "dutch"], polska: ["polska", "polish"],
+      arabiska: ["arabiska", "arabic"], kinesiska: ["kinesiska", "chinese", "mandarin"], japanska: ["japanska", "japanese"], ryska: ["ryska", "russian"],
+    };
+    const cvLangAliases = new Set<string>();
+    for (const l of resume_content_json.languages || []) {
+      const name = String(l?.language || "").toLowerCase().trim();
+      if (!name) continue;
+      cvLangAliases.add(name);
+      for (const aliases of Object.values(LANG_ALIASES)) {
+        if (aliases.includes(name)) aliases.forEach(a => cvLangAliases.add(a));
+      }
+    }
+    if (cvLangAliases.size && Array.isArray(result?.gaps)) {
+      const langCtx = /language|språk|proficien|fluen|flytande|modersmål|native|cefr/;
+      result.gaps = result.gaps.filter((g: any) => {
+        const hay = `${g?.requirement || ""} ${g?.why || ""} ${g?.suggestion || ""}`.toLowerCase();
+        return !(langCtx.test(hay) && [...cvLangAliases].some(a => hay.includes(a)));
+      });
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
