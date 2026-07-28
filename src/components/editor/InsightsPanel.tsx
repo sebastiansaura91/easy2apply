@@ -241,18 +241,25 @@ export function InsightsPanel({
   const applyAutoFix = () => {
     if (!autoFixPreview) return;
     const { target, targetIdx, text } = autoFixPreview;
+    // The CV is plain text — strip any markdown/bullet characters the AI might emit
+    // so they never end up printed literally in the PDF.
+    const clean = (s: string) => s.replace(/\*\*|__|`|^#+\s*/g, "").replace(/^[•*\-–]\s*/, "").trim();
     if (target === "profile") {
-      onUpdateProfile?.(text);
+      onUpdateProfile?.(clean(text));
       onNavigateToSection?.("profile");
     } else if (target === "experience" && targetIdx !== undefined) {
-      const newBullets = text.split("\n").map(b => b.replace(/^[•\-–]\s*/, "").trim()).filter(b => b.length > 0);
+      const newBullets = text.split("\n").map(clean).filter(b => b.length > 0);
       const existing = cv.experience[targetIdx]?.bullets || [];
       const merged = [...existing, ...newBullets.filter(nb => !existing.includes(nb))];
       onUpdateExperienceBullets?.(targetIdx, merged);
       onNavigateToSection?.("experience");
     } else if (target === "skills") {
-      const newSkills = text.split(/[,\n]/).map(s => s.trim()).filter(s => s.length > 0);
-      onUpdateSkills?.(newSkills);
+      // Grouped lines ("Category: a, b, c") stay as ONE entry — the research-backed
+      // grouped-skills pattern; plain lines are split on commas as before.
+      const newSkills = text.split("\n").map(clean).filter(Boolean).flatMap(line =>
+        line.includes(":") ? [line] : line.split(",").map(s => s.trim()).filter(Boolean)
+      );
+      if (newSkills.length > 0) onUpdateSkills?.(newSkills);
       onNavigateToSection?.("skills");
     }
     toast({ title: isSv ? "✅ Fix applicerad" : "✅ Fix applied" });

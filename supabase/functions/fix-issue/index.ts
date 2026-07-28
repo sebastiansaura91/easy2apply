@@ -37,13 +37,14 @@ serve(async (req) => {
 
 RULES:
 - Generate text that is ready to paste into the CV
+- PLAIN TEXT ONLY. The CV renderer prints content literally: NEVER use markdown (** * # _ backticks), bullet characters or emojis — they would appear verbatim in the PDF and break ATS parsing.
 - Follow decision-first / outcome-first structure: Result → Method → Scope → Metric
 - NEVER invent facts. Use [FYLL I] placeholders for any specific numbers, company names, or details you don't know
 - Match the CV's existing tone and language (${isSv ? "Swedish" : "English"})
 - Be concise and professional
 - For profile text: 3-4 sentences max
 - For bullets: outcome-first structure, max 2 lines each
-- For skills: comma-separated list of additions
+- For skills: either a comma-separated list of skills, or 3–6 grouped lines in the exact plain format "Category: skill, skill, skill" (one group per line, no formatting characters)
 
 OUTPUT FORMAT (JSON):
 {

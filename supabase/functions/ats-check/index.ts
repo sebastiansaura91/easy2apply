@@ -36,7 +36,8 @@ serve(async (req) => {
     userPrompt += `- Name + contact details are rendered as plain body text at the very top of page 1 (NOT in a document header/footer). Do not raise "contact info placement" issues.\n`;
     userPrompt += `- Standard fonts, selectable vector text, no embedded objects; the PDF is fully machine-readable.\n`;
     userPrompt += `- Dates are printed in a consistent "mon YYYY – mon YYYY" format; role titles never split across pages.\n`;
-    userPrompt += `- Therefore: only flag CONTENT issues (wording, keywords, metrics, ordering of sections, gaps, inconsistent data) — never layout/file-format speculation.\n\n`;
+    userPrompt += `- Skills render as a scannable bulleted grid with engine-controlled whitespace. Never flag skills density, hierarchy or whitespace. The ONLY skills advice allowed is CONTENT-level: if there are more than ~10 skills, you may suggest grouping them into labeled categories (e.g. "Commercial: pricing, GTM").\n`;
+    userPrompt += `- Therefore: only flag CONTENT issues (wording, keywords, metrics, ordering of sections, gaps, inconsistent data) — never layout/whitespace/file-format speculation.\n\n`;
     userPrompt += `## CV DATA (JSON)\n\`\`\`json\n${JSON.stringify(resume_content_json, null, 2)}\n\`\`\`\n\n`;
     userPrompt += `## RENDERED PLAIN TEXT (what ATS sees)\n\`\`\`\n${renderedText}\n\`\`\`\n\n`;
     userPrompt += `## BULLETS WITH IDS\n\`\`\`json\n${JSON.stringify(bulletList, null, 2)}\n\`\`\`\n\n`;
@@ -302,7 +303,13 @@ function buildRenderedText(cv: any, lang: "sv" | "en" = "sv"): string {
         }
         break;
       case "skills":
-        if (cv.skills?.length) lines.push(H.skills, cv.skills.join(", "), "");
+        // Mirrors the actual rendering: a bulleted list (3-column grid visually,
+        // linear in the text stream).
+        if (cv.skills?.length) {
+          lines.push(H.skills);
+          for (const s of cv.skills) if (s?.trim()) lines.push(`• ${s}`);
+          lines.push("");
+        }
         break;
       case "certifications":
         if (cv.certifications?.length) {
