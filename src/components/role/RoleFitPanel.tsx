@@ -169,7 +169,7 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
           className="min-h-[80px] text-sm"
         />
       </div>
-      <Button onClick={run} disabled={loading} className="w-full">
+      <Button onClick={() => run()} disabled={loading} className="w-full">
         {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
         {isSv ? `Analysera fit mot ${label}` : `Analyse fit for ${label}`}
       </Button>
@@ -218,7 +218,7 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
               <p className="text-xs text-amber-700 dark:text-amber-400">
                 {isSv ? `${applied.size} ändring${applied.size === 1 ? "" : "ar"} applicerad${applied.size === 1 ? "" : "e"} — poängen är inaktuell.` : `${applied.size} change${applied.size === 1 ? "" : "s"} applied — the score is out of date.`}
               </p>
-              <Button size="sm" className="h-9 flex-shrink-0 text-xs" onClick={run} disabled={loading}>
+              <Button size="sm" className="h-9 flex-shrink-0 text-xs" onClick={() => run()} disabled={loading}>
                 {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
                 {isSv ? "Uppdatera poängen" : "Update the score"}
               </Button>

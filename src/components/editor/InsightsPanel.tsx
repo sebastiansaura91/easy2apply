@@ -86,6 +86,18 @@ export function InsightsPanel({
   const [placing, setPlacing] = useState(false);
   const [placements, setPlacements] = useState<Placement[] | null>(null);
   const [appliedPlacements, setAppliedPlacements] = useState<Set<number>>(new Set());
+  // Credibility gate: the user confirms per keyword whether they actually have it,
+  // BEFORE anything is placed into the CV. "yes" → placeable; "no" → honest omission.
+  const [kwConfirm, setKwConfirm] = useState<Record<string, "yes" | "no">>({});
+  const cycleKw = (k: string) =>
+    setKwConfirm(prev => {
+      const cur = prev[k];
+      const next = { ...prev };
+      if (cur === undefined) next[k] = "yes";
+      else if (cur === "yes") next[k] = "no";
+      else delete next[k];
+      return next;
+    });
   const [autoFixingIdx, setAutoFixingIdx] = useState<number | null>(null);
   const [autoFixPreview, setAutoFixPreview] = useState<{
     issueIdx: number;
@@ -283,13 +295,13 @@ export function InsightsPanel({
   const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
   const weakFeedback = (deepResult?.bullet_feedback ?? []).filter(b => b.score < 7);
 
-  const runPlacements = async () => {
+  const runPlacements = async (phrases: string[]) => {
     setPlacing(true);
     setPlacements(null);
     setAppliedPlacements(new Set());
     try {
       const { data, error } = await supabase.functions.invoke("place-keywords", {
-        body: { resume_content_json: cv, missing_phrases: missingKw, locale: cvLanguage },
+        body: { resume_content_json: cv, missing_phrases: phrases, locale: cvLanguage },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -431,13 +443,45 @@ export function InsightsPanel({
           {missingKw.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Saknade nyckelord" : "Missing keywords"}</p>
-              <div className="flex flex-wrap gap-1">{missingKw.map(p => <Badge key={p} variant="destructive" className="text-[9px] h-5">{p}</Badge>)}</div>
-              {canFix && (
-                <Button variant="outline" size="sm" className="mt-1 h-9 w-full text-xs" onClick={runPlacements} disabled={placing}>
-                  {placing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-                  {placing ? (isSv ? "Letar placeringar…" : "Finding placements…") : (isSv ? "Placera nyckelorden i punkter" : "Place keywords into bullets")}
-                </Button>
+              <p className="text-[10px] text-muted-foreground">
+                {isSv ? "Tryck på varje ord: ✓ = jag har detta på riktigt · ✕ = har inte (utelämnas ärligt)." : "Tap each word: ✓ = I genuinely have this · ✕ = I don't (honestly omitted)."}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {missingKw.map(p => {
+                  const s = kwConfirm[p];
+                  return (
+                    <button key={p} type="button" onClick={() => cycleKw(p)}
+                      className={`inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[10px] font-medium transition-colors ${
+                        s === "yes" ? "border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-500"
+                        : s === "no" ? "border-border text-muted-foreground line-through opacity-60"
+                        : "border-destructive/40 bg-destructive/5 text-destructive"
+                      }`}>
+                      {s === "yes" ? "✓" : s === "no" ? "✕" : "?"} {p}
+                    </button>
+                  );
+                })}
+              </div>
+              {Object.values(kwConfirm).filter(v => v === "no").length > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  {isSv
+                    ? `${Object.values(kwConfirm).filter(v => v === "no").length} markerade som "har inte" — de läggs aldrig in. Ärlighet slår nyckelord.`
+                    : `${Object.values(kwConfirm).filter(v => v === "no").length} marked "don't have" — never inserted. Honesty beats keywords.`}
+                </p>
               )}
+              {canFix && (() => {
+                const confirmed = missingKw.filter(p => kwConfirm[p] === "yes");
+                return (
+                  <Button variant={confirmed.length ? "default" : "outline"} size="sm" className="mt-1 h-9 w-full text-xs"
+                    onClick={() => runPlacements(confirmed)} disabled={placing || confirmed.length === 0}>
+                    {placing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                    {placing
+                      ? (isSv ? "Letar placeringar…" : "Finding placements…")
+                      : confirmed.length === 0
+                        ? (isSv ? "Markera med ✓ det du faktiskt har" : "Mark with ✓ what you actually have")
+                        : (isSv ? `Placera ${confirmed.length} bekräftade nyckelord` : `Place ${confirmed.length} confirmed keywords`)}
+                  </Button>
+                );
+              })()}
               {placements?.map((p, i) => (
                 <div key={i} className="rounded-lg border border-border p-2.5 space-y-1.5">
                   <Badge variant="secondary" className="text-[9px] h-5">{p.keyword}</Badge>
