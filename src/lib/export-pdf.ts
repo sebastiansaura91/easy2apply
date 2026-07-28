@@ -282,8 +282,38 @@ export function buildPdf(
       case "skills": {
         if (cv.skills.length === 0) break;
         drawH2(t("sectionSkills"));
-        drawText(cv.skills.join(", "), marginL, y);
-        y += 1;
+        // Three VISUAL columns of bullets, drawn column-by-column so the PDF text
+        // stream stays linear (col 1 top→down, then col 2, col 3) — ATS reads a
+        // clean sequential list while the page shows a compact grid.
+        const items = cv.skills.filter(Boolean);
+        const cols = 3;
+        const colW = contentW / cols;
+        const rowsPerCol = Math.ceil(items.length / cols);
+        const lineH = 10 * 1.4 * 0.3528;
+        pdf.setFontSize(10);
+        pdf.setFont(font, "normal");
+        pdf.setTextColor(...colors.black);
+        const itemH = (s: string) => pdf.splitTextToSize(s, colW - 7).length * lineH + 0.5;
+        const colHeights = Array.from({ length: cols }, (_, c) =>
+          items.slice(c * rowsPerCol, (c + 1) * rowsPerCol).reduce((a, s) => a + itemH(s), 0));
+        const blockH = Math.max(...colHeights) + 1;
+        checkPage(Math.min(blockH, pageH - marginTop - marginBottom));
+        const y0 = y;
+        let maxY = y0;
+        for (let c = 0; c < cols; c++) {
+          y = y0;
+          const x = marginL + c * colW;
+          for (const s of items.slice(c * rowsPerCol, (c + 1) * rowsPerCol)) {
+            pdf.circle(x + 1.5, y - 1, 0.5, "F");
+            for (const ln of pdf.splitTextToSize(s, colW - 7)) {
+              pdf.text(ln, x + 4.5, y);
+              y += lineH;
+            }
+            y += 0.5;
+          }
+          maxY = Math.max(maxY, y);
+        }
+        y = maxY + 1;
         break;
       }
 

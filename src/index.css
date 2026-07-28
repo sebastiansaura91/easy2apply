@@ -182,6 +182,17 @@
   margin-bottom: 2pt;
 }
 
+/* Skills as three visual columns — DOM stays one linear list (ATS-safe). */
+.a4-preview ul.skills-cols {
+  columns: 3;
+  column-gap: 10pt;
+  padding-left: 14pt;
+  margin-top: 4pt;
+}
+.a4-preview ul.skills-cols li {
+  break-inside: avoid;
+}
+
 .a4-preview .role-meta {
   font-size: 9pt;
   color: #475569;

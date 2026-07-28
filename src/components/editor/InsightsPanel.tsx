@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CVContent } from "@/types/cv";
 import { AtsCheckResult, FirstScanIssue } from "@/types/ats-check";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +33,8 @@ interface Props {
   onPersistScore?: (score: number, grade: string, subscores?: AtsCheckResult["subscores"]) => void;
   /** Persist the full analysis + input hash, so unchanged input reuses the stored result. */
   onPersistResult?: (hash: string, result: AtsCheckResult) => void;
+  /** Scan automatically on mount (opening "Improve" runs everything — no extra click). */
+  autoRun?: boolean;
 }
 
 interface SinceLast {
@@ -59,7 +61,7 @@ function severityBorder(severity: CvIssue["severity"]) {
 
 export function InsightsPanel({
   cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
-  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult,
+  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun,
 }: Props) {
   const { toast } = useToast();
   // Restore the stored full analysis so buckets are populated from the start.
@@ -119,12 +121,12 @@ export function InsightsPanel({
   );
   const isStale = !!deepResult && analyzedSnapshot !== null && analyzedSnapshot !== cvSignature;
 
-  const runDeep = async () => {
+  const runDeep = async (opts?: { silent?: boolean }) => {
     // Stability by construction: the model isn't perfectly deterministic even at
     // temperature 0, so if nothing changed since the stored analysis, reuse it.
     if (cv.__meta?.lastAtsResult?.hash === cvSignature && deepResult) {
       setAnalyzedSnapshot(cvSignature);
-      toast({
+      if (!opts?.silent) toast({
         title: isSv ? "Inget har ändrats" : "Nothing changed",
         description: isSv ? "Samma underlag ger samma resultat — visar den sparade analysen." : "Same input gives the same result — showing the stored analysis.",
       });
@@ -177,6 +179,15 @@ export function InsightsPanel({
       toast({ title: "Analysis failed", description: e.message, variant: "destructive" });
     } finally { setLoading(false); }
   };
+
+  // Opening "Improve" scans everything once — cached results short-circuit for free.
+  const autoRanRef = useRef(false);
+  useEffect(() => {
+    if (!autoRun || autoRanRef.current || loading) return;
+    autoRanRef.current = true;
+    if (!deepResult || isStale) runDeep({ silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun]);
 
   const scoreColor = (s: number) => s >= 80 ? "text-green-600" : s >= 60 ? "text-warning" : "text-destructive";
 
@@ -664,7 +675,7 @@ export function InsightsPanel({
 
       {/* ── Deep analysis CTA ── */}
       <Button
-        onClick={runDeep}
+        onClick={() => runDeep()}
         disabled={loading}
         className="w-full text-xs h-9"
         variant={deepResult ? (isStale ? "default" : "outline") : "default"}

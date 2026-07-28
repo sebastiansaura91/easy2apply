@@ -50,13 +50,14 @@ export function TailorPanel({
             <TabsTrigger value="guide" disabled={!hasPresetRole}>{isSv ? "Rollguide" : "Role guide"}</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="fit" className="mt-0">
+          {/* forceMount: opening "Improve" scans BOTH role fit and ATS at once — no extra clicks. */}
+          <TabsContent value="fit" forceMount className="mt-0 data-[state=inactive]:hidden">
             {hasRole ? (
               <RoleFitPanel
                 cv={cv}
                 cvLanguage={cvLanguage}
                 onApplyReframe={onApplyReframe}
-                autoRun={!!seededJob}
+                autoRun
                 onUpdateProfile={onUpdateProfile}
                 onUpdateExperienceBullets={onUpdateExperienceBullets}
                 onUpdateSkills={onUpdateSkills}
@@ -69,7 +70,7 @@ export function TailorPanel({
             )}
           </TabsContent>
 
-          <TabsContent value="ats" className="mt-0">
+          <TabsContent value="ats" forceMount className="mt-0 data-[state=inactive]:hidden">
             <InsightsPanel
               cv={cv}
               cvLanguage={cvLanguage}
@@ -82,6 +83,7 @@ export function TailorPanel({
               onUpdateSkills={onUpdateSkills}
               onPersistScore={onPersistScore}
               onPersistResult={onPersistResult}
+              autoRun={open}
             />
           </TabsContent>
 

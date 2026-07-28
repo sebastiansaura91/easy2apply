@@ -203,7 +203,9 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
             return cv.skills.length > 0 ? (
               <div key={section.id}>
                 <h2>{t("sectionSkills")}</h2>
-                <p>{cv.skills.join(", ")}</p>
+                <ul className="skills-cols">
+                  {cv.skills.filter(Boolean).map((s, i) => <li key={i}>{s}</li>)}
+                </ul>
               </div>
             ) : null;
           case "certifications":
