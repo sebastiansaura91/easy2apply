@@ -326,6 +326,14 @@ function buildRenderedText(cv: any, lang: "sv" | "en" = "sv"): string {
           for (const exp of cv.experience) {
             lines.push(`${exp.title}${exp.company ? ", " + exp.company : ""}${exp.location ? " – " + exp.location : ""}`);
             lines.push(`${exp.startDate} – ${exp.isPresent ? H.present : exp.endDate}`);
+            // Executive scope fields render in the PDF — the scanner must see them too.
+            const meta = [
+              exp.pnlSize ? `P&L: ${exp.pnlSize}` : null,
+              exp.headcount ? `${lang === "sv" ? "Personalansvar" : "Team"}: ${exp.headcount}` : null,
+              exp.revenueImpact ? `${lang === "sv" ? "Intäktspåverkan" : "Revenue impact"}: ${exp.revenueImpact}` : null,
+            ].filter(Boolean).join(" · ");
+            if (meta) lines.push(meta);
+            if (exp.roleScope) lines.push(exp.roleScope);
             for (const b of exp.bullets || []) if (b.trim()) lines.push(`• ${b}`);
             lines.push("");
           }
