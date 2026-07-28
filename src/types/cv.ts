@@ -78,6 +78,12 @@ export interface CVMeta {
     /** Subscores kept so the next scan can show what improved. */
     subscores?: { parse: number; scanability: number; relevance: number; evidence: number };
   };
+  /**
+   * Full last analysis + a hash of the input it was computed from. The model is not
+   * perfectly deterministic even at temperature 0, so unchanged input returns THIS
+   * stored result instead of re-sampling — stability by construction.
+   */
+  lastAtsResult?: { hash: string; at: string; result: unknown };
   createdFrom?: string;
   /**
    * Your one true "base profile" — the canonical set of real facts. Role templates are

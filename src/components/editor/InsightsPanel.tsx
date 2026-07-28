@@ -31,6 +31,8 @@ interface Props {
   onUpdateSkills?: (skills: string[]) => void;
   /** Persist the deep score onto the CV so the same number shows everywhere and survives reloads. */
   onPersistScore?: (score: number, grade: string, subscores?: AtsCheckResult["subscores"]) => void;
+  /** Persist the full analysis + input hash, so unchanged input reuses the stored result. */
+  onPersistResult?: (hash: string, result: AtsCheckResult) => void;
 }
 
 interface SinceLast {
@@ -57,21 +59,30 @@ function severityBorder(severity: CvIssue["severity"]) {
 
 export function InsightsPanel({
   cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
-  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore,
+  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult,
 }: Props) {
   const { toast } = useToast();
-  const [deepResult, setDeepResult] = useState<AtsCheckResult | null>(initialResult ?? null);
+  // Restore the stored full analysis so buckets are populated from the start.
+  const stored = cv.__meta?.lastAtsResult;
+  const [deepResult, setDeepResult] = useState<AtsCheckResult | null>(
+    initialResult ?? ((stored?.result as AtsCheckResult) ?? null)
+  );
   const [loading, setLoading] = useState(false);
   const [jobText, setJobText] = useState(jobPostingText || "");
   const [showJob, setShowJob] = useState(false);
   const [fixingIssue, setFixingIssue] = useState<FirstScanIssue | null>(null);
-  const [analyzedSnapshot, setAnalyzedSnapshot] = useState<string | null>(null);
+  const [analyzedSnapshot, setAnalyzedSnapshot] = useState<string | null>(!initialResult && stored ? stored.hash : null);
   const [analyzedAt, setAnalyzedAt] = useState<Date | null>(null);
   const [lastDelta, setLastDelta] = useState<number | null>(null);
   const [sinceLast, setSinceLast] = useState<SinceLast | null>(null);
   const [openBuckets, setOpenBuckets] = useState<Set<string>>(new Set(["keywords"]));
   const toggleBucket = (k: string) =>
     setOpenBuckets(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; });
+  // Minimal keyword placements: which bullet to touch and the 1–2-word swap to make.
+  interface Placement { keyword: string; exp_index: number; bullet_index: number; original: string; revised: string; note: string }
+  const [placing, setPlacing] = useState(false);
+  const [placements, setPlacements] = useState<Placement[] | null>(null);
+  const [appliedPlacements, setAppliedPlacements] = useState<Set<number>>(new Set());
   const [autoFixingIdx, setAutoFixingIdx] = useState<number | null>(null);
   const [autoFixPreview, setAutoFixPreview] = useState<{
     issueIdx: number;
@@ -100,11 +111,25 @@ export function InsightsPanel({
   // The local heuristic score was removed: it produced a second, conflicting number.
   // The panel shows only the deep ATS score (live or persisted on the CV).
 
-  // Stale detection — has the CV changed since last analysis?
-  const cvSignature = useMemo(() => JSON.stringify(cv) + "|" + jobText.trim(), [cv, jobText]);
+  // Stale detection — has the CV changed since last analysis? __meta is excluded so
+  // persisting the analysis itself never marks the result stale.
+  const cvSignature = useMemo(
+    () => JSON.stringify({ ...cv, __meta: undefined }) + "|" + jobText.trim(),
+    [cv, jobText]
+  );
   const isStale = !!deepResult && analyzedSnapshot !== null && analyzedSnapshot !== cvSignature;
 
   const runDeep = async () => {
+    // Stability by construction: the model isn't perfectly deterministic even at
+    // temperature 0, so if nothing changed since the stored analysis, reuse it.
+    if (cv.__meta?.lastAtsResult?.hash === cvSignature && deepResult) {
+      setAnalyzedSnapshot(cvSignature);
+      toast({
+        title: isSv ? "Inget har ändrats" : "Nothing changed",
+        description: isSv ? "Samma underlag ger samma resultat — visar den sparade analysen." : "Same input gives the same result — showing the stored analysis.",
+      });
+      return;
+    }
     setLoading(true);
     // Previous state to diff against: the in-session result, else the score persisted on the CV.
     const prevFull = deepResult;
@@ -120,6 +145,7 @@ export function InsightsPanel({
       const newResult = data as AtsCheckResult;
       setDeepResult(newResult);
       onPersistScore?.(Math.round(newResult.overall_score), newResult.grade, newResult.subscores);
+      onPersistResult?.(cvSignature, newResult);
       setAnalyzedSnapshot(cvSignature);
       setAnalyzedAt(new Date());
       if (prevScore !== null) {
@@ -241,6 +267,38 @@ export function InsightsPanel({
   const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
   const weakFeedback = (deepResult?.bullet_feedback ?? []).filter(b => b.score < 7);
 
+  const runPlacements = async () => {
+    setPlacing(true);
+    setPlacements(null);
+    setAppliedPlacements(new Set());
+    try {
+      const { data, error } = await supabase.functions.invoke("place-keywords", {
+        body: { resume_content_json: cv, missing_phrases: missingKw, locale: cvLanguage },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setPlacements(data.placements || []);
+      if (!(data.placements || []).length) {
+        toast({ title: isSv ? "Ingen ärlig placering hittades" : "No honest placement found", description: isSv ? "Inga punkter kan ta nyckelorden utan att ändra innehållet." : "No bullet can take the keywords without changing its claim." });
+      }
+    } catch (e: any) {
+      toast({ title: isSv ? "Placering misslyckades" : "Placement failed", description: e.message, variant: "destructive" });
+    } finally { setPlacing(false); }
+  };
+
+  const applyPlacement = (p: Placement, idx: number) => {
+    const bullets = cv.experience[p.exp_index]?.bullets;
+    if (!bullets || (bullets[p.bullet_index] || "").trim().toLowerCase() !== p.original.trim().toLowerCase()) {
+      toast({ title: isSv ? "Punkten har ändrats" : "That bullet has changed", description: isSv ? "Kör placeringen igen." : "Re-run the placement.", variant: "destructive" });
+      return;
+    }
+    const next = [...bullets];
+    next[p.bullet_index] = p.revised;
+    onUpdateExperienceBullets?.(p.exp_index, next);
+    setAppliedPlacements(prev => new Set(prev).add(idx));
+    toast({ title: isSv ? "Nyckelord inlagt — sparas i CV:t" : "Keyword placed — saved to the CV" });
+  };
+
   const bucketCounts: Record<BucketKey, number> = {
     keywords: missingKw.length + genericKw.length + localBy.keywords.length + deepBy("keywords").length,
     bullets: weakBullets + weakFeedback.length + localBy.bullets.length + deepBy("bullets").length,
@@ -358,6 +416,30 @@ export function InsightsPanel({
             <div className="space-y-1.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Saknade nyckelord" : "Missing keywords"}</p>
               <div className="flex flex-wrap gap-1">{missingKw.map(p => <Badge key={p} variant="destructive" className="text-[9px] h-5">{p}</Badge>)}</div>
+              {canFix && (
+                <Button variant="outline" size="sm" className="mt-1 h-9 w-full text-xs" onClick={runPlacements} disabled={placing}>
+                  {placing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                  {placing ? (isSv ? "Letar placeringar…" : "Finding placements…") : (isSv ? "Placera nyckelorden i punkter" : "Place keywords into bullets")}
+                </Button>
+              )}
+              {placements?.map((p, i) => (
+                <div key={i} className="rounded-lg border border-border p-2.5 space-y-1.5">
+                  <Badge variant="secondary" className="text-[9px] h-5">{p.keyword}</Badge>
+                  <p className="text-[10px] text-muted-foreground line-through leading-relaxed">{p.original}</p>
+                  <p className="text-xs leading-relaxed">{p.revised}</p>
+                  <p className="text-[9px] italic text-muted-foreground">{p.note}</p>
+                  <Button
+                    size="sm"
+                    variant={appliedPlacements.has(i) ? "secondary" : "outline"}
+                    className="h-9 w-full text-xs"
+                    disabled={appliedPlacements.has(i)}
+                    onClick={() => applyPlacement(p, i)}
+                  >
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                    {appliedPlacements.has(i) ? (isSv ? "Inlagd" : "Applied") : (isSv ? "Använd" : "Apply")}
+                  </Button>
+                </div>
+              ))}
             </div>
           )}
           {genericKw.length > 0 && (

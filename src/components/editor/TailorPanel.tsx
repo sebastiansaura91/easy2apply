@@ -20,6 +20,7 @@ interface Props {
   onUpdateExperienceBullets: (expIdx: number, bullets: string[]) => void;
   onUpdateSkills: (skills: string[]) => void;
   onPersistScore?: (score: number, grade: string, subscores?: AtsCheckResult["subscores"]) => void;
+  onPersistResult?: (hash: string, result: AtsCheckResult) => void;
 }
 
 /**
@@ -30,7 +31,7 @@ interface Props {
  */
 export function TailorPanel({
   open, onOpenChange, cv, cvLanguage, t, seededJob, seededResult,
-  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore,
+  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult,
 }: Props) {
   const isSv = cvLanguage === "sv";
   const hasRole = !!(cv.__meta?.targetRole || cv.__meta?.targetRoleLabel);
@@ -80,6 +81,7 @@ export function TailorPanel({
               onUpdateExperienceBullets={onUpdateExperienceBullets}
               onUpdateSkills={onUpdateSkills}
               onPersistScore={onPersistScore}
+              onPersistResult={onPersistResult}
             />
           </TabsContent>
 
