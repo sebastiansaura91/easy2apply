@@ -109,13 +109,21 @@ serve(async (req) => {
       });
     }
 
-    // Deterministic guard: drop "future date" issues when no CV date is actually after today.
+    // Deterministic guard: drop "future date" issues when no CV date is actually after
+    // today — from the scan issues AND the parse check (the model hallucinates these).
     const hasFutureDate = collectDates(resume_content_json).some(d => d > today);
-    if (!hasFutureDate && Array.isArray(result?.first_scan_issues)) {
-      result.first_scan_issues = result.first_scan_issues.filter((iss: any) => {
-        const hay = `${iss?.title || ""} ${iss?.why_it_matters || ""} ${iss?.fix || ""}`.toLowerCase();
-        return !(hay.includes("future") || hay.includes("framtid"));
-      });
+    if (!hasFutureDate) {
+      const isFutureClaim = (txt: string) => txt.includes("future") || txt.includes("framtid");
+      if (Array.isArray(result?.first_scan_issues)) {
+        result.first_scan_issues = result.first_scan_issues.filter((iss: any) =>
+          !isFutureClaim(`${iss?.title || ""} ${iss?.why_it_matters || ""} ${iss?.fix || ""}`.toLowerCase()));
+      }
+      if (Array.isArray(result?.parse_check)) {
+        for (const c of result.parse_check) {
+          const hay = `${c?.dimension || ""} ${c?.why_it_matters || ""} ${c?.recommendation || ""}`.toLowerCase();
+          if (c?.status && c.status !== "pass" && isFutureClaim(hay)) c.status = "pass";
+        }
+      }
     }
 
     // Deterministic guard: the export engine guarantees single-column body-text layout
@@ -123,10 +131,19 @@ serve(async (req) => {
     // the model is always a false positive. Drop those issues.
     if (Array.isArray(result?.first_scan_issues)) {
       const layoutNoise = /contact info placement|kontaktuppgifternas placering|header or separate block|document header|sidhuvud|multi-?column|flera kolumner|text box|textruta|\btable\b|\btabell\b|image|bild|graphic|grafik|file format|filformat/;
+      // Placement/formatting complaints in either language about things the renderer controls.
+      const contactPlacement = /(kontaktinformation|kontaktuppgifter|contact info(rmation)?)[\s\S]*?(flytta|placer|skanningsväg|övre|hörn|move|placement|top left|corner|scan path)/;
+      const skillsFormatting = /(kompetens|skills)[\s\S]*?(tomt utrymme|whitespace|luft|hierark|hierarchy|punktlist|bullet point|tät|dense|cluttered|belamrad)/;
       result.first_scan_issues = result.first_scan_issues.filter((iss: any) => {
         const hay = `${iss?.title || ""} ${iss?.why_it_matters || ""} ${iss?.fix || ""}`.toLowerCase();
-        return !layoutNoise.test(hay);
+        return !layoutNoise.test(hay) && !contactPlacement.test(hay) && !skillsFormatting.test(hay);
       });
+      if (Array.isArray(result?.next_actions)) {
+        result.next_actions = result.next_actions.filter((a: string) => {
+          const hay = String(a || "").toLowerCase();
+          return !layoutNoise.test(hay) && !contactPlacement.test(hay) && !skillsFormatting.test(hay);
+        });
+      }
     }
 
     // Renderer-guaranteed format dimensions can never fail: the export engine enforces
