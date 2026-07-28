@@ -89,6 +89,15 @@ export function InsightsPanel({
   // Credibility gate: the user confirms per keyword whether they actually have it,
   // BEFORE anything is placed into the CV. "yes" → placeable; "no" → honest omission.
   const [kwConfirm, setKwConfirm] = useState<Record<string, "yes" | "no">>({});
+  // Interview mode: the app asks one verification question per missing keyword and the
+  // answers become the evidence for truthful placements (or honest omission).
+  interface KwQuestion { keyword: string; question: string }
+  interface NewBullet { keyword: string; exp_index: number; bullet: string; note: string }
+  const [kwQuestions, setKwQuestions] = useState<KwQuestion[] | null>(null);
+  const [kwAnswers, setKwAnswers] = useState<Record<string, string>>({});
+  const [loadingQ, setLoadingQ] = useState(false);
+  const [newBullets, setNewBullets] = useState<NewBullet[] | null>(null);
+  const [appliedNew, setAppliedNew] = useState<Set<number>>(new Set());
   const cycleKw = (k: string) =>
     setKwConfirm(prev => {
       const cur = prev[k];
@@ -295,23 +304,71 @@ export function InsightsPanel({
   const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
   const weakFeedback = (deepResult?.bullet_feedback ?? []).filter(b => b.score < 7);
 
-  const runPlacements = async (phrases: string[]) => {
+  const runPlacements = async (phrases: string[], evidence?: { keyword: string; answer: string }[]) => {
     setPlacing(true);
     setPlacements(null);
+    setNewBullets(null);
     setAppliedPlacements(new Set());
+    setAppliedNew(new Set());
     try {
       const { data, error } = await supabase.functions.invoke("place-keywords", {
-        body: { resume_content_json: cv, missing_phrases: phrases, locale: cvLanguage },
+        body: { resume_content_json: cv, missing_phrases: phrases, locale: cvLanguage, evidence },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setPlacements(data.placements || []);
-      if (!(data.placements || []).length) {
+      setNewBullets(data.new_bullets || []);
+      if (!(data.placements || []).length && !(data.new_bullets || []).length) {
         toast({ title: isSv ? "Ingen ärlig placering hittades" : "No honest placement found", description: isSv ? "Inga punkter kan ta nyckelorden utan att ändra innehållet." : "No bullet can take the keywords without changing its claim." });
       }
     } catch (e: any) {
       toast({ title: isSv ? "Placering misslyckades" : "Placement failed", description: e.message, variant: "destructive" });
     } finally { setPlacing(false); }
+  };
+
+  // Interview flow: fetch one verification question per unconfirmed keyword.
+  const fetchQuestions = async () => {
+    const unknowns = missingKw.filter(p => !kwConfirm[p]);
+    if (!unknowns.length) return;
+    setLoadingQ(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-keywords", {
+        body: { resume_content_json: cv, missing_phrases: unknowns, locale: cvLanguage },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setKwQuestions(data.questions || []);
+      if (!(data.questions || []).length) toast({ title: isSv ? "Inga frågor kunde skapas" : "No questions could be generated" });
+    } catch (e: any) {
+      toast({ title: isSv ? "Kunde inte skapa frågor" : "Couldn't generate questions", description: e.message, variant: "destructive" });
+    } finally { setLoadingQ(false); }
+  };
+
+  const dismissQuestion = (keyword: string) => {
+    setKwConfirm(prev => ({ ...prev, [keyword]: "no" }));
+    setKwQuestions(prev => (prev || []).filter(q => q.keyword !== keyword));
+  };
+
+  const submitAnswers = () => {
+    const answered = (kwQuestions || []).filter(q => (kwAnswers[q.keyword] || "").trim().length > 2);
+    if (!answered.length) return;
+    setKwConfirm(prev => {
+      const next = { ...prev };
+      answered.forEach(q => { next[q.keyword] = "yes"; });
+      return next;
+    });
+    const evidence = answered.map(q => ({ keyword: q.keyword, answer: kwAnswers[q.keyword].trim() }));
+    const tapped = missingKw.filter(p => kwConfirm[p] === "yes" && !evidence.some(e => e.keyword === p));
+    setKwQuestions(null);
+    runPlacements([...tapped, ...evidence.map(e => e.keyword)], evidence);
+  };
+
+  const applyNewBullet = (nb: NewBullet, idx: number) => {
+    const exp = cv.experience[nb.exp_index];
+    if (!exp) return;
+    onUpdateExperienceBullets?.(nb.exp_index, [...exp.bullets, nb.bullet]);
+    setAppliedNew(prev => new Set(prev).add(idx));
+    toast({ title: isSv ? "Ny punkt tillagd — sparas i CV:t" : "New bullet added — saved to the CV" });
   };
 
   const applyPlacement = (p: Placement, idx: number) => {
@@ -468,20 +525,78 @@ export function InsightsPanel({
                     : `${Object.values(kwConfirm).filter(v => v === "no").length} marked "don't have" — never inserted. Honesty beats keywords.`}
                 </p>
               )}
-              {canFix && (() => {
+              {canFix && !kwQuestions && (() => {
                 const confirmed = missingKw.filter(p => kwConfirm[p] === "yes");
+                const unknowns = missingKw.filter(p => !kwConfirm[p]);
                 return (
-                  <Button variant={confirmed.length ? "default" : "outline"} size="sm" className="mt-1 h-9 w-full text-xs"
-                    onClick={() => runPlacements(confirmed)} disabled={placing || confirmed.length === 0}>
-                    {placing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-                    {placing
-                      ? (isSv ? "Letar placeringar…" : "Finding placements…")
-                      : confirmed.length === 0
-                        ? (isSv ? "Markera med ✓ det du faktiskt har" : "Mark with ✓ what you actually have")
-                        : (isSv ? `Placera ${confirmed.length} bekräftade nyckelord` : `Place ${confirmed.length} confirmed keywords`)}
-                  </Button>
+                  <div className="mt-1 space-y-1.5">
+                    {unknowns.length > 0 && (
+                      <Button variant="default" size="sm" className="h-9 w-full text-xs" onClick={fetchQuestions} disabled={loadingQ || placing}>
+                        {loadingQ ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Wrench className="mr-1.5 h-3.5 w-3.5" />}
+                        {loadingQ ? (isSv ? "Skapar frågor…" : "Creating questions…") : (isSv ? `Fråga mig om ${unknowns.length} nyckelord` : `Ask me about ${unknowns.length} keywords`)}
+                      </Button>
+                    )}
+                    {confirmed.length > 0 && (
+                      <Button variant="outline" size="sm" className="h-9 w-full text-xs"
+                        onClick={() => runPlacements(confirmed)} disabled={placing}>
+                        {placing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                        {placing ? (isSv ? "Letar placeringar…" : "Finding placements…") : (isSv ? `Placera ${confirmed.length} bekräftade nyckelord` : `Place ${confirmed.length} confirmed keywords`)}
+                      </Button>
+                    )}
+                  </div>
                 );
               })()}
+              {kwQuestions && kwQuestions.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {isSv ? "Har du detta? Svara kort — dina svar blir underlaget." : "Do you have this? Answer briefly — your answers become the evidence."}
+                  </p>
+                  {kwQuestions.map(q => (
+                    <div key={q.keyword} className="rounded-lg border border-border p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge variant="secondary" className="text-[9px] h-5">{q.keyword}</Badge>
+                        <button type="button" className="text-[10px] text-muted-foreground underline-offset-2 hover:underline" onClick={() => dismissQuestion(q.keyword)}>
+                          {isSv ? "Har inte" : "Don't have it"}
+                        </button>
+                      </div>
+                      <p className="text-xs leading-relaxed">{q.question}</p>
+                      <Textarea
+                        rows={2}
+                        value={kwAnswers[q.keyword] || ""}
+                        onChange={e => setKwAnswers(prev => ({ ...prev, [q.keyword]: e.target.value }))}
+                        placeholder={isSv ? "T.ex. vilket system, din roll, resultatet…" : "E.g. which system, your role, the outcome…"}
+                        className="text-xs"
+                      />
+                    </div>
+                  ))}
+                  <div className="flex gap-1.5">
+                    <Button size="sm" className="h-9 flex-1 text-xs" onClick={submitAnswers}
+                      disabled={placing || !(kwQuestions || []).some(q => (kwAnswers[q.keyword] || "").trim().length > 2)}>
+                      {placing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+                      {isSv ? "Skicka svar & placera" : "Submit answers & place"}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => setKwQuestions(null)} disabled={placing}>
+                      {isSv ? "Avbryt" : "Cancel"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {newBullets?.map((nb, i) => (
+                <div key={`nb${i}`} className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Badge className="text-[9px] h-5">{isSv ? "NY PUNKT" : "NEW BULLET"}</Badge>
+                    <Badge variant="secondary" className="text-[9px] h-5">{nb.keyword}</Badge>
+                    <span className="truncate text-[10px] text-muted-foreground">{cv.experience[nb.exp_index]?.title}</span>
+                  </div>
+                  <p className="text-xs leading-relaxed">{nb.bullet}</p>
+                  <p className="text-[9px] italic text-muted-foreground">{nb.note}</p>
+                  <Button size="sm" variant={appliedNew.has(i) ? "secondary" : "outline"} className="h-9 w-full text-xs"
+                    disabled={appliedNew.has(i)} onClick={() => applyNewBullet(nb, i)}>
+                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                    {appliedNew.has(i) ? (isSv ? "Tillagd" : "Added") : (isSv ? "Lägg till" : "Add")}
+                  </Button>
+                </div>
+              ))}
               {placements?.map((p, i) => (
                 <div key={i} className="rounded-lg border border-border p-2.5 space-y-1.5">
                   <Badge variant="secondary" className="text-[9px] h-5">{p.keyword}</Badge>

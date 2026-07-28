@@ -16,7 +16,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { resume_content_json, missing_phrases, locale } = await req.json();
+    const { resume_content_json, missing_phrases, locale, evidence } = await req.json();
     if (!resume_content_json || !Array.isArray(missing_phrases) || missing_phrases.length === 0) {
       return new Response(JSON.stringify({ error: "resume_content_json and missing_phrases are required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -38,16 +38,25 @@ serve(async (req) => {
       });
     }
 
+    const hasEvidence = Array.isArray(evidence) && evidence.length > 0;
     const systemPrompt = `You place missing ATS keywords into existing CV bullets with MINIMAL edits.
 STRICT RULES:
 - For each keyword, choose the ONE bullet where it fits most naturally (a synonym or related phrasing already exists there).
 - The revised bullet must be the SAME bullet with only 1–2 words swapped or inserted. Same claim, same numbers, same structure, roughly the same length.
-- NEVER invent achievements, numbers, tools or scope. If a keyword has no honest home in any bullet, OMIT it (do not force it).
-- Never place two keywords in the same bullet.
+- NEVER invent achievements, numbers, tools or scope. If a keyword has no honest home in any bullet${hasEvidence ? " and no candidate evidence covers it" : ""}, OMIT it (do not force it).
+- Never place two keywords in the same bullet.${hasEvidence ? `
+- CANDIDATE EVIDENCE: the candidate has answered verification questions confirming real experience. Use their answers to pick the right bullet and wording.
+- If a confirmed keyword has NO honest home in any existing bullet, you may instead propose ONE new bullet in new_bullets for the most relevant experience — built ONLY from facts in the candidate's answer (their system names, role, outcome). Use "${locale === "en" ? "[FILL IN]" : "[FYLL I]"}" for any number the answer does not state. Max 180 characters, outcome-first.` : ""}
 - Output all text in ${lang}.
 Return via the keyword_placements tool.`;
 
-    const userPrompt = `## MISSING KEYWORDS\n${missing_phrases.slice(0, 10).join("; ")}\n\n## BULLETS (with indices)\n\`\`\`json\n${JSON.stringify(bullets, null, 2)}\n\`\`\`\n\nPropose minimal placements now.`;
+    let userPrompt = `## MISSING KEYWORDS\n${missing_phrases.slice(0, 10).join("; ")}\n\n## BULLETS (with indices)\n\`\`\`json\n${JSON.stringify(bullets, null, 2)}\n\`\`\`\n\n`;
+    if (hasEvidence) {
+      userPrompt += `## CANDIDATE EVIDENCE (verified answers — the only source of new facts)\n`;
+      for (const ev of evidence.slice(0, 10)) userPrompt += `- ${ev.keyword}: ${String(ev.answer || "").slice(0, 400)}\n`;
+      userPrompt += `\n`;
+    }
+    userPrompt += `Propose minimal placements now.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -81,6 +90,20 @@ Return via the keyword_placements tool.`;
                       note: { type: "string", description: "One short sentence: what was swapped and why it stays truthful" },
                     },
                     required: ["keyword", "exp_index", "bullet_index", "original", "revised", "note"],
+                  },
+                },
+                new_bullets: {
+                  type: "array",
+                  description: "Only when evidence confirms a keyword that has no honest home in existing bullets",
+                  items: {
+                    type: "object",
+                    properties: {
+                      keyword: { type: "string" },
+                      exp_index: { type: "number" },
+                      bullet: { type: "string", description: "New bullet built ONLY from the candidate's answer" },
+                      note: { type: "string" },
+                    },
+                    required: ["keyword", "exp_index", "bullet", "note"],
                   },
                 },
               },
@@ -129,6 +152,18 @@ Return via the keyword_placements tool.`;
       if (p.revised.length > p.original.length * 1.25 + 20) return false;
       if (digits(p.revised) !== digits(p.original)) return false; // numbers must be untouched
       return true;
+    });
+
+    // New bullets are allowed ONLY with evidence, and every number in them must come
+    // from the candidate's own answer (or be a [FYLL I]/[FILL IN] placeholder).
+    const evidenceText = (Array.isArray(evidence) ? evidence : []).map((e: any) => String(e?.answer || "")).join(" ");
+    const evidenceDigits = new Set((evidenceText.match(/\d+/g) || []));
+    result.new_bullets = (result.new_bullets || []).filter((nb: any) => {
+      if (!hasEvidence) return false;
+      if (typeof nb?.exp_index !== "number" || !(resume_content_json.experience || [])[nb.exp_index]) return false;
+      if (!nb.bullet || nb.bullet.length > 220) return false;
+      const nums = String(nb.bullet).match(/\d+/g) || [];
+      return nums.every((n: string) => evidenceDigits.has(n));
     });
 
     return new Response(JSON.stringify(result), {
