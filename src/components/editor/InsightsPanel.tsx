@@ -549,14 +549,18 @@ export function InsightsPanel({
                 </span>
                 {b.count > 0 ? (
                   <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold text-warning">{b.count}</span>
-                ) : (
+                ) : deepResult ? (
                   <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">—</span>
                 )}
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-2 pt-2">
-              {b.count > 0 || b.key === "keywords" ? b.body : (
+              {b.count > 0 || b.key === "keywords" ? b.body : deepResult ? (
                 <p className="px-1 text-[10px] text-muted-foreground">{isSv ? "Inga problem hittade." : "No issues found."}</p>
+              ) : (
+                <p className="px-1 text-[10px] text-muted-foreground">{isSv ? "Kör analysen för att fylla i detaljerna." : "Run the analysis to populate details."}</p>
               )}
             </CollapsibleContent>
           </Collapsible>
