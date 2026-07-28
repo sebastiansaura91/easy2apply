@@ -165,6 +165,54 @@ serve(async (req) => {
       });
     }
 
+    // Deterministic keyword guard: a phrase is not "missing" if the CV contains it
+    // verbatim (normalized), or expresses it in the other language / a known variant.
+    const SV_EN_TERMS: string[][] = [
+      ["ledningsgrupp", "ledningsgruppen", "management team", "executive team", "leadership team"],
+      ["affärsutveckling", "business development"],
+      ["försäljning", "sales"],
+      ["ledarskap", "leadership"],
+      ["förhandling", "negotiation"],
+      ["upphandling", "procurement"],
+      ["intäkt", "intäkter", "revenue"],
+      ["lönsamhet", "profitability"],
+      ["tillväxt", "growth"],
+      ["prissättning", "pricing"],
+      ["kundresa", "customer journey"],
+      ["kundnöjdhet", "customer satisfaction", "nps"],
+      ["marknadsföring", "marketing"],
+      ["betalning", "betalningar", "betalningslösningar", "payments", "payment solutions"],
+      ["lojalitetsprogram", "loyalty program", "loyalty programs"],
+      ["e-handel", "e-commerce", "ecommerce"],
+      ["strategi", "strategisk", "strategy", "strategic"],
+      ["budgetansvar", "p&l", "profit and loss", "budget responsibility"],
+      ["förändringsledning", "change management"],
+      ["verksamhetsutveckling", "business transformation", "operational development"],
+      ["hållbarhet", "sustainability"],
+      ["styrelse", "board of directors", "board"],
+      ["personalansvar", "people management", "headcount"],
+      ["nyckeltal", "kpi", "kpis", "key performance indicators"],
+      ["go-to-market", "gtm"],
+      ["abonnemang", "subscription", "subscriptions"],
+    ];
+    const normalize = (s: string) => s.toLowerCase().replace(/[-–—]/g, " ").replace(/\s+/g, " ").trim();
+    const cvText = normalize(renderedText);
+    const isPresent = (phrase: string): boolean => {
+      const p = normalize(phrase);
+      if (!p) return true;
+      if (cvText.includes(p)) return true;
+      // singular/definite tolerance: match on a lightly stemmed form of longer words
+      const stem = p.replace(/(erna|arna|orna|en|et|er|ar|or|s)$/i, "");
+      if (stem.length >= 5 && cvText.includes(stem)) return true;
+      for (const group of SV_EN_TERMS) {
+        if (group.some(g => p.includes(g)) && group.some(g => cvText.includes(g))) return true;
+      }
+      return false;
+    };
+    if (Array.isArray(result?.job_language_match?.missing_phrases)) {
+      result.job_language_match.missing_phrases = result.job_language_match.missing_phrases.filter((p: string) => !isPresent(p));
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -384,6 +432,18 @@ For senior/commercial/strategic roles, default rewrite pattern:
 1. Decision-purpose first
 2. Method/how second
 3. Outcome third (only if confirmed, otherwise placeholder)
+
+## KEYWORD MATCHING RULES (job_language_match) — how real ATS matching works
+A posting keyword counts as PRESENT on the CV if it appears in ANY of these forms:
+1. Exact or lightly inflected form (singular/plural, verb form, hyphen/space variants: "e-commerce" = "ecommerce").
+2. Its acronym OR its spelled-out form (P&L = profit and loss; GTM = go-to-market; KPI = key performance indicator).
+3. Its TRANSLATION between Swedish and English — the CV and the ad may be in different languages. Examples: "ledningsgrupp" = "management team"/"executive team"; "affärsutveckling" = "business development"; "försäljning" = "sales"; "prissättning" = "pricing"; "förändringsledning" = "change management".
+4. An unambiguous synonym for the same competence ("kundresa" = "customer journey").
+Before adding ANYTHING to missing_phrases: actively search the rendered CV text for all four forms. If any form is present, the keyword is NOT missing.
+- Frequency does not matter — presence does. The strongest pattern is one mention in Skills plus one inside a quantified bullet. Never recommend repeating a term.
+- Many ATS still match literally: when a keyword is covered only via translation/synonym, do NOT list it as missing, but you MAY add a suggested_replacement swapping the CV's wording to the posting's exact term (only where truthful).
+- If a term is present only as an acronym or only spelled out, suggest writing "Full Term (ACRONYM)" once — do not list it as missing.
+- missing_phrases must be concrete competences/tools/terms worth adding — never soft traits or fluff.
 
 ## SCANABILITY CHECK
 Return 5 dimensions:

@@ -54,6 +54,14 @@ serve(async (req) => {
 - Weight WORK EXPERIENCE heaviest. For senior roles, formal education carries little weight — factor it into the fit score only when it is genuinely relevant (e.g. an MBA for a strategy role) and never let it dominate or rescue an otherwise weak fit.
 - ALL human-readable text you output MUST be in ${langName}.
 
+## KEYWORD & REQUIREMENT MATCHING
+A keyword or requirement counts as COVERED if the CV expresses it in ANY form:
+exact/inflected wording, its acronym or spelled-out form (P&L = profit and loss),
+its TRANSLATION between Swedish and English ("ledningsgrupp" = "management team"/"executive team",
+"affärsutveckling" = "business development"), or an unambiguous synonym.
+The CV and the posting may be in different languages — search both. Never list a
+keyword as missing (or raise it as a gap) when any of these forms is present.
+
 ## WHAT TO PRODUCE
 - fit_score (0–100): how well the candidate's ACTUAL experience covers what the role (and posting, if given) screens for.
 - keyword_coverage: which rubric/posting keywords the candidate already demonstrably evidences vs. which are missing.
