@@ -59,11 +59,13 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<Report>(null);
   const [base, setBase] = useState<ApplyTemplate | null>(null);
+  // Company name for tracking — prefilled from the ad when detectable, always editable.
+  const [company, setCompany] = useState("");
 
   const isCustom = roleId === CUSTOM_ROLE;
   const label = isCustom ? (customLabel.trim() || (isSv ? "Egen roll" : "Custom role")) : roleLabel(roleId, null, language);
 
-  const reset = () => { setStep("input"); setJobText(""); setReport(null); setBase(null); setBusy(false); };
+  const reset = () => { setStep("input"); setJobText(""); setReport(null); setBase(null); setBusy(false); setCompany(""); };
   const close = (o: boolean) => { if (!o) reset(); onOpenChange(o); };
 
   // Pick the template whose role matches; else the most recent; else none (→ create first).
@@ -106,6 +108,8 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
         if (error) throw error;
         if ((data as any)?.error) throw new Error((data as any).error);
         setReport({ kind: "job", ats: data as AtsCheckResult, jobTitle: ja?.job_title, company: ja?.company_name, ja: ja || undefined });
+        const detected = ja?.company_name && !/^(unknown|okänt)$/i.test(ja.company_name) ? ja.company_name : "";
+        setCompany(detected);
       } else {
         // No-ad path: check against the role's normal requirements (static role advice).
         setReport({ kind: "role" });
@@ -137,7 +141,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
           targetRole: isCustom ? undefined : roleId,
           targetRoleLabel: isCustom ? customLabel.trim() : undefined,
           tailoredForJob: report?.kind === "job" ? report.jobTitle : undefined,
-          tailoredForCompany: report?.kind === "job" ? report.company : undefined,
+          tailoredForCompany: company.trim() || undefined,
           jobPostingText: jobText.trim() || undefined,
           lastAtsScore: report?.kind === "job"
             ? { score: Math.round(report.ats.overall_score), grade: report.ats.grade, at: new Date().toISOString(), subscores: report.ats.subscores }
@@ -288,6 +292,15 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
                   <p className="text-xs text-muted-foreground">{isSv ? "Djupare rollfit körs i editorn." : "Deeper role fit runs in the editor."}</p>
                 </div>
               )}
+            </div>
+
+            <div className="space-y-1.5 pt-1">
+              <label className="text-sm font-medium">{isSv ? "Företag" : "Company"} <span className="font-normal text-muted-foreground">({isSv ? "för din överblick" : "for your tracking"})</span></label>
+              <Input
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder={isSv ? "t.ex. Klarna" : "e.g. Klarna"}
+              />
             </div>
 
             <DialogFooter className="flex-col gap-2 sm:flex-col">
