@@ -35,7 +35,7 @@ interface Props {
 }
 
 type Report =
-  | { kind: "job"; ats: AtsCheckResult; jobTitle?: string; company?: string }
+  | { kind: "job"; ats: AtsCheckResult; jobTitle?: string; company?: string; ja?: import("@/contexts/FlowContext").JobAnalysis }
   | { kind: "role" }
   | null;
 
@@ -105,7 +105,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
         });
         if (error) throw error;
         if ((data as any)?.error) throw new Error((data as any).error);
-        setReport({ kind: "job", ats: data as AtsCheckResult, jobTitle: ja?.job_title, company: ja?.company_name });
+        setReport({ kind: "job", ats: data as AtsCheckResult, jobTitle: ja?.job_title, company: ja?.company_name, ja: ja || undefined });
       } else {
         // No-ad path: check against the role's normal requirements (static role advice).
         setReport({ kind: "role" });
@@ -237,6 +237,27 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
                     <span className={`font-serif text-4xl font-semibold ${scoreColor(report.ats.overall_score)}`}>{Math.round(report.ats.overall_score)}</span>
                     <span className="text-sm text-muted-foreground">/ 100 {isSv ? "matchning" : "match"} · {isSv ? "betyg" : "grade"} {report.ats.grade}</span>
                   </div>
+                  {(report.ja?.competence_themes?.length ?? 0) > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Vad arbetsgivaren screenar på" : "What the employer screens for"}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {report.ja!.competence_themes!.map((t) => (
+                          <Badge key={t.theme} variant={t.importance === "must" ? "default" : "secondary"} className="text-[10px]">
+                            {t.theme}{t.importance === "must" ? " ★" : ""}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {(report.ja?.knockout_requirements?.length ?? 0) > 0 && (
+                    <div className="space-y-1 rounded-lg border border-warning/40 bg-warning/5 p-3">
+                      <p className="text-xs font-semibold">{isSv ? "Hårda krav — svara ärligt i ansökan" : "Hard requirements — answer honestly in the application"}</p>
+                      <p className="text-[10px] text-muted-foreground">{isSv ? "Detta är de enda automatiska avslagen. CV-formuleringar hjälper inte här." : "These are the only automatic rejections. CV wording can't help here."}</p>
+                      <ul className="list-disc pl-4 text-xs">
+                        {report.ja!.knockout_requirements!.map((k) => <li key={k}>{k}</li>)}
+                      </ul>
+                    </div>
+                  )}
                   {missing.length > 0 && (
                     <div className="space-y-1.5">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Saknade nyckelord" : "Missing keywords"}</p>

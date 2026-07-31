@@ -333,9 +333,14 @@ export function InsightsPanel({
     } finally { setPlacing(false); }
   };
 
-  // Interview flow: fetch one verification question per unconfirmed keyword.
+  // Interview flow: fetch one verification question per unconfirmed keyword — AND per
+  // competence theme lacking evidence ("Har du drivit transformationsarbete?"), since
+  // recruiters screen buckets first and terms second.
   const fetchQuestions = async () => {
-    const unknowns = missingKw.filter(p => !kwConfirm[p]);
+    const weakThemes = themes
+      .filter(t => t.evidence !== "strong" && !kwConfirm[t.theme])
+      .map(t => t.theme);
+    const unknowns = Array.from(new Set([...weakThemes, ...missingKw.filter(p => !kwConfirm[p])]));
     if (!unknowns.length) return;
     setLoadingQ(true);
     try {

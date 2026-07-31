@@ -44,7 +44,20 @@ Determine seniority strictly from the job TITLE using these rules:
 - "Junior", "Graduate", "Trainee", "Intern" → "Junior"
 
 Use ONLY these five levels: Junior, Mid-level, Senior, Management, Upper Management.
-Always base seniority on the title, NOT on the job description content.`,
+Always base seniority on the title, NOT on the job description content.
+
+## COMPETENCE THEMES (how recruiters screen)
+Recruiters evaluate candidates on 4–7 CORE COMPETENCE BUCKETS, not keyword lists.
+Derive them from the posting (e.g. "Controlling", "Transformation", "Commercial leadership").
+Mark each "must" or "nice" by how the posting weights it (title + repeated emphasis +
+explicit requirements beat single mentions). For each theme list the posting's own
+supporting terms (3–6 short terms, the employer's exact words).
+
+## KNOCKOUT REQUIREMENTS (the only real auto-rejectors)
+Extract binary hard requirements that application forms screen on: work authorization,
+location/relocation, required languages, mandatory certifications/licenses, non-negotiable
+years of experience or degree. Only list requirements the posting states as absolute.
+Empty array if none.`,
           },
           {
             role: "user",
@@ -68,8 +81,27 @@ Always base seniority on the title, NOT on the job description content.`,
                 key_phrases: { type: "array", items: { type: "string" }, description: "Important phrases from the posting that a CV should echo (max 8)" },
                 industry: { type: "string", description: "Industry or sector" },
                 detected_language: { type: "string", description: "ISO 639-1 language code of the job posting (e.g. 'sv' for Swedish, 'en' for English)" },
+                competence_themes: {
+                  type: "array",
+                  description: "4-7 core competence buckets the role screens for",
+                  items: {
+                    type: "object",
+                    properties: {
+                      theme: { type: "string" },
+                      importance: { type: "string", enum: ["must", "nice"] },
+                      supporting_terms: { type: "array", items: { type: "string" } },
+                    },
+                    required: ["theme", "importance", "supporting_terms"],
+                    additionalProperties: false,
+                  },
+                },
+                knockout_requirements: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Binary hard requirements (work authorization, location, required language, certifications) — the only real auto-rejectors",
+                },
               },
-              required: ["job_title", "company_name", "seniority_level", "key_requirements", "nice_to_have", "core_responsibilities", "key_phrases", "industry", "detected_language"],
+              required: ["job_title", "company_name", "seniority_level", "key_requirements", "nice_to_have", "core_responsibilities", "key_phrases", "industry", "detected_language", "competence_themes", "knockout_requirements"],
               additionalProperties: false,
             },
           },

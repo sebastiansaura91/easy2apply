@@ -12,6 +12,10 @@ export interface JobAnalysis {
   key_phrases: string[];
   industry: string;
   detected_language?: string;
+  /** 4–7 core competence buckets the role screens for (recruiter lens). */
+  competence_themes?: { theme: string; importance: "must" | "nice"; supporting_terms: string[] }[];
+  /** Binary hard requirements — the only real auto-rejectors. Answer honestly, wording can't help. */
+  knockout_requirements?: string[];
 }
 
 interface FlowState {
