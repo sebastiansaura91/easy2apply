@@ -40,6 +40,8 @@ const Dashboard = () => {
   const [roleForId, setRoleForId] = useState<string | null>(null);
   const [roleDraft, setRoleDraft] = useState<string>("");
   const [roleCustom, setRoleCustom] = useState<string>("");
+  const [roleIsApp, setRoleIsApp] = useState(false);
+  const [companyDraft, setCompanyDraft] = useState<string>("");
 
   const fetchResumes = async () => {
     if (!user) return;
@@ -84,6 +86,8 @@ const Dashboard = () => {
     setRoleForId(r.id);
     setRoleDraft(m.targetRoleLabel ? CUSTOM_ROLE : (m.targetRole ?? ""));
     setRoleCustom(m.targetRoleLabel ?? "");
+    setRoleIsApp(applications.some(a => a.id === r.id));
+    setCompanyDraft(m.tailoredForCompany ?? "");
   };
 
   const saveRole = async () => {
@@ -97,6 +101,8 @@ const Dashboard = () => {
         ...(prev.__meta || {}),
         targetRole: isCustom ? undefined : (roleDraft || undefined),
         targetRoleLabel: isCustom ? (roleCustom.trim() || undefined) : undefined,
+        // Company is application tracking — only written for applications.
+        ...(roleIsApp ? { tailoredForCompany: companyDraft.trim() || undefined } : {}),
       },
     };
     const { error } = await supabase.from("resumes").update({ content_json: content }).eq("id", roleForId);
@@ -246,9 +252,11 @@ const Dashboard = () => {
       <Dialog open={!!roleForId} onOpenChange={(o) => !o && setRoleForId(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{isSv ? "Kategorisera roll" : "Categorize role"}</DialogTitle>
+            <DialogTitle>{roleIsApp ? (isSv ? "Roll & företag" : "Role & company") : (isSv ? "Kategorisera roll" : "Categorize role")}</DialogTitle>
             <DialogDescription>
-              {isSv ? "Välj vilken roll det här CV:t är en mall för." : "Choose which role this CV is a template for."}
+              {roleIsApp
+                ? (isSv ? "Rollen ansökan gäller och företaget — för din överblick." : "The role this application targets and the company — for your tracking.")
+                : (isSv ? "Välj vilken roll det här CV:t är en mall för." : "Choose which role this CV is a template for.")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-1">
@@ -260,6 +268,16 @@ const Dashboard = () => {
                 onChange={(e) => setRoleCustom(e.target.value)}
                 placeholder={isSv ? "t.ex. VP Customer Experience" : "e.g. VP Customer Experience"}
               />
+            )}
+            {roleIsApp && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">{isSv ? "Företag" : "Company"}</label>
+                <Input
+                  value={companyDraft}
+                  onChange={(e) => setCompanyDraft(e.target.value)}
+                  placeholder={isSv ? "t.ex. Klarna" : "e.g. Klarna"}
+                />
+              </div>
             )}
           </div>
           <DialogFooter>
