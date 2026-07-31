@@ -242,15 +242,24 @@ serve(async (req) => {
         "self starter", "team player", "lagspelare", "högt tempo", "eget driv",
       ]);
       const verbLed = /^(driva|leda|skapa|utveckla|bygga|säkerställa|arbeta|vara|drive|lead|create|develop|build|ensure|work)\b/;
-      result.job_language_match.missing_phrases = result.job_language_match.missing_phrases
-        .filter((p: string) => !isPresent(p))
-        .filter((p: string) => {
-          const n = normalize(p);
-          if (!n || SOFT_TRAITS.has(n)) return false;
-          if (verbLed.test(n)) return false;
-          if (n.split(" ").length > 4) return false;
-          return true;
-        });
+      const keepPhrase = (p: string) => {
+        if (isPresent(p)) return false;
+        const n = normalize(p);
+        if (!n || SOFT_TRAITS.has(n)) return false;
+        if (verbLed.test(n)) return false;
+        if (n.split(" ").length > 4) return false;
+        return true;
+      };
+      result.job_language_match.missing_phrases = result.job_language_match.missing_phrases.filter(keepPhrase);
+      if (Array.isArray(result.job_language_match.competence_themes)) {
+        for (const th of result.job_language_match.competence_themes) {
+          if (Array.isArray(th?.supporting_terms_missing)) th.supporting_terms_missing = th.supporting_terms_missing.filter(keepPhrase);
+          // If nothing is genuinely missing and evidence exists, the theme is effectively covered.
+          if (th?.evidence === "partial" && Array.isArray(th.supporting_terms_missing) && th.supporting_terms_missing.length === 0 && (th.supporting_terms_present || []).length > 0) {
+            th.evidence = "strong";
+          }
+        }
+      }
     }
 
     return new Response(JSON.stringify(result), {
@@ -487,6 +496,23 @@ For senior/commercial/strategic roles, default rewrite pattern:
 2. Method/how second
 3. Outcome third (only if confirmed, otherwise placeholder)
 
+## COMPETENCE THEMES (job_language_match.competence_themes) — how recruiters actually screen
+Recruiters do not evaluate keyword lists. They define 4–7 CORE COMPETENCE BUCKETS for the
+role (e.g. "Controlling", "Transformation", "Commercial leadership") and judge whether the
+CV EVIDENCES each bucket. Keywords are only signals that support a bucket.
+- Derive 4–7 competence themes from the posting. Mark each "must" or "nice" by how the
+  posting weights it (title + repeated emphasis + must-have list beat single mentions).
+- For each theme, judge the CV's evidence: "strong" (quantified achievements clearly in
+  this bucket), "partial" (related work, weak framing), "missing" (no honest evidence).
+  Cite where in evidence_note.
+- supporting_terms_present: the posting's terms for this theme that the CV already uses
+  (in any language/form). supporting_terms_missing: the posting's terms that would
+  reinforce this theme and are genuinely absent (subject to the matching rules below).
+- A theme with strong evidence but missing exact terms needs WORDING, not new content.
+  A "must" theme with missing evidence is an honest gap — say so.
+- missing_phrases must be consistent with the themes: every missing phrase should belong
+  to some theme's supporting_terms_missing. No posting → return an empty themes array.
+
 ## KEYWORD MATCHING RULES (job_language_match) — how real ATS matching works
 A posting keyword counts as PRESENT on the CV if it appears in ANY of these forms:
 1. Exact or lightly inflected form (singular/plural, verb form, hyphen/space variants: "e-commerce" = "ecommerce").
@@ -589,6 +615,23 @@ const RESULT_SCHEMA = {
     job_language_match: {
       type: "object",
       properties: {
+        competence_themes: {
+          type: "array",
+          description: "4-7 core competence buckets the role screens for (recruiter lens), each with CV evidence strength and supporting terms",
+          items: {
+            type: "object",
+            properties: {
+              theme: { type: "string", description: "The competence bucket, e.g. 'Controlling' or 'Transformation'" },
+              importance: { type: "string", enum: ["must", "nice"] },
+              evidence: { type: "string", enum: ["strong", "partial", "missing"] },
+              evidence_note: { type: "string", description: "One short sentence: where the CV evidences this (or that it doesn't)" },
+              supporting_terms_present: { type: "array", items: { type: "string" } },
+              supporting_terms_missing: { type: "array", items: { type: "string" } },
+            },
+            required: ["theme", "importance", "evidence", "evidence_note", "supporting_terms_present", "supporting_terms_missing"],
+            additionalProperties: false,
+          },
+        },
         missing_phrases: { type: "array", items: { type: "string" } },
         generic_phrases_to_replace: { type: "array", items: { type: "string" } },
         suggested_replacements: {
@@ -605,7 +648,7 @@ const RESULT_SCHEMA = {
           },
         },
       },
-      required: ["missing_phrases", "generic_phrases_to_replace", "suggested_replacements"],
+      required: ["competence_themes", "missing_phrases", "generic_phrases_to_replace", "suggested_replacements"],
       additionalProperties: false,
     },
     bullet_feedback: {

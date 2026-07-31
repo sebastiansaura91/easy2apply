@@ -300,7 +300,14 @@ export function InsightsPanel({
   const deepIssues = (deepResult?.first_scan_issues ?? []).map((iss, i) => ({ iss, i, cat: catOf(`${iss.title} ${iss.why_it_matters} ${iss.fix}`) }));
   const deepBy = (k: BucketKey) => deepIssues.filter(d => d.cat === k);
   const scanFails = deepResult ? [...deepResult.scanability_check, ...deepResult.parse_check].filter(c => c.status !== "pass") : [];
-  const missingKw = deepResult?.job_language_match.missing_phrases ?? [];
+  // Recruiter lens: competence themes with supporting terms. missingKw = the union of
+  // every genuinely-missing term (flat list kept as fallback + for the interview flow).
+  const themes = deepResult?.job_language_match?.competence_themes ?? [];
+  const missingKw = Array.from(new Set([
+    ...(deepResult?.job_language_match.missing_phrases ?? []),
+    ...themes.flatMap(t => t.supporting_terms_missing || []),
+  ].map(s => s.trim()).filter(Boolean)));
+  const unthemedKw = missingKw.filter(p => !themes.some(t => (t.supporting_terms_missing || []).includes(p)));
   const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
   const weakFeedback = (deepResult?.bullet_feedback ?? []).filter(b => b.score < 7);
 
@@ -499,12 +506,8 @@ export function InsightsPanel({
         <>
           {missingKw.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Saknade nyckelord" : "Missing keywords"}</p>
-              <p className="text-[10px] text-muted-foreground">
-                {isSv ? "Tryck på varje ord: ✓ = jag har detta på riktigt · ✕ = har inte (utelämnas ärligt)." : "Tap each word: ✓ = I genuinely have this · ✕ = I don't (honestly omitted)."}
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {missingKw.map(p => {
+              {(() => {
+                const kwChip = (p: string) => {
                   const s = kwConfirm[p];
                   return (
                     <button key={p} type="button" onClick={() => cycleKw(p)}
@@ -516,8 +519,49 @@ export function InsightsPanel({
                       {s === "yes" ? "✓" : s === "no" ? "✕" : "?"} {p}
                     </button>
                   );
-                })}
-              </div>
+                };
+                const evidenceBadge = (e: string) =>
+                  e === "strong"
+                    ? <span className="rounded-full bg-green-600/10 px-2 py-0.5 text-[9px] font-semibold text-green-700 dark:text-green-500">{isSv ? "Stark evidens" : "Strong evidence"}</span>
+                    : e === "partial"
+                      ? <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[9px] font-semibold text-warning">{isSv ? "Delvis" : "Partial"}</span>
+                      : <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[9px] font-semibold text-destructive">{isSv ? "Saknar evidens" : "No evidence"}</span>;
+                return (
+                  <>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {themes.length > 0 ? (isSv ? "Kompetensområden rollen screenar på" : "Competence areas the role screens for") : (isSv ? "Saknade nyckelord" : "Missing keywords")}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {isSv ? "Tryck på varje ord: ✓ = jag har detta på riktigt · ✕ = har inte (utelämnas ärligt)." : "Tap each word: ✓ = I genuinely have this · ✕ = I don't (honestly omitted)."}
+                    </p>
+                    {themes.length > 0 ? (
+                      <div className="space-y-2">
+                        {themes.map((th, i) => (
+                          <div key={i} className={`rounded-lg border p-2.5 space-y-1.5 ${th.importance === "must" && th.evidence === "missing" ? "border-destructive/30" : "border-border"}`}>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-xs font-semibold">{th.theme}</span>
+                              {th.importance === "must" && (
+                                <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">{isSv ? "Krav" : "Must"}</span>
+                              )}
+                              {evidenceBadge(th.evidence)}
+                            </div>
+                            <p className="text-[10px] leading-relaxed text-muted-foreground">{th.evidence_note}</p>
+                            {(th.supporting_terms_present || []).length > 0 && (
+                              <p className="text-[10px] text-green-700 dark:text-green-500">✓ {th.supporting_terms_present.join(" · ")}</p>
+                            )}
+                            {(th.supporting_terms_missing || []).length > 0 && (
+                              <div className="flex flex-wrap gap-1">{th.supporting_terms_missing.map(kwChip)}</div>
+                            )}
+                          </div>
+                        ))}
+                        {unthemedKw.length > 0 && <div className="flex flex-wrap gap-1">{unthemedKw.map(kwChip)}</div>}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">{missingKw.map(kwChip)}</div>
+                    )}
+                  </>
+                );
+              })()}
               {Object.values(kwConfirm).filter(v => v === "no").length > 0 && (
                 <p className="text-[10px] text-muted-foreground">
                   {isSv

@@ -26,7 +26,18 @@ export interface LanguageReplacement {
   where: string;
 }
 
+/** A recruiter-style competence bucket: roles are screened on buckets; keywords just support them. */
+export interface CompetenceTheme {
+  theme: string;
+  importance: "must" | "nice";
+  evidence: "strong" | "partial" | "missing";
+  evidence_note: string;
+  supporting_terms_present: string[];
+  supporting_terms_missing: string[];
+}
+
 export interface JobLanguageMatch {
+  competence_themes?: CompetenceTheme[];
   missing_phrases: string[];
   generic_phrases_to_replace: string[];
   suggested_replacements: LanguageReplacement[];
