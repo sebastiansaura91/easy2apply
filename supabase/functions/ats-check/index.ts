@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { resume_content_json, job_posting_text, locale } = await req.json();
+    const { resume_content_json, job_posting_text, locale, demand_profile } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -38,6 +38,14 @@ serve(async (req) => {
     userPrompt += `- Dates are printed in a consistent "mon YYYY – mon YYYY" format; role titles never split across pages.\n`;
     userPrompt += `- Skills render as a scannable bulleted grid with engine-controlled whitespace. Never flag skills density, hierarchy or whitespace. The ONLY skills advice allowed is CONTENT-level: if there are more than ~10 skills, you may suggest grouping them into labeled categories (e.g. "Commercial: pricing, GTM").\n`;
     userPrompt += `- Therefore: only flag CONTENT issues (wording, keywords, metrics, ordering of sections, gaps, inconsistent data) — never layout/whitespace/file-format speculation.\n\n`;
+    if (demand_profile?.competence_themes?.length) {
+      userPrompt += `## DEMAND PROFILE (ANCHOR — use EXACTLY these themes)\n`;
+      userPrompt += `The employer's competence themes were already extracted. In job_language_match.competence_themes you MUST use these exact theme names and importance values — only judge the CV's evidence and supporting terms for each:\n`;
+      for (const t of demand_profile.competence_themes) {
+        userPrompt += `- ${t.theme} (${t.importance})${t.supporting_terms?.length ? ` — supporting terms: ${t.supporting_terms.join(", ")}` : ""}\n`;
+      }
+      userPrompt += `\n`;
+    }
     userPrompt += `## CV DATA (JSON)\n\`\`\`json\n${JSON.stringify(resume_content_json, null, 2)}\n\`\`\`\n\n`;
     userPrompt += `## RENDERED PLAIN TEXT (what ATS sees)\n\`\`\`\n${renderedText}\n\`\`\`\n\n`;
     userPrompt += `## BULLETS WITH IDS\n\`\`\`json\n${JSON.stringify(bulletList, null, 2)}\n\`\`\`\n\n`;

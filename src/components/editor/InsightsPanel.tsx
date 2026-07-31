@@ -159,7 +159,14 @@ export function InsightsPanel({
     const prevSubs = prevFull?.subscores ?? prevPersisted?.subscores ?? null;
     try {
       const { data, error } = await supabase.functions.invoke("ats-check", {
-        body: { resume_content_json: cv, job_posting_text: jobText.trim() || undefined, locale: cvLanguage },
+        body: {
+          resume_content_json: cv,
+          job_posting_text: jobText.trim() || undefined,
+          locale: cvLanguage,
+          // Anchor themes to the demand profile extracted at application creation, so the
+          // report and the editor always talk about the same competence buckets.
+          demand_profile: cv.__meta?.demandProfile || undefined,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -539,6 +546,15 @@ export function InsightsPanel({
                     <p className="text-[10px] text-muted-foreground">
                       {isSv ? "Tryck på varje ord: ✓ = jag har detta på riktigt · ✕ = har inte (utelämnas ärligt)." : "Tap each word: ✓ = I genuinely have this · ✕ = I don't (honestly omitted)."}
                     </p>
+                    {(cv.__meta?.demandProfile?.knockout_requirements?.length ?? 0) > 0 && (
+                      <div className="space-y-1 rounded-lg border border-warning/40 bg-warning/5 p-2.5">
+                        <p className="text-[11px] font-semibold">{isSv ? "Hårda krav — svara ärligt i ansökan" : "Hard requirements — answer honestly in the application"}</p>
+                        <p className="text-[9px] text-muted-foreground">{isSv ? "De enda automatiska avslagen. CV-formuleringar hjälper inte här." : "The only automatic rejections. CV wording can't help here."}</p>
+                        <ul className="list-disc pl-4 text-[11px]">
+                          {cv.__meta!.demandProfile!.knockout_requirements!.map(k => <li key={k}>{k}</li>)}
+                        </ul>
+                      </div>
+                    )}
                     {themes.length > 0 ? (
                       <div className="space-y-2">
                         {themes.map((th, i) => (

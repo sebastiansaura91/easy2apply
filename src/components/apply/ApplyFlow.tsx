@@ -146,6 +146,10 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
           lastAtsResult: report?.kind === "job"
             ? { hash: cvScanSignature(cv, jobText.trim()), at: new Date().toISOString(), result: report.ats }
             : undefined,
+          // Single source of truth: the editor's scans anchor to THIS demand profile.
+          demandProfile: report?.kind === "job" && report.ja
+            ? { competence_themes: report.ja.competence_themes, knockout_requirements: report.ja.knockout_requirements }
+            : undefined,
         },
       };
       const { error } = await supabase.from("resumes").insert({

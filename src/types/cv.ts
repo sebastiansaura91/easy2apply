@@ -86,6 +86,15 @@ export interface CVMeta {
   lastAtsResult?: { hash: string; at: string; result: unknown };
   /** Same stability contract for the role-fit analysis. */
   lastRoleFit?: { hash: string; at: string; result: unknown };
+  /**
+   * The employer's demand profile extracted from the ad at application creation —
+   * the single source of truth every later scan anchors to (report and editor must
+   * always show the same themes).
+   */
+  demandProfile?: {
+    competence_themes?: { theme: string; importance: "must" | "nice"; supporting_terms: string[] }[];
+    knockout_requirements?: string[];
+  };
   createdFrom?: string;
   /**
    * Your one true "base profile" — the canonical set of real facts. Role templates are
