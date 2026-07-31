@@ -463,6 +463,15 @@ Adjust expectations based on seniority level (see above).
 `;
 
 const FEEDBACK_RULES = `
+## TRUTHFUL FRAMING (how rejection actually works)
+- NEVER claim or imply the ATS will auto-reject the CV over wording ("will be filtered
+  out by ATS" is a debunked myth — ~92% of recruiters do not auto-reject on content).
+- Frame keyword work truthfully: matching the employer's terms makes the candidate
+  FINDABLE in recruiter searches and LEGIBLE in a 6-10 second human scan.
+- The real automatic rejections are knockout questions (work authorization, location,
+  certifications, required language) — flag these as "hard requirements to answer
+  honestly", never as wording problems.
+
 ## FEEDBACK RULES
 - NEVER give generic advice: "use stronger verbs", "add more numbers", "improve readability", "consider adding skills"
 - Every recommendation MUST be tied to a specific section or bullet
