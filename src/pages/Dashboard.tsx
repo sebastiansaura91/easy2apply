@@ -131,7 +131,7 @@ const Dashboard = () => {
                 )}
               </div>
               <p className="truncate text-xs text-muted-foreground">
-                {meta.tailoredForJob ? `${isSv ? "för" : "for"} ${meta.tailoredForJob} · ` : ""}
+                {meta.tailoredForJob ? `${isSv ? "för" : "for"} ${meta.tailoredForJob}${meta.tailoredForCompany ? ` @ ${meta.tailoredForCompany}` : ""} · ` : ""}
                 {format(new Date(r.updated_at), "yyyy-MM-dd")} · {r.language.toUpperCase()}
               </p>
             </div>
