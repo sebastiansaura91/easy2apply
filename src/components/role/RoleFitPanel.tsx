@@ -28,6 +28,8 @@ interface Props {
   onNavigateToSection?: (sectionType: string) => void;
   /** Persist the analysis + input hash on the CV so unchanged input reuses the stored result. */
   onPersistRoleFit?: (hash: string, result: RoleFitResult) => void;
+  /** Show only reframes + emphasis — score and gaps live in the Matchning scorecard. */
+  reframesOnly?: boolean;
 }
 
 const actionMeta: Record<EmphasisAction, { icon: JSX.Element; cls: string }> = {
@@ -40,7 +42,7 @@ const actionMeta: Record<EmphasisAction, { icon: JSX.Element; cls: string }> = {
  * Runs the role-fit analysis for the CV's target role (optionally sharpened by a pasted
  * job posting) and renders suggestion-only output. The user applies each reframe manually.
  */
-export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onNavigateToSection, onPersistRoleFit }: Props) {
+export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onNavigateToSection, onPersistRoleFit, reframesOnly }: Props) {
   const didAuto = useRef(false);
   const isSv = cvLanguage === "sv";
   const { toast } = useToast();
@@ -203,14 +205,16 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
 
       {result && (
         <div className="space-y-5 pt-1">
-          {/* Score + summary */}
-          <div className="flex items-start gap-3 rounded-lg border border-border p-3">
-            <div className={`font-serif text-3xl font-medium ${applied.size > 0 ? "text-muted-foreground/60" : scoreColor(result.fit_score)}`}>{result.fit_score}</div>
-            <div className="text-sm">
-              <p className="font-medium">{isSv ? "Fit-score" : "Fit score"}</p>
-              <p className="text-muted-foreground leading-snug">{result.summary}</p>
+          {/* Score + summary — hidden in reframesOnly mode (Matchning owns the score). */}
+          {!reframesOnly && (
+            <div className="flex items-start gap-3 rounded-lg border border-border p-3">
+              <div className={`font-serif text-3xl font-medium ${applied.size > 0 ? "text-muted-foreground/60" : scoreColor(result.fit_score)}`}>{result.fit_score}</div>
+              <div className="text-sm">
+                <p className="font-medium">{isSv ? "Fit-score" : "Fit score"}</p>
+                <p className="text-muted-foreground leading-snug">{result.summary}</p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Applied changes make the score stale — offer a one-tap re-run */}
           {applied.size > 0 && (
@@ -306,8 +310,8 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
             </div>
           )}
 
-          {/* Gaps */}
-          {result.gaps.length > 0 && (
+          {/* Gaps — hidden in reframesOnly mode (the Matchning scorecard owns gaps). */}
+          {!reframesOnly && result.gaps.length > 0 && (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
                 {isSv ? "Ärliga gap" : "Honest gaps"}

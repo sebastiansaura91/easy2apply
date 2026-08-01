@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { resume_content_json, job_posting_text, locale, demand_profile } = await req.json();
+    const { resume_content_json, job_posting_text, locale, demand_profile, previous_themes } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -44,6 +44,11 @@ serve(async (req) => {
       for (const t of demand_profile.competence_themes) {
         userPrompt += `- ${t.theme} (${t.importance})${t.supporting_terms?.length ? ` — supporting terms: ${t.supporting_terms.join(", ")}` : ""}\n`;
       }
+      userPrompt += `\n`;
+    }
+    if (Array.isArray(previous_themes) && previous_themes.length) {
+      userPrompt += `## PREVIOUS RATINGS (anchor — change only where the CV's evidence for that theme changed)\n`;
+      for (const t of previous_themes) userPrompt += `- ${t.theme}: ${t.rating}/5\n`;
       userPrompt += `\n`;
     }
     userPrompt += `## CV DATA (JSON)\n\`\`\`json\n${JSON.stringify(resume_content_json, null, 2)}\n\`\`\`\n\n`;
@@ -262,10 +267,16 @@ serve(async (req) => {
       if (Array.isArray(result.job_language_match.competence_themes)) {
         for (const th of result.job_language_match.competence_themes) {
           if (Array.isArray(th?.supporting_terms_missing)) th.supporting_terms_missing = th.supporting_terms_missing.filter(keepPhrase);
+          // Clamp/derive the scorecard rating; keep evidence consistent with it.
+          let r = Number(th?.rating);
+          if (!Number.isFinite(r)) r = th?.evidence === "strong" ? 4 : th?.evidence === "missing" ? 1 : 3;
+          th.rating = Math.max(1, Math.min(5, Math.round(r)));
           // If nothing is genuinely missing and evidence exists, the theme is effectively covered.
           if (th?.evidence === "partial" && Array.isArray(th.supporting_terms_missing) && th.supporting_terms_missing.length === 0 && (th.supporting_terms_present || []).length > 0) {
             th.evidence = "strong";
+            if (th.rating < 4) th.rating = 4;
           }
+          th.evidence = th.rating >= 4 ? "strong" : th.rating <= 1 ? "missing" : "partial";
         }
       }
     }
@@ -519,9 +530,17 @@ role (e.g. "Controlling", "Transformation", "Commercial leadership") and judge w
 CV EVIDENCES each bucket. Keywords are only signals that support a bucket.
 - Derive 4–7 competence themes from the posting. Mark each "must" or "nice" by how the
   posting weights it (title + repeated emphasis + must-have list beat single mentions).
-- For each theme, judge the CV's evidence: "strong" (quantified achievements clearly in
-  this bucket), "partial" (related work, weak framing), "missing" (no honest evidence).
-  Cite where in evidence_note.
+- Rate each theme 1–5 with these ANCHORS (recruiter scorecard style):
+  5 = multiple QUANTIFIED achievements squarely in this bucket
+  4 = clear achievements in the bucket, partly quantified
+  3 = real experience, but activity-framed (weak outcome evidence)
+  2 = only adjacent/indirect experience
+  1 = no honest evidence
+  Set evidence from the rating: 4–5 → "strong", 2–3 → "partial", 1 → "missing".
+  Cite where the evidence sits in evidence_note.
+- If PREVIOUS RATINGS are provided in the user prompt, START from them: change a theme's
+  rating ONLY when the CV's evidence for THAT theme clearly differs from what the previous
+  rating implies. Never re-litigate untouched themes.
 - supporting_terms_present: the posting's terms for this theme that the CV already uses
   (in any language/form). supporting_terms_missing: the posting's terms that would
   reinforce this theme and are genuinely absent (subject to the matching rules below).
@@ -640,12 +659,13 @@ const RESULT_SCHEMA = {
             properties: {
               theme: { type: "string", description: "The competence bucket, e.g. 'Controlling' or 'Transformation'" },
               importance: { type: "string", enum: ["must", "nice"] },
+              rating: { type: "number", description: "Anchored 1-5 recruiter-scorecard rating of the CV's evidence for this theme" },
               evidence: { type: "string", enum: ["strong", "partial", "missing"] },
               evidence_note: { type: "string", description: "One short sentence: where the CV evidences this (or that it doesn't)" },
               supporting_terms_present: { type: "array", items: { type: "string" } },
               supporting_terms_missing: { type: "array", items: { type: "string" } },
             },
-            required: ["theme", "importance", "evidence", "evidence_note", "supporting_terms_present", "supporting_terms_missing"],
+            required: ["theme", "importance", "rating", "evidence", "evidence_note", "supporting_terms_present", "supporting_terms_missing"],
             additionalProperties: false,
           },
         },

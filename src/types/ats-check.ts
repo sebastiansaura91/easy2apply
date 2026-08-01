@@ -30,6 +30,8 @@ export interface LanguageReplacement {
 export interface CompetenceTheme {
   theme: string;
   importance: "must" | "nice";
+  /** Anchored 1–5 recruiter-scorecard rating of the CV's evidence for this theme. */
+  rating?: number;
   evidence: "strong" | "partial" | "missing";
   evidence_note: string;
   supporting_terms_present: string[];

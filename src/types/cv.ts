@@ -95,6 +95,8 @@ export interface CVMeta {
     competence_themes?: { theme: string; importance: "must" | "nice"; supporting_terms: string[] }[];
     knockout_requirements?: string[];
   };
+  /** Themes the user has consciously accepted as honest gaps — shown muted, never nagged. */
+  acceptedGaps?: string[];
   createdFrom?: string;
   /**
    * Your one true "base profile" — the canonical set of real facts. Role templates are

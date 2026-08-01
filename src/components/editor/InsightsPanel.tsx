@@ -11,6 +11,8 @@ import { runAtsCheck } from "@/components/cv-editor/AtsCheck";
 import { detectCvLanguages } from "@/lib/language-detection";
 import { findCvIssues, analyzeAllBullets, CvIssue } from "@/lib/cv-quality";
 import { cvScanSignature } from "@/lib/cv-signature";
+import { computeMatchScore, biggestGap } from "@/lib/match-score";
+import { CVMeta } from "@/types/cv";
 import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 import {
   CheckCircle2, AlertTriangle, AlertOctagon, Loader2, ChevronDown, ChevronRight,
@@ -36,6 +38,8 @@ interface Props {
   onPersistResult?: (hash: string, result: AtsCheckResult) => void;
   /** Scan automatically on mount (opening "Improve" runs everything — no extra click). */
   autoRun?: boolean;
+  /** Merge a metadata patch into the CV (persists via autosave) — accepted gaps etc. */
+  onUpdateMeta?: (patch: Partial<CVMeta>) => void;
 }
 
 interface SinceLast {
@@ -62,7 +66,7 @@ function severityBorder(severity: CvIssue["severity"]) {
 
 export function InsightsPanel({
   cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
-  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun,
+  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta,
 }: Props) {
   const { toast } = useToast();
   // Restore the stored full analysis so buckets are populated from the start.
@@ -166,6 +170,10 @@ export function InsightsPanel({
           // Anchor themes to the demand profile extracted at application creation, so the
           // report and the editor always talk about the same competence buckets.
           demand_profile: cv.__meta?.demandProfile || undefined,
+          // Anchor ratings to the previous scan so untouched themes never drift.
+          previous_themes: (prevFull?.job_language_match?.competence_themes || [])
+            .filter(t => Number.isFinite(t.rating as number))
+            .map(t => ({ theme: t.theme, rating: t.rating })),
         },
       });
       if (error) throw error;
@@ -343,11 +351,14 @@ export function InsightsPanel({
   // Interview flow: fetch one verification question per unconfirmed keyword — AND per
   // competence theme lacking evidence ("Har du drivit transformationsarbete?"), since
   // recruiters screen buckets first and terms second.
-  const fetchQuestions = async () => {
+  const fetchQuestions = async (scope?: string[]) => {
+    const accepted = new Set(cv.__meta?.acceptedGaps || []);
     const weakThemes = themes
-      .filter(t => t.evidence !== "strong" && !kwConfirm[t.theme])
+      .filter(t => t.evidence !== "strong" && !kwConfirm[t.theme] && !accepted.has(t.theme))
       .map(t => t.theme);
-    const unknowns = Array.from(new Set([...weakThemes, ...missingKw.filter(p => !kwConfirm[p])]));
+    const unknowns = scope?.length
+      ? scope.filter(p => !kwConfirm[p])
+      : Array.from(new Set([...weakThemes, ...missingKw.filter(p => !kwConfirm[p])]));
     if (!unknowns.length) return;
     setLoadingQ(true);
     try {
@@ -557,24 +568,60 @@ export function InsightsPanel({
                     )}
                     {themes.length > 0 ? (
                       <div className="space-y-2">
-                        {themes.map((th, i) => (
-                          <div key={i} className={`rounded-lg border p-2.5 space-y-1.5 ${th.importance === "must" && th.evidence === "missing" ? "border-destructive/30" : "border-border"}`}>
+                        {[...themes]
+                          .sort((a, b) => ((a.importance === "must" ? 0 : 1) - (b.importance === "must" ? 0 : 1)) || ((a.rating ?? 3) - (b.rating ?? 3)))
+                          .map((th, i) => {
+                          const accepted = (cv.__meta?.acceptedGaps || []).includes(th.theme);
+                          const r = Math.max(1, Math.min(5, Math.round(th.rating ?? (th.evidence === "strong" ? 4 : th.evidence === "missing" ? 1 : 3))));
+                          return (
+                          <div key={i} className={`rounded-lg border p-2.5 space-y-1.5 ${accepted ? "border-border opacity-55" : th.importance === "must" && th.evidence === "missing" ? "border-destructive/30" : "border-border"}`}>
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span className="text-xs font-semibold">{th.theme}</span>
                               {th.importance === "must" && (
                                 <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">{isSv ? "Krav" : "Must"}</span>
                               )}
-                              {evidenceBadge(th.evidence)}
+                              {/* Scorecard rating dots (1–5) */}
+                              <span className="ml-auto flex items-center gap-0.5" title={`${r}/5`} aria-label={`${r}/5`}>
+                                {[1, 2, 3, 4, 5].map(n => (
+                                  <span key={n} className={`h-1.5 w-1.5 rounded-full ${n <= r ? (r >= 4 ? "bg-green-600" : r >= 2 ? "bg-warning" : "bg-destructive") : "bg-muted"}`} />
+                                ))}
+                              </span>
+                              {accepted && <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">{isSv ? "Accepterat gap" : "Accepted gap"}</span>}
                             </div>
-                            <p className="text-[10px] leading-relaxed text-muted-foreground">{th.evidence_note}</p>
-                            {(th.supporting_terms_present || []).length > 0 && (
-                              <p className="text-[10px] text-green-700 dark:text-green-500">✓ {th.supporting_terms_present.join(" · ")}</p>
+                            {!accepted && (
+                              <>
+                                <p className="text-[10px] leading-relaxed text-muted-foreground">{th.evidence_note}</p>
+                                {(th.supporting_terms_present || []).length > 0 && (
+                                  <p className="text-[10px] text-green-700 dark:text-green-500">✓ {th.supporting_terms_present.join(" · ")}</p>
+                                )}
+                                {(th.supporting_terms_missing || []).length > 0 && (
+                                  <div className="flex flex-wrap gap-1">{th.supporting_terms_missing.map(kwChip)}</div>
+                                )}
+                                {r < 4 && canFix && (
+                                  <div className="flex gap-1.5 pt-0.5">
+                                    <Button variant="outline" size="sm" className="h-8 flex-1 text-[10px]" disabled={loadingQ || placing}
+                                      onClick={() => fetchQuestions([th.theme, ...(th.supporting_terms_missing || [])])}>
+                                      <Wrench className="mr-1 h-3 w-3" />{isSv ? "Överbrygga — fråga mig" : "Bridge — ask me"}
+                                    </Button>
+                                    {onUpdateMeta && (
+                                      <Button variant="ghost" size="sm" className="h-8 text-[10px] text-muted-foreground"
+                                        onClick={() => onUpdateMeta({ acceptedGaps: [...(cv.__meta?.acceptedGaps || []), th.theme] })}>
+                                        {isSv ? "Ärligt gap" : "Honest gap"}
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+                              </>
                             )}
-                            {(th.supporting_terms_missing || []).length > 0 && (
-                              <div className="flex flex-wrap gap-1">{th.supporting_terms_missing.map(kwChip)}</div>
+                            {accepted && onUpdateMeta && (
+                              <button type="button" className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+                                onClick={() => onUpdateMeta({ acceptedGaps: (cv.__meta?.acceptedGaps || []).filter(g => g !== th.theme) })}>
+                                {isSv ? "Ångra" : "Undo"}
+                              </button>
                             )}
                           </div>
-                        ))}
+                          );
+                        })}
                         {unthemedKw.length > 0 && <div className="flex flex-wrap gap-1">{unthemedKw.map(kwChip)}</div>}
                       </div>
                     ) : (
@@ -596,7 +643,7 @@ export function InsightsPanel({
                 return (
                   <div className="mt-1 space-y-1.5">
                     {unknowns.length > 0 && (
-                      <Button variant="default" size="sm" className="h-9 w-full text-xs" onClick={fetchQuestions} disabled={loadingQ || placing}>
+                      <Button variant="default" size="sm" className="h-9 w-full text-xs" onClick={() => fetchQuestions()} disabled={loadingQ || placing}>
                         {loadingQ ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Wrench className="mr-1.5 h-3.5 w-3.5" />}
                         {loadingQ ? (isSv ? "Skapar frågor…" : "Creating questions…") : (isSv ? `Fråga mig om ${unknowns.length} nyckelord` : `Ask me about ${unknowns.length} keywords`)}
                       </Button>
@@ -799,7 +846,34 @@ export function InsightsPanel({
     <div className="p-4 space-y-4">
       {/* ── Health overview ── */}
       <div className="text-center pb-3 border-b border-border">
-        {deepResult ? (
+        {(() => {
+          const matchScore = computeMatchScore(themes);
+          if (matchScore === null) return null;
+          const gap = biggestGap(themes);
+          return (
+            <>
+              <div className={`font-serif text-4xl font-medium ${scoreColor(matchScore)}`}>{matchScore}</div>
+              <p className="text-xs font-semibold text-muted-foreground">
+                {isSv ? "Matchpoäng · viktad kompetensmatchning" : "Match score · weighted competency match"}
+              </p>
+              {gap && (
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {isSv ? "Störst gap:" : "Biggest gap:"} <span className="font-medium text-foreground">{gap.theme}</span>
+                </p>
+              )}
+              {typeof window !== "undefined" && !window.localStorage.getItem("matchModelSeen") && (
+                <button
+                  type="button"
+                  className="mt-1 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+                  onClick={(e) => { window.localStorage.setItem("matchModelSeen", "1"); (e.target as HTMLElement).remove(); }}
+                >
+                  {isSv ? "Ny poängmodell: som en rekryterares scorecard — krav-teman väger dubbelt. (göm)" : "New scoring model: like a recruiter's scorecard — must-themes weigh double. (hide)"}
+                </button>
+              )}
+            </>
+          );
+        })()}
+        {computeMatchScore(themes) !== null ? null : deepResult ? (
           <>
             <div className={`font-serif text-4xl font-medium ${scoreColor(deepResult.overall_score)}`}>{Math.round(deepResult.overall_score)}</div>
             <p className={`text-xs font-semibold ${scoreColor(deepResult.overall_score)}`}>{isSv ? "Betyg" : "Grade"} {deepResult.grade}</p>

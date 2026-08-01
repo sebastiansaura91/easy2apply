@@ -23,6 +23,7 @@ interface Props {
   onPersistScore?: (score: number, grade: string, subscores?: AtsCheckResult["subscores"]) => void;
   onPersistResult?: (hash: string, result: AtsCheckResult) => void;
   onPersistRoleFit?: (hash: string, result: RoleFitResult) => void;
+  onUpdateMeta?: (patch: Partial<CVContent["__meta"] & object>) => void;
 }
 
 /**
@@ -33,7 +34,7 @@ interface Props {
  */
 export function TailorPanel({
   open, onOpenChange, cv, cvLanguage, t, seededJob, seededResult,
-  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit,
+  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit, onUpdateMeta,
 }: Props) {
   const isSv = cvLanguage === "sv";
   const hasRole = !!(cv.__meta?.targetRole || cv.__meta?.targetRoleLabel);
@@ -45,34 +46,14 @@ export function TailorPanel({
         <SheetHeader className="p-4 pb-2">
           <SheetTitle>{isSv ? "Förbättra CV:t" : "Improve this CV"}</SheetTitle>
         </SheetHeader>
-        <Tabs defaultValue={seededResult ? "ats" : hasRole ? "fit" : "ats"} className="flex-1">
+        <Tabs defaultValue="ats" className="flex-1">
           <TabsList className="mx-4 grid grid-cols-3">
-            <TabsTrigger value="fit" disabled={!hasRole}>{isSv ? "Rollfit" : "Role fit"}</TabsTrigger>
-            <TabsTrigger value="ats">{isSv ? "ATS & ord" : "ATS & words"}</TabsTrigger>
+            <TabsTrigger value="ats">{isSv ? "Matchning" : "Match"}</TabsTrigger>
+            <TabsTrigger value="fit" disabled={!hasRole}>{isSv ? "Omformuleringar" : "Reframes"}</TabsTrigger>
             <TabsTrigger value="guide" disabled={!hasPresetRole}>{isSv ? "Rollguide" : "Role guide"}</TabsTrigger>
           </TabsList>
 
-          {/* forceMount: opening "Improve" scans BOTH role fit and ATS at once — no extra clicks. */}
-          <TabsContent value="fit" forceMount className="mt-0 data-[state=inactive]:hidden">
-            {hasRole ? (
-              <RoleFitPanel
-                cv={cv}
-                cvLanguage={cvLanguage}
-                onApplyReframe={onApplyReframe}
-                autoRun
-                onUpdateProfile={onUpdateProfile}
-                onUpdateExperienceBullets={onUpdateExperienceBullets}
-                onUpdateSkills={onUpdateSkills}
-                onNavigateToSection={onNavigateToSection}
-                onPersistRoleFit={onPersistRoleFit}
-              />
-            ) : (
-              <p className="p-4 text-sm text-muted-foreground">
-                {isSv ? "Rikta CV:t mot en roll för att se rollfit." : "Tailor this CV to a role to see role fit."}
-              </p>
-            )}
-          </TabsContent>
-
+          {/* Matchning: the recruiter scorecard — the single score and gap surface. */}
           <TabsContent value="ats" forceMount className="mt-0 data-[state=inactive]:hidden">
             <InsightsPanel
               cv={cv}
@@ -87,7 +68,30 @@ export function TailorPanel({
               onPersistScore={onPersistScore}
               onPersistResult={onPersistResult}
               autoRun={open}
+              onUpdateMeta={onUpdateMeta}
             />
+          </TabsContent>
+
+          {/* Reframes: truthful rewrites + emphasis — no competing score here. */}
+          <TabsContent value="fit" forceMount className="mt-0 data-[state=inactive]:hidden">
+            {hasRole ? (
+              <RoleFitPanel
+                cv={cv}
+                cvLanguage={cvLanguage}
+                onApplyReframe={onApplyReframe}
+                autoRun
+                reframesOnly
+                onUpdateProfile={onUpdateProfile}
+                onUpdateExperienceBullets={onUpdateExperienceBullets}
+                onUpdateSkills={onUpdateSkills}
+                onNavigateToSection={onNavigateToSection}
+                onPersistRoleFit={onPersistRoleFit}
+              />
+            ) : (
+              <p className="p-4 text-sm text-muted-foreground">
+                {isSv ? "Rikta CV:t mot en roll för att se omformuleringar." : "Tailor this CV to a role to see reframes."}
+              </p>
+            )}
           </TabsContent>
 
           <TabsContent value="guide" className="mt-0">

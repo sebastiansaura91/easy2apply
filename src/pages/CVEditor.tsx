@@ -499,6 +499,8 @@ const CVEditor = () => {
           setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastAtsResult: { hash, at: new Date().toISOString(), result } } }))}
         onPersistRoleFit={(hash, result) =>
           setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastRoleFit: { hash, at: new Date().toISOString(), result } } }))}
+        onUpdateMeta={(patch) =>
+          setCv(prev => ({ ...prev, __meta: { ...prev.__meta, ...patch } }))}
       />
 
       {/* Sync structural facts across the whole lineage */}
