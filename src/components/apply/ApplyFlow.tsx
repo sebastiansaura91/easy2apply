@@ -15,6 +15,9 @@ import { RolePicker, CUSTOM_ROLE } from "@/components/role/RolePicker";
 import { roleLabel, getRoleAdvice } from "@/lib/role-advice";
 import { getResumeMeta } from "@/lib/resume-grouping";
 import { cvScanSignature } from "@/lib/cv-signature";
+import { deriveRoleFromTitle } from "@/lib/role-from-title";
+import { MatchScorecard } from "@/components/editor/MatchScorecard";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CVMeta } from "@/types/cv";
 import { AtsCheckResult } from "@/types/ats-check";
 
@@ -61,59 +64,80 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
   const [base, setBase] = useState<ApplyTemplate | null>(null);
   // Company name for tracking — prefilled from the ad when detectable, always editable.
   const [company, setCompany] = useState("");
+  // Secondary path: no ad → target a role directly.
+  const [roleMode, setRoleMode] = useState(false);
 
   const isCustom = roleId === CUSTOM_ROLE;
   const label = isCustom ? (customLabel.trim() || (isSv ? "Egen roll" : "Custom role")) : roleLabel(roleId, null, language);
 
-  const reset = () => { setStep("input"); setJobText(""); setReport(null); setBase(null); setBusy(false); setCompany(""); };
+  const reset = () => { setStep("input"); setJobText(""); setReport(null); setBase(null); setBusy(false); setCompany(""); setRoleMode(false); };
   const close = (o: boolean) => { if (!o) reset(); onOpenChange(o); };
 
   // Pick the template whose role matches; else the most recent; else none (→ create first).
-  const resolveBase = (): ApplyTemplate | null => {
+  const resolveBase = (rid: string, custom: string): ApplyTemplate | null => {
     const matched = templates.find((t) => {
       const m = getResumeMeta(t);
-      if (isCustom) return !!m.targetRoleLabel && m.targetRoleLabel.toLowerCase() === customLabel.trim().toLowerCase();
-      return !!roleId && m.targetRole === roleId;
+      if (rid === CUSTOM_ROLE) return !!m.targetRoleLabel && m.targetRoleLabel.toLowerCase() === custom.trim().toLowerCase();
+      return !!rid && m.targetRole === rid;
     });
     return matched ?? templates[0] ?? null;
   };
 
-  const runReport = async () => {
-    if (!roleId) { toast({ title: isSv ? "Välj en roll" : "Choose a role", variant: "destructive" }); return; }
-    if (isCustom && !customLabel.trim()) { toast({ title: isSv ? "Ange rolltitel" : "Enter a role title", variant: "destructive" }); return; }
-
-    const b = resolveBase();
-    if (!b) {
-      // No templates yet — go create the first one, seeded with this role intent.
-      onOpenChange(false);
-      navigate("/wizard/create");
+  // Ad-first: paste the ad and everything else (role, template, company) is derived.
+  const runReport = async (baseOverride?: ApplyTemplate) => {
+    const hasAd = jobText.trim().length > 0;
+    if (!hasAd) {
+      // Role path (secondary): a role must be chosen.
+      if (!roleId) { toast({ title: isSv ? "Välj en roll" : "Choose a role", variant: "destructive" }); return; }
+      if (isCustom && !customLabel.trim()) { toast({ title: isSv ? "Ange rolltitel" : "Enter a role title", variant: "destructive" }); return; }
+      const b = baseOverride ?? resolveBase(roleId, customLabel);
+      if (!b) { onOpenChange(false); navigate("/wizard/create"); return; }
+      setBase(b);
+      setReport({ kind: "role" });
+      setStep("report");
       return;
     }
-    setBase(b);
+
     setBusy(true);
     try {
+      // 1) Parse the ad → job title, company, demand profile.
+      let ja: any = null;
+      try {
+        const { data } = await supabase.functions.invoke("analyze-job-posting", { body: { job_posting_text: jobText.trim() } });
+        if (!(data as any)?.error) ja = data;
+      } catch { /* non-fatal: still show the ATS match */ }
+
+      // 2) Derive the role bucket from the ad title (user can still change it in the report).
+      let rid = roleId;
+      let custom = customLabel;
+      if (!rid) {
+        const derived = deriveRoleFromTitle(ja?.job_title);
+        if (derived) { rid = derived.roleId; custom = derived.customLabel ?? ""; }
+        setRoleId(rid || "");
+        setCustomLabel(custom);
+      }
+
+      // 3) Auto-pick the template for that role.
+      const b = baseOverride ?? resolveBase(rid, custom);
+      if (!b) { onOpenChange(false); navigate("/wizard/create"); return; }
+      setBase(b);
+
+      // 4) Score the match.
       const { data: full } = await supabase.from("resumes").select("content_json").eq("id", b.id).single();
       const cv = (full?.content_json as any) || {};
-
-      if (jobText.trim()) {
-        // Ad path: parse the ad (for a clean job title) + score the match.
-        let ja: any = null;
-        try {
-          const { data } = await supabase.functions.invoke("analyze-job-posting", { body: { job_posting_text: jobText.trim() } });
-          if (!(data as any)?.error) ja = data;
-        } catch { /* non-fatal: still show the ATS match */ }
-        const { data, error } = await supabase.functions.invoke("ats-check", {
-          body: { resume_content_json: cv, job_posting_text: jobText.trim(), locale: b.language || language },
-        });
-        if (error) throw error;
-        if ((data as any)?.error) throw new Error((data as any).error);
-        setReport({ kind: "job", ats: data as AtsCheckResult, jobTitle: ja?.job_title, company: ja?.company_name, ja: ja || undefined });
-        const detected = ja?.company_name && !/^(unknown|okänt)$/i.test(ja.company_name) ? ja.company_name : "";
-        setCompany(detected);
-      } else {
-        // No-ad path: check against the role's normal requirements (static role advice).
-        setReport({ kind: "role" });
-      }
+      const { data, error } = await supabase.functions.invoke("ats-check", {
+        body: {
+          resume_content_json: cv,
+          job_posting_text: jobText.trim(),
+          locale: b.language || language,
+          demand_profile: ja ? { competence_themes: ja.competence_themes, knockout_requirements: ja.knockout_requirements } : undefined,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setReport({ kind: "job", ats: data as AtsCheckResult, jobTitle: ja?.job_title, company: ja?.company_name, ja: ja || undefined });
+      const detected = ja?.company_name && !/^(unknown|okänt)$/i.test(ja.company_name) ? ja.company_name : "";
+      setCompany(detected);
       setStep("report");
     } catch (e: any) {
       toast({ title: isSv ? "Analysen misslyckades" : "Analysis failed", description: e.message, variant: "destructive" });
@@ -175,9 +199,8 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
   };
 
   const advice = getRoleAdvice(roleId);
-  const weakBullets = report?.kind === "job" ? report.ats.bullet_feedback.filter((b) => b.score < 6).length : 0;
-  const missing = report?.kind === "job" ? report.ats.job_language_match.missing_phrases.slice(0, 8) : [];
-  const scoreColor = (s: number) => (s >= 75 ? "text-green-600" : s >= 50 ? "text-amber-600" : "text-destructive");
+  const reportThemes = report?.kind === "job" ? (report.ats.job_language_match?.competence_themes ?? []) : [];
+  const gapCount = reportThemes.filter(t => Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3)) < 4).length;
 
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -190,31 +213,50 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
                 {isSv ? "Sök en ny tjänst" : "Apply for a new position"}
               </DialogTitle>
               <DialogDescription>
-                {isSv ? "Välj roll. Klistra in annonsen om du har en — annars kollar vi mot rollens normala krav." : "Pick the role. Paste the ad if you have one — otherwise we check against the role's normal requirements."}
+                {isSv ? "Klistra in annonsen — vi listar ut roll, mall och företag åt dig." : "Paste the ad — we work out the role, template and company for you."}
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-1">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">{isSv ? "Vilken roll söker du?" : "What role are you applying for?"}</label>
-                <RolePicker value={roleId} onChange={setRoleId} selectedLabel={roleId ? label : ""} onCustomLabel={(l) => setCustomLabel(l)} />
-                {isCustom && (
-                  <Input autoFocus value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder={isSv ? "t.ex. Commercial Excellence" : "e.g. Commercial Excellence"} />
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {isSv ? "Välj en bred roll — den exakta titeln tas från annonsen, så en mall räcker för många jobb." : "Pick a broad role — the exact title comes from the ad, so one template covers many jobs."}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">{isSv ? "Jobbannons" : "Job ad"} <span className="font-normal text-muted-foreground">({isSv ? "valfritt" : "optional"})</span></label>
-                <Textarea value={jobText} onChange={(e) => setJobText(e.target.value)} placeholder={isSv ? "Klistra in annonsen…" : "Paste the ad…"} className="min-h-[110px] text-sm" />
-              </div>
+            <div className="space-y-3 py-1">
+              {!roleMode ? (
+                <>
+                  <Textarea
+                    autoFocus
+                    value={jobText}
+                    onChange={(e) => setJobText(e.target.value)}
+                    placeholder={isSv ? "Klistra in jobbannonsen här…" : "Paste the job ad here…"}
+                    className="min-h-[180px] text-sm"
+                  />
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    onClick={() => setRoleMode(true)}
+                  >
+                    {isSv ? "Ingen annons? Rikta mot en roll →" : "No ad? Target a role →"}
+                  </button>
+                </>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">{isSv ? "Vilken roll söker du?" : "What role are you applying for?"}</label>
+                  <RolePicker value={roleId} onChange={setRoleId} selectedLabel={roleId ? label : ""} onCustomLabel={(l) => setCustomLabel(l)} />
+                  {isCustom && (
+                    <Input autoFocus value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder={isSv ? "t.ex. Commercial Excellence" : "e.g. Commercial Excellence"} />
+                  )}
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    onClick={() => setRoleMode(false)}
+                  >
+                    {isSv ? "← Har en annons ändå" : "← I have an ad after all"}
+                  </button>
+                </div>
+              )}
             </div>
 
             <DialogFooter>
-              <Button size="lg" className="w-full text-base" onClick={runReport} disabled={busy || !roleId}>
+              <Button size="lg" className="w-full text-base" onClick={() => runReport()} disabled={busy || (roleMode ? !roleId : !jobText.trim())}>
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
-                {busy ? (isSv ? "Analyserar…" : "Analyzing…") : (isSv ? "Fortsätt" : "Continue")}
+                {busy ? (isSv ? "Analyserar…" : "Analyzing…") : roleMode ? (isSv ? "Fortsätt" : "Continue") : (isSv ? "Analysera matchning" : "Analyze match")}
               </Button>
             </DialogFooter>
           </>
@@ -233,49 +275,48 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
             </DialogHeader>
 
             <div className="space-y-4 py-1">
-              {base && (
-                <div className="rounded-md border border-border bg-accent/40 px-3 py-2 text-sm">
-                  <span className="text-muted-foreground">{isSv ? "Vi utgår från din mall: " : "Working from your template: "}</span>
-                  <span className="font-medium">{base.title}</span>
-                </div>
-              )}
-              {report?.kind === "job" ? (
-                <>
-                  <div className="flex items-baseline gap-3">
-                    <span className={`font-serif text-4xl font-semibold ${scoreColor(report.ats.overall_score)}`}>{Math.round(report.ats.overall_score)}</span>
-                    <span className="text-sm text-muted-foreground">/ 100 {isSv ? "matchning" : "match"} · {isSv ? "betyg" : "grade"} {report.ats.grade}</span>
+              {/* Everything derived — shown as editable fields, never asked upfront. */}
+              <div className="grid gap-2">
+                {report?.kind === "job" && (
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">{isSv ? "Roll (härledd från annonsen)" : "Role (derived from the ad)"}</label>
+                    <RolePicker value={roleId} onChange={setRoleId} selectedLabel={roleId ? label : ""} onCustomLabel={(l) => setCustomLabel(l)} />
                   </div>
-                  {(report.ja?.competence_themes?.length ?? 0) > 0 && (
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Vad arbetsgivaren screenar på" : "What the employer screens for"}</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {report.ja!.competence_themes!.map((t) => (
-                          <Badge key={t.theme} variant={t.importance === "must" ? "default" : "secondary"} className="text-[10px]">
-                            {t.theme}{t.importance === "must" ? " ★" : ""}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {(report.ja?.knockout_requirements?.length ?? 0) > 0 && (
-                    <div className="space-y-1 rounded-lg border border-warning/40 bg-warning/5 p-3">
-                      <p className="text-xs font-semibold">{isSv ? "Hårda krav — svara ärligt i ansökan" : "Hard requirements — answer honestly in the application"}</p>
-                      <p className="text-[10px] text-muted-foreground">{isSv ? "Detta är de enda automatiska avslagen. CV-formuleringar hjälper inte här." : "These are the only automatic rejections. CV wording can't help here."}</p>
-                      <ul className="list-disc pl-4 text-xs">
-                        {report.ja!.knockout_requirements!.map((k) => <li key={k}>{k}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                  {missing.length > 0 && (
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Saknade nyckelord" : "Missing keywords"}</p>
-                      <div className="flex flex-wrap gap-1.5">{missing.map((p) => <Badge key={p} variant="destructive" className="text-[10px]">{p}</Badge>)}</div>
-                    </div>
-                  )}
-                  {weakBullets > 0 && (
-                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground"><AlertTriangle className="h-3.5 w-3.5 text-warning" />{weakBullets} {isSv ? "punkter att skärpa" : "bullets to sharpen"}</p>
-                  )}
-                </>
+                )}
+                {templates.length > 1 && base && (
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">{isSv ? "Mall" : "Template"}</label>
+                    <Select
+                      value={base.id}
+                      onValueChange={(id) => {
+                        const b = templates.find(t => t.id === id);
+                        if (b && b.id !== base.id) runReport(b);
+                      }}
+                    >
+                      <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {templates.length <= 1 && base && (
+                  <p className="text-xs text-muted-foreground">{isSv ? "Mall: " : "Template: "}<span className="font-medium text-foreground">{base.title}</span></p>
+                )}
+              </div>
+
+              {busy && (
+                <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{isSv ? "Analyserar om mot vald mall…" : "Re-analyzing against the selected template…"}</p>
+              )}
+
+              {report?.kind === "job" ? (
+                <MatchScorecard
+                  themes={reportThemes}
+                  knockouts={report.ja?.knockout_requirements}
+                  fallbackScore={report.ats.overall_score}
+                  fallbackGrade={report.ats.grade}
+                  isSv={isSv}
+                />
               ) : (
                 <div className="space-y-3">
                   {advice ? (
@@ -306,7 +347,9 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
             <DialogFooter className="flex-col gap-2 sm:flex-col">
               <Button size="lg" className="w-full text-base" onClick={createAndOpen} disabled={busy}>
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
-                {isSv ? "Skapa & öppna i editorn" : "Create & open in editor"}
+                {gapCount > 0
+                  ? (isSv ? `Skapa riktat CV — ${gapCount} gap att fixa` : `Create tailored CV — ${gapCount} gaps to fix`)
+                  : (isSv ? "Skapa riktat CV" : "Create tailored CV")}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setStep("input")} disabled={busy}>{isSv ? "Tillbaka" : "Back"}</Button>
             </DialogFooter>

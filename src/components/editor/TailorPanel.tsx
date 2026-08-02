@@ -24,6 +24,7 @@ interface Props {
   onPersistResult?: (hash: string, result: AtsCheckResult) => void;
   onPersistRoleFit?: (hash: string, result: RoleFitResult) => void;
   onUpdateMeta?: (patch: Partial<CVContent["__meta"] & object>) => void;
+  onDownload?: () => void;
 }
 
 /**
@@ -34,7 +35,7 @@ interface Props {
  */
 export function TailorPanel({
   open, onOpenChange, cv, cvLanguage, t, seededJob, seededResult,
-  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit, onUpdateMeta,
+  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit, onUpdateMeta, onDownload,
 }: Props) {
   const isSv = cvLanguage === "sv";
   const hasRole = !!(cv.__meta?.targetRole || cv.__meta?.targetRoleLabel);
@@ -69,6 +70,7 @@ export function TailorPanel({
               onPersistResult={onPersistResult}
               autoRun={open}
               onUpdateMeta={onUpdateMeta}
+              onDownload={onDownload}
             />
           </TabsContent>
 

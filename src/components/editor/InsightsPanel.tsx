@@ -40,6 +40,8 @@ interface Props {
   autoRun?: boolean;
   /** Merge a metadata patch into the CV (persists via autosave) — accepted gaps etc. */
   onUpdateMeta?: (patch: Partial<CVMeta>) => void;
+  /** Download the PDF — surfaced in the "ready to send" success state. */
+  onDownload?: () => void;
 }
 
 interface SinceLast {
@@ -66,7 +68,7 @@ function severityBorder(severity: CvIssue["severity"]) {
 
 export function InsightsPanel({
   cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
-  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta,
+  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta, onDownload,
 }: Props) {
   const { toast } = useToast();
   // Restore the stored full analysis so buckets are populated from the start.
@@ -850,16 +852,39 @@ export function InsightsPanel({
           const matchScore = computeMatchScore(themes);
           if (matchScore === null) return null;
           const gap = biggestGap(themes);
+          const accepted = new Set(cv.__meta?.acceptedGaps || []);
+          const ratingOf = (t: typeof themes[number]) => Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
+          const allGaps = themes.filter(t => ratingOf(t) < 4);
+          const remaining = allGaps.filter(t => !accepted.has(t.theme)).length;
+          const done = remaining === 0;
           return (
             <>
               <div className={`font-serif text-4xl font-medium ${scoreColor(matchScore)}`}>{matchScore}</div>
               <p className="text-xs font-semibold text-muted-foreground">
                 {isSv ? "Matchpoäng · viktad kompetensmatchning" : "Match score · weighted competency match"}
               </p>
-              {gap && (
+              {!done && (
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {isSv ? "Störst gap:" : "Biggest gap:"} <span className="font-medium text-foreground">{gap.theme}</span>
+                  {remaining} {isSv ? `av ${allGaps.length} gap kvar` : `of ${allGaps.length} gaps left`}
+                  {gap && !accepted.has(gap.theme) && (
+                    <> · {isSv ? "störst:" : "biggest:"} <span className="font-medium text-foreground">{gap.theme}</span></>
+                  )}
                 </p>
+              )}
+              {done && (
+                <div className="mx-auto mt-2 max-w-xs space-y-1.5 rounded-lg border border-green-600/30 bg-green-600/10 p-3">
+                  <p className="text-xs font-semibold text-green-700 dark:text-green-500">
+                    ✓ {isSv ? "Redo att skicka" : "Ready to send"} · {matchScore}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {isSv ? "Alla gap är åtgärdade eller ärligt accepterade." : "Every gap is fixed or honestly accepted."}
+                  </p>
+                  {onDownload && (
+                    <Button size="sm" className="h-9 w-full text-xs" onClick={onDownload}>
+                      {isSv ? "Ladda ner PDF" : "Download PDF"}
+                    </Button>
+                  )}
+                </div>
               )}
               {typeof window !== "undefined" && !window.localStorage.getItem("matchModelSeen") && (
                 <button

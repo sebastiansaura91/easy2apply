@@ -501,6 +501,7 @@ const CVEditor = () => {
           setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastRoleFit: { hash, at: new Date().toISOString(), result } } }))}
         onUpdateMeta={(patch) =>
           setCv(prev => ({ ...prev, __meta: { ...prev.__meta, ...patch } }))}
+        onDownload={doExport}
       />
 
       {/* Sync structural facts across the whole lineage */}
