@@ -24,6 +24,28 @@ const REFINEMENT_PROMPTS_EN: Record<string, string> = {
   ats: `Make this CV bullet more ATS-keyword friendly. Insert relevant industry/role-specific keywords naturally. Do NOT fabricate – keep it truthful. Reply with ONLY the new text.`,
 };
 
+// Distilled human-writing rules (from the "signs of AI writing" guide): suggested
+// text must read like a person wrote it. Recruiters discard obvious AI wording.
+const HUMAN_WRITING_RULES = `
+
+HUMAN WRITING RULES for every piece of suggested text:
+- Plain verbs, plain claims: led/built/increased (ledde/byggde/ökade). Banned CV-slop verbs: spearheaded, leveraged, utilized, orchestrated, championed, pioneered.
+- Banned buzzwords (EN): passionate, dynamic, results-driven, proven track record, synergy, seamless, cutting-edge, vibrant, pivotal, crucial, testament, showcase, delve, robust, holistic, "landscape"/"tapestry" (figurative).
+- Banned (SV): brinner för, passionerad, dynamisk, visionär, spjutspetskompetens, "mervärde" och "framgångsrikt" som utfyllnad.
+- No "-ing"/"vilket" tails that fake depth ("...driving growth, enhancing efficiency" / "...vilket skapade synergier"). One bullet, one concrete claim.
+- No rule-of-three padding: two facts get two items, not a forced third. No "not only... but also" / "inte bara... utan även".
+- Never use em dashes (—) or en dashes (–). Use a comma, period or colon instead.
+- Cut filler: "in order to" -> "to", "responsible for ensuring" -> "ensured", "i syfte att" -> "för att", "ansvarade för att säkerställa" -> "säkerställde".
+- Every word must carry a checkable fact (what, scale, outcome) or be cut. Vary sentence length; never end on a generic upbeat close.`;
+
+// Em dashes are the most reliable AI tell: strip them from every suggested string
+// no matter what the model returns. Hyphens and digit ranges stay untouched;
+// values under an "original" key quote the CV verbatim and must survive for matching.
+const stripAiDashes = (v: unknown): unknown =>
+  typeof v === "string" ? v.replace(/\s*—\s*/g, ", ")
+    : Array.isArray(v) ? v.map(stripAiDashes)
+    : v && typeof v === "object" ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, k === "original" ? x : stripAiDashes(x)])) : v;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -70,7 +92,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: systemContent },
+          { role: "system", content: systemContent + HUMAN_WRITING_RULES },
           { role: "user", content: `${prompt}${contextStr}\n\nBullet: "${bullet}"` },
         ],
         temperature: 0.3,
@@ -96,7 +118,7 @@ serve(async (req) => {
 
     if (!improved) throw new Error("No response from AI");
 
-    return new Response(JSON.stringify({ improved }), {
+    return new Response(JSON.stringify({ improved: stripAiDashes(improved) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
