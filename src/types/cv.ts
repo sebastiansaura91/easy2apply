@@ -97,6 +97,8 @@ export interface CVMeta {
   };
   /** Themes the user has consciously accepted as honest gaps — shown muted, never nagged. */
   acceptedGaps?: string[];
+  /** The knockout-requirements card has been acknowledged — don't lead the queue with it again. */
+  knockoutsAcked?: boolean;
   createdFrom?: string;
   /**
    * Your one true "base profile" — the canonical set of real facts. Role templates are

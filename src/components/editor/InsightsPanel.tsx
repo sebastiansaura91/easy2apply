@@ -104,6 +104,12 @@ export function InsightsPanel({
   const [loadingQ, setLoadingQ] = useState(false);
   const [newBullets, setNewBullets] = useState<NewBullet[] | null>(null);
   const [appliedNew, setAppliedNew] = useState<Set<number>>(new Set());
+  // ── Fix queue (guided mode): one card at a time; the full dashboard hides behind "Visa detaljer".
+  const [showDetails, setShowDetails] = useState(false);
+  const [handledThemes, setHandledThemes] = useState<Set<string>>(new Set());
+  const [dismissedPlacements, setDismissedPlacements] = useState<Set<number>>(new Set());
+  const [dismissedNew, setDismissedNew] = useState<Set<number>>(new Set());
+  const answeredRef = useRef<{ keyword: string; answer: string }[]>([]);
   const cycleKw = (k: string) =>
     setKwConfirm(prev => {
       const cur = prev[k];
@@ -379,6 +385,21 @@ export function InsightsPanel({
   const dismissQuestion = (keyword: string) => {
     setKwConfirm(prev => ({ ...prev, [keyword]: "no" }));
     setKwQuestions(prev => (prev || []).filter(q => q.keyword !== keyword));
+  };
+
+  // Queue mode: answer questions one card at a time; the batch placement runs after the last.
+  const submitOneAnswer = (q: KwQuestion) => {
+    const answer = (kwAnswers[q.keyword] || "").trim();
+    if (answer.length <= 2) return;
+    answeredRef.current.push({ keyword: q.keyword, answer });
+    setKwConfirm(prev => ({ ...prev, [q.keyword]: "yes" }));
+    const rest = (kwQuestions || []).filter(x => x.keyword !== q.keyword);
+    setKwQuestions(rest.length ? rest : null);
+    if (!rest.length) {
+      const evidence = answeredRef.current;
+      answeredRef.current = [];
+      runPlacements(evidence.map(e => e.keyword), evidence);
+    }
   };
 
   const submitAnswers = () => {
@@ -955,6 +976,143 @@ export function InsightsPanel({
         </div>
       </div>
 
+      {/* ── FIX QUEUE: one card at a time (guided mode) ── */}
+      {themes.length > 0 && !showDetails && (() => {
+        const accepted = new Set(cv.__meta?.acceptedGaps || []);
+        const ratingOf = (t: typeof themes[number]) => Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
+        const gaps = [...themes]
+          .filter(t => ratingOf(t) < 4 && !accepted.has(t.theme) && !handledThemes.has(t.theme))
+          .sort((a, b) => ((a.importance === "must" ? 0 : 1) - (b.importance === "must" ? 0 : 1)) || (ratingOf(a) - ratingOf(b)));
+        const knockouts = cv.__meta?.demandProfile?.knockout_requirements || [];
+        const pendingQ = (kwQuestions || [])[0] || null;
+        const pIdx = (placements || []).findIndex((_, i) => !appliedPlacements.has(i) && !dismissedPlacements.has(i));
+        const nbIdx = (newBullets || []).findIndex((_, i) => !appliedNew.has(i) && !dismissedNew.has(i));
+        const busyQ = loadingQ || placing;
+        const markHandled = (theme: string) => setHandledThemes(prev => new Set(prev).add(theme));
+
+        const card = (body: React.ReactNode) => (
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-2">{body}</div>
+        );
+
+        let content: React.ReactNode;
+        if (knockouts.length > 0 && !cv.__meta?.knockoutsAcked) {
+          content = card(<>
+            <p className="text-xs font-semibold">{isSv ? "Hårda krav — svara ärligt i ansökan" : "Hard requirements — answer honestly in the application"}</p>
+            <ul className="list-disc pl-4 text-xs">{knockouts.map(k => <li key={k}>{k}</li>)}</ul>
+            <p className="text-[10px] text-muted-foreground">{isSv ? "De enda automatiska avslagen — CV-formuleringar hjälper inte här." : "The only automatic rejections — CV wording can't help here."}</p>
+            {onUpdateMeta && <Button size="sm" className="h-9 w-full text-xs" onClick={() => onUpdateMeta({ knockoutsAcked: true })}>{isSv ? "OK, förstått" : "Got it"}</Button>}
+          </>);
+        } else if (busyQ) {
+          content = card(<p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{loadingQ ? (isSv ? "Skapar fråga…" : "Creating question…") : (isSv ? "Letar ärliga placeringar…" : "Finding honest placements…")}</p>);
+        } else if (pendingQ) {
+          content = card(<>
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant="secondary" className="h-5 text-[9px]">{pendingQ.keyword}</Badge>
+              <span className="text-[10px] text-muted-foreground">{(kwQuestions || []).length} {isSv ? "fråga kvar" : "left"}</span>
+            </div>
+            <p className="text-sm leading-relaxed">{pendingQ.question}</p>
+            <Textarea rows={2} autoFocus value={kwAnswers[pendingQ.keyword] || ""}
+              onChange={e => setKwAnswers(prev => ({ ...prev, [pendingQ.keyword]: e.target.value }))}
+              placeholder={isSv ? "T.ex. vilket system, din roll, resultatet…" : "E.g. which system, your role, the outcome…"} className="text-sm" />
+            <div className="flex gap-1.5">
+              <Button size="sm" className="h-9 flex-1 text-xs" disabled={(kwAnswers[pendingQ.keyword] || "").trim().length <= 2} onClick={() => submitOneAnswer(pendingQ)}>
+                {isSv ? "Skicka" : "Submit"}
+              </Button>
+              <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => dismissQuestion(pendingQ.keyword)}>{isSv ? "Har inte" : "Don't have it"}</Button>
+            </div>
+          </>);
+        } else if (pIdx >= 0) {
+          const p = placements![pIdx];
+          content = card(<>
+            <Badge variant="secondary" className="h-5 text-[9px]">{p.keyword}</Badge>
+            <p className="text-[11px] leading-relaxed text-muted-foreground line-through">{p.original}</p>
+            <p className="text-sm leading-relaxed">{p.revised}</p>
+            <div className="flex gap-1.5">
+              <Button size="sm" className="h-9 flex-1 text-xs" onClick={() => applyPlacement(p, pIdx)}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{isSv ? "Använd" : "Accept"}</Button>
+              <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setDismissedPlacements(prev => new Set(prev).add(pIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
+            </div>
+          </>);
+        } else if (nbIdx >= 0) {
+          const nb = newBullets![nbIdx];
+          content = card(<>
+            <div className="flex items-center gap-1.5">
+              <Badge className="h-5 text-[9px]">{isSv ? "NY PUNKT" : "NEW BULLET"}</Badge>
+              <Badge variant="secondary" className="h-5 text-[9px]">{nb.keyword}</Badge>
+            </div>
+            <p className="text-sm leading-relaxed">{nb.bullet}</p>
+            <div className="flex gap-1.5">
+              <Button size="sm" className="h-9 flex-1 text-xs" onClick={() => applyNewBullet(nb, nbIdx)}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{isSv ? "Lägg till" : "Add"}</Button>
+              <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setDismissedNew(prev => new Set(prev).add(nbIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
+            </div>
+          </>);
+        } else if (gaps.length > 0) {
+          const g = gaps[0];
+          const r = ratingOf(g);
+          const terms = g.supporting_terms_missing || [];
+          content = card(<>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-semibold">{g.theme}</span>
+              {g.importance === "must" && <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">{isSv ? "Krav" : "Must"}</span>}
+              <span className="ml-auto flex items-center gap-0.5">{[1, 2, 3, 4, 5].map(n => <span key={n} className={`h-1.5 w-1.5 rounded-full ${n <= r ? (r >= 4 ? "bg-green-600" : r >= 2 ? "bg-warning" : "bg-destructive") : "bg-muted"}`} />)}</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">{g.evidence_note}</p>
+            <div className="space-y-1.5">
+              {canFix && (
+                <Button size="sm" className="h-9 w-full text-xs" onClick={() => { markHandled(g.theme); fetchQuestions([g.theme, ...terms]); }}>
+                  <Wrench className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Svara på en fråga om detta" : "Answer one question about this"}
+                </Button>
+              )}
+              <div className="flex gap-1.5">
+                {terms.length > 0 && canFix && (
+                  <Button variant="outline" size="sm" className="h-9 flex-1 text-xs" onClick={() => { markHandled(g.theme); runPlacements(terms); }}>
+                    <Sparkles className="mr-1 h-3.5 w-3.5" />{isSv ? `Ordval (${terms.length})` : `Wording (${terms.length})`}
+                  </Button>
+                )}
+                {onUpdateMeta && (
+                  <Button variant="outline" size="sm" className="h-9 flex-1 text-xs" onClick={() => onUpdateMeta({ acceptedGaps: [...(cv.__meta?.acceptedGaps || []), g.theme] })}>
+                    {isSv ? "Ärligt gap" : "Honest gap"}
+                  </Button>
+                )}
+              </div>
+              <button type="button" className="w-full text-center text-[11px] text-muted-foreground underline-offset-2 hover:underline" onClick={() => markHandled(g.theme)}>
+                {isSv ? "Hoppa över →" : "Skip →"}
+              </button>
+            </div>
+          </>);
+        } else {
+          const anyHandled = handledThemes.size > 0;
+          content = card(<>
+            <p className="text-sm font-semibold text-green-700 dark:text-green-500">✓ {isSv ? "Alla kort hanterade" : "All cards handled"}</p>
+            <p className="text-[11px] text-muted-foreground">
+              {anyHandled
+                ? (isSv ? "Kör om analysen så uppdateras poängen efter dina ändringar." : "Re-run the analysis to refresh the score after your changes.")
+                : (isSv ? "Alla gap är åtgärdade eller ärligt accepterade." : "Every gap is fixed or honestly accepted.")}
+            </p>
+            <div className="flex gap-1.5">
+              {anyHandled && (
+                <Button size="sm" className="h-9 flex-1 text-xs" disabled={loading} onClick={() => { setHandledThemes(new Set()); runDeep(); }}>
+                  {loading ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}{isSv ? "Uppdatera poängen" : "Update the score"}
+                </Button>
+              )}
+              {onDownload && (
+                <Button variant={anyHandled ? "outline" : "default"} size="sm" className="h-9 flex-1 text-xs" onClick={onDownload}>
+                  {isSv ? "Ladda ner PDF" : "Download PDF"}
+                </Button>
+              )}
+            </div>
+          </>);
+        }
+        return <div className="space-y-2">{content}</div>;
+      })()}
+
+      {/* One toggle between guided queue and the full dashboard. */}
+      {themes.length > 0 && (
+        <button type="button" className="w-full text-center text-[11px] text-muted-foreground underline-offset-2 hover:underline" onClick={() => setShowDetails(v => !v)}>
+          {showDetails ? (isSv ? "↑ Tillbaka till guiden" : "↑ Back to the guide") : (isSv ? "Visa detaljer" : "Show details")}
+        </button>
+      )}
+
+      <div className={themes.length > 0 && !showDetails ? "hidden" : "space-y-4"}>
       {/* ── What to fix: ATS buckets ── */}
       <div className="space-y-2">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1058,6 +1216,7 @@ export function InsightsPanel({
 
         </div>
       )}
+      </div>{/* end details wrapper (hidden in guided mode) */}
     </div>
   );
 }
