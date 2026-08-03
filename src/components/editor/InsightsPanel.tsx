@@ -97,10 +97,13 @@ export function InsightsPanel({
   const [kwConfirm, setKwConfirm] = useState<Record<string, "yes" | "no">>({});
   // Interview mode: the app asks one verification question per missing keyword and the
   // answers become the evidence for truthful placements (or honest omission).
-  interface KwQuestion { keyword: string; question: string }
+  interface KwQuestion { keyword: string; question: string; options?: string[]; hint?: string }
   interface NewBullet { keyword: string; exp_index: number; bullet: string; note: string }
   const [kwQuestions, setKwQuestions] = useState<KwQuestion[] | null>(null);
   const [kwAnswers, setKwAnswers] = useState<Record<string, string>>({});
+  // Recognition over recall: the user picks one honest involvement statement, then
+  // optionally adds specifics. Choice + detail together form the evidence answer.
+  const [kwChoice, setKwChoice] = useState<Record<string, string>>({});
   const [loadingQ, setLoadingQ] = useState(false);
   const [newBullets, setNewBullets] = useState<NewBullet[] | null>(null);
   const [appliedNew, setAppliedNew] = useState<Set<number>>(new Set());
@@ -387,9 +390,14 @@ export function InsightsPanel({
     setKwQuestions(prev => (prev || []).filter(q => q.keyword !== keyword));
   };
 
+  // The evidence answer = chosen statement + optional typed detail (either alone is enough).
+  const composedAnswer = (q: KwQuestion) =>
+    [(kwChoice[q.keyword] || "").trim(), (kwAnswers[q.keyword] || "").trim()].filter(Boolean).join(" — ");
+  const canSubmitQ = (q: KwQuestion) => composedAnswer(q).length > 2;
+
   // Queue mode: answer questions one card at a time; the batch placement runs after the last.
   const submitOneAnswer = (q: KwQuestion) => {
-    const answer = (kwAnswers[q.keyword] || "").trim();
+    const answer = composedAnswer(q);
     if (answer.length <= 2) return;
     answeredRef.current.push({ keyword: q.keyword, answer });
     setKwConfirm(prev => ({ ...prev, [q.keyword]: "yes" }));
@@ -403,14 +411,14 @@ export function InsightsPanel({
   };
 
   const submitAnswers = () => {
-    const answered = (kwQuestions || []).filter(q => (kwAnswers[q.keyword] || "").trim().length > 2);
+    const answered = (kwQuestions || []).filter(canSubmitQ);
     if (!answered.length) return;
     setKwConfirm(prev => {
       const next = { ...prev };
       answered.forEach(q => { next[q.keyword] = "yes"; });
       return next;
     });
-    const evidence = answered.map(q => ({ keyword: q.keyword, answer: kwAnswers[q.keyword].trim() }));
+    const evidence = answered.map(q => ({ keyword: q.keyword, answer: composedAnswer(q) }));
     const tapped = missingKw.filter(p => kwConfirm[p] === "yes" && !evidence.some(e => e.keyword === p));
     setKwQuestions(null);
     runPlacements([...tapped, ...evidence.map(e => e.keyword)], evidence);
@@ -695,18 +703,27 @@ export function InsightsPanel({
                         </button>
                       </div>
                       <p className="text-xs leading-relaxed">{q.question}</p>
+                      {(q.options || []).map(opt => (
+                        <button key={opt} type="button"
+                          onClick={() => setKwChoice(prev => ({ ...prev, [q.keyword]: prev[q.keyword] === opt ? "" : opt }))}
+                          className={`w-full rounded-lg border p-2 text-left text-[11px] leading-relaxed transition-colors ${kwChoice[q.keyword] === opt ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
+                          {opt}
+                        </button>
+                      ))}
                       <Textarea
                         rows={2}
                         value={kwAnswers[q.keyword] || ""}
                         onChange={e => setKwAnswers(prev => ({ ...prev, [q.keyword]: e.target.value }))}
-                        placeholder={isSv ? "T.ex. vilket system, din roll, resultatet…" : "E.g. which system, your role, the outcome…"}
+                        placeholder={(q.options || []).length
+                          ? (q.hint || (isSv ? "Frivillig detalj: system, omfattning, resultat…" : "Optional detail: system, scope, outcome…"))
+                          : (isSv ? "T.ex. vilket system, din roll, resultatet…" : "E.g. which system, your role, the outcome…")}
                         className="text-xs"
                       />
                     </div>
                   ))}
                   <div className="flex gap-1.5">
                     <Button size="sm" className="h-9 flex-1 text-xs" onClick={submitAnswers}
-                      disabled={placing || !(kwQuestions || []).some(q => (kwAnswers[q.keyword] || "").trim().length > 2)}>
+                      disabled={placing || !(kwQuestions || []).some(canSubmitQ)}>
                       {placing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
                       {isSv ? "Skicka svar & placera" : "Submit answers & place"}
                     </Button>
@@ -1011,11 +1028,25 @@ export function InsightsPanel({
               <span className="text-[10px] text-muted-foreground">{(kwQuestions || []).length} {isSv ? "fråga kvar" : "left"}</span>
             </div>
             <p className="text-sm leading-relaxed">{pendingQ.question}</p>
-            <Textarea rows={2} autoFocus value={kwAnswers[pendingQ.keyword] || ""}
+            {(pendingQ.options || []).length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Vad stämmer bäst?" : "What fits best?"}</p>
+                {(pendingQ.options || []).map(opt => (
+                  <button key={opt} type="button"
+                    onClick={() => setKwChoice(prev => ({ ...prev, [pendingQ.keyword]: prev[pendingQ.keyword] === opt ? "" : opt }))}
+                    className={`w-full rounded-lg border p-2.5 text-left text-xs leading-relaxed transition-colors ${kwChoice[pendingQ.keyword] === opt ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Textarea rows={2} autoFocus={!(pendingQ.options || []).length} value={kwAnswers[pendingQ.keyword] || ""}
               onChange={e => setKwAnswers(prev => ({ ...prev, [pendingQ.keyword]: e.target.value }))}
-              placeholder={isSv ? "T.ex. vilket system, din roll, resultatet…" : "E.g. which system, your role, the outcome…"} className="text-sm" />
+              placeholder={(pendingQ.options || []).length
+                ? (pendingQ.hint || (isSv ? "Frivillig detalj: system, omfattning, resultat…" : "Optional detail: system, scope, outcome…"))
+                : (isSv ? "T.ex. vilket system, din roll, resultatet…" : "E.g. which system, your role, the outcome…")} className="text-sm" />
             <div className="flex gap-1.5">
-              <Button size="sm" className="h-9 flex-1 text-xs" disabled={(kwAnswers[pendingQ.keyword] || "").trim().length <= 2} onClick={() => submitOneAnswer(pendingQ)}>
+              <Button size="sm" className="h-9 flex-1 text-xs" disabled={!canSubmitQ(pendingQ)} onClick={() => submitOneAnswer(pendingQ)}>
                 {isSv ? "Skicka" : "Submit"}
               </Button>
               <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => dismissQuestion(pendingQ.keyword)}>{isSv ? "Har inte" : "Don't have it"}</Button>

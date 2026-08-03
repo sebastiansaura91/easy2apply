@@ -32,10 +32,11 @@ serve(async (req) => {
       .join("\n");
 
     const systemPrompt = `You verify whether a candidate actually has specific competences a job ad asks for.
-For EACH keyword, write ONE short, concrete question (max 25 words) that helps the candidate recall real experience with it.
-- Anchor the question in the candidate's CV context when something related exists ("Your Salesforce transformation — did it include ERP integration? Which system?").
-- Ask for specifics that could go on a CV: which system/tool, what role, what outcome.
-- Never suggest the candidate should claim something — the question must make "no" an easy answer.
+For EACH keyword return three things:
+1. question — ONE short, concrete question (max 25 words) that helps the candidate recall real experience with it. Anchor it in the candidate's CV context when something related exists ("Your Salesforce transformation — did it include ERP integration?").
+2. options — exactly 3 first-person answer statements at different HONEST levels of involvement, strongest first (pattern: owned/led it → drove it operationally → contributed as part of a team). Each option: max 14 words, specific to THIS keyword and the candidate's CV context, safe to claim without exaggeration, and with NO numbers — the candidate adds their own specifics.
+3. hint — one short prompt (max 12 words) for the specifics worth adding: which system/tool, scope, outcome.
+- Never suggest the candidate should claim something — "no" must stay an easy answer. Do NOT include a "no experience" option; the interface has a separate button for that.
 - Output all text in ${lang}. Return via the verification_questions tool.`;
 
     const userPrompt = `## KEYWORDS TO VERIFY\n${missing_phrases.slice(0, 10).join("; ")}\n\n## CANDIDATE CV CONTEXT\n${cvContext || "(none)"}`;
@@ -66,8 +67,14 @@ For EACH keyword, write ONE short, concrete question (max 25 words) that helps t
                     properties: {
                       keyword: { type: "string" },
                       question: { type: "string" },
+                      options: {
+                        type: "array",
+                        description: "Exactly 3 honest first-person answer statements, strongest involvement first",
+                        items: { type: "string" },
+                      },
+                      hint: { type: "string", description: "Short prompt for specifics: system, scope, outcome" },
                     },
-                    required: ["keyword", "question"],
+                    required: ["keyword", "question", "options"],
                   },
                 },
               },
@@ -101,9 +108,17 @@ For EACH keyword, write ONE short, concrete question (max 25 words) that helps t
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    // Only questions for keywords we actually asked about.
+    // Only questions for keywords we actually asked about; options capped and cleaned.
     const asked = new Set(missing_phrases.map((p: string) => p.toLowerCase().trim()));
-    result.questions = (result.questions || []).filter((q: any) => asked.has(String(q?.keyword || "").toLowerCase().trim()));
+    result.questions = (result.questions || [])
+      .filter((q: any) => asked.has(String(q?.keyword || "").toLowerCase().trim()))
+      .map((q: any) => ({
+        ...q,
+        options: (Array.isArray(q.options) ? q.options : [])
+          .filter((o: any) => typeof o === "string" && o.trim())
+          .map((o: string) => o.trim())
+          .slice(0, 3),
+      }));
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

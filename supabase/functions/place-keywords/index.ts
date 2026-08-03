@@ -47,6 +47,8 @@ STRICT RULES:
 - Never place two keywords in the same bullet.${hasEvidence ? `
 - CANDIDATE EVIDENCE: the candidate has answered verification questions confirming real experience. Use their answers to pick the right bullet and wording.
 - If a confirmed keyword has NO honest home in any existing bullet, you may instead propose ONE new bullet in new_bullets for the most relevant experience — built ONLY from facts in the candidate's answer (their system names, role, outcome). Use "${locale === "en" ? "[FILL IN]" : "[FYLL I]"}" for any number the answer does not state. Max 180 characters, outcome-first.` : ""}
+- LANGUAGE PURITY: every revised bullet must be written entirely in ${lang}. When a keyword comes from a job ad in the other language, place its natural ${lang} equivalent instead (Swedish "serieförvärvare" → English "serial acquirer"; "ledningsgrupp" → "management team"). Recruiters and scanners match translations — never mix two languages inside one bullet.
+- EMPLOYER-CONTEXT TERMS: some keywords describe the COMPANY, not the person ("serieförvärvare"/"serial acquirer", "PE-backed", "family-owned", industry labels). Place these only as environment context ("…within a serial acquirer" / "…i en serieförvärvarkoncern") — never as a role or trait of the candidate ("as a serial acquirer" would be false). If no bullet can carry that context naturally, omit the keyword.
 - Output all text in ${lang}.
 Return via the keyword_placements tool.`;
 
@@ -165,6 +167,15 @@ Return via the keyword_placements tool.`;
       const nums = String(nb.bullet).match(/\d+/g) || [];
       return nums.every((n: string) => evidenceDigits.has(n));
     });
+
+    // Language guard: an English CV must never pick up Swedish words through a placement —
+    // a Swedish ad's keyword has to arrive translated. Swedish letters are a reliable tell
+    // for this direction (proper nouns already in the bullet keep their åäö).
+    if (locale === "en") {
+      const sv = /[åäöÅÄÖ]/;
+      result.placements = result.placements.filter((p: any) => !sv.test(p.revised) || sv.test(p.original));
+      result.new_bullets = result.new_bullets.filter((nb: any) => !sv.test(nb.bullet) || sv.test(evidenceText));
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
