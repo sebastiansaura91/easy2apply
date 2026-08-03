@@ -101,9 +101,14 @@ export function InsightsPanel({
   interface NewBullet { keyword: string; exp_index: number; bullet: string; note: string }
   const [kwQuestions, setKwQuestions] = useState<KwQuestion[] | null>(null);
   const [kwAnswers, setKwAnswers] = useState<Record<string, string>>({});
-  // Recognition over recall: the user picks one honest involvement statement, then
-  // optionally adds specifics. Choice + detail together form the evidence answer.
-  const [kwChoice, setKwChoice] = useState<Record<string, string>>({});
+  // Recognition over recall: the user ticks the concrete statements that are true
+  // (several allowed), then optionally adds specifics. Choices + detail = the evidence.
+  const [kwChoice, setKwChoice] = useState<Record<string, string[]>>({});
+  const toggleChoice = (k: string, opt: string) =>
+    setKwChoice(prev => {
+      const cur = prev[k] || [];
+      return { ...prev, [k]: cur.includes(opt) ? cur.filter(o => o !== opt) : [...cur, opt] };
+    });
   const [loadingQ, setLoadingQ] = useState(false);
   const [newBullets, setNewBullets] = useState<NewBullet[] | null>(null);
   const [appliedNew, setAppliedNew] = useState<Set<number>>(new Set());
@@ -390,9 +395,16 @@ export function InsightsPanel({
     setKwQuestions(prev => (prev || []).filter(q => q.keyword !== keyword));
   };
 
-  // The evidence answer = chosen statement + optional typed detail (either alone is enough).
+  // Options must always exist — if the model (or an old function version) sends none,
+  // fall back to honest involvement levels so the card never degrades to a bare textbox.
+  const optionsFor = (q: KwQuestion): string[] =>
+    q.options?.length ? q.options : (isSv
+      ? ["Jag ägde detta område och satte riktningen", "Jag drev arbetet operativt i min roll", "Jag bidrog som del av ett team"]
+      : ["I owned this area and set the direction", "I drove the work hands-on in my role", "I contributed as part of a team"]);
+
+  // The evidence answer = ticked statements + optional typed detail (either alone is enough).
   const composedAnswer = (q: KwQuestion) =>
-    [(kwChoice[q.keyword] || "").trim(), (kwAnswers[q.keyword] || "").trim()].filter(Boolean).join(" — ");
+    [(kwChoice[q.keyword] || []).join("; "), (kwAnswers[q.keyword] || "").trim()].filter(Boolean).join(" — ");
   const canSubmitQ = (q: KwQuestion) => composedAnswer(q).length > 2;
 
   // Queue mode: answer questions one card at a time; the batch placement runs after the last.
@@ -703,10 +715,9 @@ export function InsightsPanel({
                         </button>
                       </div>
                       <p className="text-xs leading-relaxed">{q.question}</p>
-                      {(q.options || []).map(opt => (
-                        <button key={opt} type="button"
-                          onClick={() => setKwChoice(prev => ({ ...prev, [q.keyword]: prev[q.keyword] === opt ? "" : opt }))}
-                          className={`w-full rounded-lg border p-2 text-left text-[11px] leading-relaxed transition-colors ${kwChoice[q.keyword] === opt ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
+                      {optionsFor(q).map(opt => (
+                        <button key={opt} type="button" onClick={() => toggleChoice(q.keyword, opt)}
+                          className={`w-full rounded-lg border p-2 text-left text-[11px] leading-relaxed transition-colors ${(kwChoice[q.keyword] || []).includes(opt) ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
                           {opt}
                         </button>
                       ))}
@@ -714,9 +725,7 @@ export function InsightsPanel({
                         rows={2}
                         value={kwAnswers[q.keyword] || ""}
                         onChange={e => setKwAnswers(prev => ({ ...prev, [q.keyword]: e.target.value }))}
-                        placeholder={(q.options || []).length
-                          ? (q.hint || (isSv ? "Frivillig detalj: system, omfattning, resultat…" : "Optional detail: system, scope, outcome…"))
-                          : (isSv ? "T.ex. vilket system, din roll, resultatet…" : "E.g. which system, your role, the outcome…")}
+                        placeholder={q.hint || (isSv ? "Frivillig detalj: system, omfattning, resultat…" : "Optional detail: system, scope, outcome…")}
                         className="text-xs"
                       />
                     </div>
@@ -1028,23 +1037,18 @@ export function InsightsPanel({
               <span className="text-[10px] text-muted-foreground">{(kwQuestions || []).length} {isSv ? "fråga kvar" : "left"}</span>
             </div>
             <p className="text-sm leading-relaxed">{pendingQ.question}</p>
-            {(pendingQ.options || []).length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Vad stämmer bäst?" : "What fits best?"}</p>
-                {(pendingQ.options || []).map(opt => (
-                  <button key={opt} type="button"
-                    onClick={() => setKwChoice(prev => ({ ...prev, [pendingQ.keyword]: prev[pendingQ.keyword] === opt ? "" : opt }))}
-                    className={`w-full rounded-lg border p-2.5 text-left text-xs leading-relaxed transition-colors ${kwChoice[pendingQ.keyword] === opt ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            )}
-            <Textarea rows={2} autoFocus={!(pendingQ.options || []).length} value={kwAnswers[pendingQ.keyword] || ""}
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Kryssa det som stämmer — flera går bra" : "Tick what's true — several ok"}</p>
+              {optionsFor(pendingQ).map(opt => (
+                <button key={opt} type="button" onClick={() => toggleChoice(pendingQ.keyword, opt)}
+                  className={`w-full rounded-lg border p-2.5 text-left text-xs leading-relaxed transition-colors ${(kwChoice[pendingQ.keyword] || []).includes(opt) ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
+                  {opt}
+                </button>
+              ))}
+            </div>
+            <Textarea rows={2} value={kwAnswers[pendingQ.keyword] || ""}
               onChange={e => setKwAnswers(prev => ({ ...prev, [pendingQ.keyword]: e.target.value }))}
-              placeholder={(pendingQ.options || []).length
-                ? (pendingQ.hint || (isSv ? "Frivillig detalj: system, omfattning, resultat…" : "Optional detail: system, scope, outcome…"))
-                : (isSv ? "T.ex. vilket system, din roll, resultatet…" : "E.g. which system, your role, the outcome…")} className="text-sm" />
+              placeholder={pendingQ.hint || (isSv ? "Frivillig detalj: system, omfattning, resultat…" : "Optional detail: system, scope, outcome…")} className="text-sm" />
             <div className="flex gap-1.5">
               <Button size="sm" className="h-9 flex-1 text-xs" disabled={!canSubmitQ(pendingQ)} onClick={() => submitOneAnswer(pendingQ)}>
                 {isSv ? "Skicka" : "Submit"}
