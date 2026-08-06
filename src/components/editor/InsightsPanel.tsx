@@ -402,6 +402,39 @@ export function InsightsPanel({
       ? ["Jag ägde detta område och satte riktningen", "Jag drev arbetet operativt i min roll", "Jag bidrog som del av ett team"]
       : ["I owned this area and set the direction", "I drove the work hands-on in my role", "I contributed as part of a team"]);
 
+  // A placement is a 1–2 word swap inside a long bullet. Two near-identical paragraphs
+  // hide the change, so render the swap itself plus the sentence with the new words marked.
+  const wordDiff = (a: string, b: string) => {
+    const aw = a.split(/\s+/), bw = b.split(/\s+/);
+    let pre = 0;
+    while (pre < aw.length && pre < bw.length && aw[pre] === bw[pre]) pre++;
+    let suf = 0;
+    while (suf < aw.length - pre && suf < bw.length - pre && aw[aw.length - 1 - suf] === bw[bw.length - 1 - suf]) suf++;
+    return {
+      removed: aw.slice(pre, aw.length - suf).join(" "),
+      added: bw.slice(pre, bw.length - suf).join(" "),
+      prefix: bw.slice(0, pre).join(" "),
+      suffix: bw.slice(bw.length - suf).join(" "),
+    };
+  };
+  const renderPlacementDiff = (p: Placement) => {
+    const d = wordDiff(p.original, p.revised);
+    return (
+      <div className="space-y-1.5">
+        <p className="text-sm leading-relaxed">
+          <span className="rounded bg-destructive/10 px-1 py-0.5 line-through decoration-destructive/50">{d.removed || (isSv ? "(inget)" : "(nothing)")}</span>
+          <span className="mx-1.5 text-muted-foreground">→</span>
+          <span className="rounded bg-green-600/15 px-1 py-0.5 font-medium">{d.added}</span>
+        </p>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          {d.prefix && <>{d.prefix} </>}
+          <span className="rounded bg-green-600/15 px-0.5 font-medium text-foreground">{d.added}</span>
+          {d.suffix && <> {d.suffix}</>}
+        </p>
+      </div>
+    );
+  };
+
   // The evidence answer = ticked statements + optional typed detail (either alone is enough).
   const composedAnswer = (q: KwQuestion) =>
     [(kwChoice[q.keyword] || []).join("; "), (kwAnswers[q.keyword] || "").trim()].filter(Boolean).join(" — ");
@@ -761,8 +794,7 @@ export function InsightsPanel({
               {placements?.map((p, i) => (
                 <div key={i} className="rounded-lg border border-border p-2.5 space-y-1.5">
                   <Badge variant="secondary" className="text-[9px] h-5">{p.keyword}</Badge>
-                  <p className="text-[10px] text-muted-foreground line-through leading-relaxed">{p.original}</p>
-                  <p className="text-xs leading-relaxed">{p.revised}</p>
+                  {renderPlacementDiff(p)}
                   <p className="text-[9px] italic text-muted-foreground">{p.note}</p>
                   <Button
                     size="sm"
@@ -1060,8 +1092,7 @@ export function InsightsPanel({
           const p = placements![pIdx];
           content = card(<>
             <Badge variant="secondary" className="h-5 text-[9px]">{p.keyword}</Badge>
-            <p className="text-[11px] leading-relaxed text-muted-foreground line-through">{p.original}</p>
-            <p className="text-sm leading-relaxed">{p.revised}</p>
+            {renderPlacementDiff(p)}
             <div className="flex gap-1.5">
               <Button size="sm" className="h-9 flex-1 text-xs" onClick={() => applyPlacement(p, pIdx)}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{isSv ? "Använd" : "Accept"}</Button>
               <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setDismissedPlacements(prev => new Set(prev).add(pIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>

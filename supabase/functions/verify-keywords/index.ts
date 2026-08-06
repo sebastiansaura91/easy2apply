@@ -7,11 +7,10 @@ const corsHeaders = {
 };
 
 /**
- * For each missing keyword from a job ad, generate ONE short verification question that
- * helps the candidate recall whether they actually have the competence — anchored in
- * their CV context where possible ("You led the Salesforce transformation — did that
- * include ERP integration? Which system?"). The answers become the evidence for
- * truthful keyword placement.
+ * For each missing keyword from a job ad, generate ONE short, role-agnostic verification
+ * question ("Have you worked with X? In what role, and where?") plus multiple-choice
+ * statements covering the plausible kinds of experience. The answers become the evidence
+ * for truthful keyword placement.
  */
 // Distilled human-writing rules (from the "signs of AI writing" guide): suggested
 // text must read like a person wrote it. Recruiters discard obvious AI wording.
@@ -55,9 +54,9 @@ serve(async (req) => {
 
     const systemPrompt = `You verify whether a candidate actually has specific competences a job ad asks for.
 For EACH keyword return three things:
-1. question — ONE short, concrete question (max 25 words) that helps the candidate recall real experience with it. Anchor it in the candidate's CV context when something related exists ("Your Salesforce transformation — did it include ERP integration?").
-2. options — the 3 most plausible CONCRETE answers to your own question for THIS candidate, first person, most likely first. Guide recognition, don't test recall: name the actual strategy types, systems or methods that are common for the role and hinted at by the CV. Example — question "What strategies drove portfolio growth?" → options "I drove growth through pricing and packaging changes" / "I reduced churn through retention initiatives" / "I ran upsell and cross-sell campaigns". Each option: max 14 words, safe to claim if true, NO numbers — the candidate adds their own specifics. The candidate can pick several.
-3. hint — one short prompt (max 12 words) for the specifics worth adding: which system/tool, scope, outcome.
+1. question — ONE short, OPEN question (max 20 words) asking whether the candidate has ANY experience with this, anywhere in their career: "Have you worked with X? In what role, and where?" ROLE-AGNOSTIC: never assert where or in which role it happened ("Your role at Y involved..." is wrong — the CV context below is only for choosing plausible options, never for framing the question).
+2. options — the 3 most plausible KINDS of experience with this competence, first person, most likely first. Guide recognition, don't test recall: name the concrete forms this work usually takes. Example — keyword "pricing" → "I have set prices and packaging myself" / "I have run pricing analyses as input to decisions" / "I have worked on pricing as part of a commercial team". Each option: max 14 words, safe to claim if true, NO numbers, NO company or role names — the candidate adds their own specifics. The candidate can pick several.
+3. hint — one short prompt (max 12 words) for the specifics worth adding: where (company/role), what you did, outcome.
 - Never suggest the candidate should claim something — "no" must stay an easy answer. Do NOT include a "no experience" option; the interface has a separate button for that.
 - Output all text in ${lang}. Return via the verification_questions tool.`;
 

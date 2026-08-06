@@ -69,7 +69,7 @@ STRICT RULES:
 - Never place two keywords in the same bullet.${hasEvidence ? `
 - CANDIDATE EVIDENCE: the candidate has answered verification questions confirming real experience. Use their answers to pick the right bullet and wording.
 - If a confirmed keyword has NO honest home in any existing bullet, you may instead propose ONE new bullet in new_bullets for the most relevant experience — built ONLY from facts in the candidate's answer (their system names, role, outcome). Use "${locale === "en" ? "[FILL IN]" : "[FYLL I]"}" for any number the answer does not state. Max 180 characters, outcome-first.` : ""}
-- LANGUAGE PURITY: every revised bullet must be written entirely in ${lang}. When a keyword comes from a job ad in the other language, place its natural ${lang} equivalent instead (Swedish "serieförvärvare" → English "serial acquirer"; "ledningsgrupp" → "management team"). Recruiters and scanners match translations — never mix two languages inside one bullet.
+- LANGUAGE PURITY: every revised bullet must be written entirely in ${lang}. When a keyword comes from a job ad in the other language, place its natural ${lang} equivalent instead (Swedish "serieförvärvare" → English "serial acquirer"; "ledningsgrupp" → "management team"; "dotterbolag" → "subsidiaries"). Inserting the ad's word verbatim into a bullet of the other language ("...integrating acquired dotterbolag") is ALWAYS wrong. Recruiters and scanners match translations — never mix two languages inside one bullet.
 - EMPLOYER-CONTEXT TERMS: some keywords describe the COMPANY, not the person ("serieförvärvare"/"serial acquirer", "PE-backed", "family-owned", industry labels). Place these only as environment context ("…within a serial acquirer" / "…i en serieförvärvarkoncern") — never as a role or trait of the candidate ("as a serial acquirer" would be false). If no bullet can carry that context naturally, omit the keyword.
 - Output all text in ${lang}.
 Return via the keyword_placements tool.`;
@@ -191,12 +191,27 @@ Return via the keyword_placements tool.`;
     });
 
     // Language guard: an English CV must never pick up Swedish words through a placement —
-    // a Swedish ad's keyword has to arrive translated. Swedish letters are a reliable tell
-    // for this direction (proper nouns already in the bullet keep their åäö).
+    // a Swedish ad's keyword has to arrive translated. Two tells on the ADDED words only
+    // (text already in the bullet or the user's own answer is never penalised):
+    // Swedish-specific letters, plus common Swedish business words that carry no åäö
+    // ("dotterbolag" proved the letter check alone is porous).
     if (locale === "en") {
       const sv = /[åäöÅÄÖ]/;
-      result.placements = result.placements.filter((p: any) => !sv.test(p.revised) || sv.test(p.original));
-      result.new_bullets = result.new_bullets.filter((nb: any) => !sv.test(nb.bullet) || sv.test(evidenceText));
+      const SV_WORDS = new Set([
+        "dotterbolag", "koncern", "koncernen", "ledningsgrupp", "ledningsgruppen", "verksamhet",
+        "verksamheten", "upphandling", "bemanning", "redovisning", "styrelse", "styrelsen",
+        "budgetansvar", "personalansvar", "resultatansvar", "utveckling", "utvecklingen",
+        "medarbetare", "ledarskap", "arbetsledning", "effektivisering", "digitalisering",
+        "kunder", "kunderna", "tjänster", "avtal", "offerter", "prissättning", "lönsamhet",
+      ]);
+      const addedWords = (orig: string, rev: string) => {
+        const seen = new Set(orig.toLowerCase().split(/[^a-zA-ZåäöÅÄÖ]+/));
+        return rev.toLowerCase().split(/[^a-zA-ZåäöÅÄÖ]+/).filter(w => w && !seen.has(w));
+      };
+      const introducesSwedish = (orig: string, rev: string) =>
+        (sv.test(rev) && !sv.test(orig)) || addedWords(orig, rev).some(w => SV_WORDS.has(w) || sv.test(w));
+      result.placements = result.placements.filter((p: any) => !introducesSwedish(p.original, p.revised));
+      result.new_bullets = result.new_bullets.filter((nb: any) => !introducesSwedish(evidenceText, nb.bullet));
     }
 
     return new Response(JSON.stringify(stripAiDashes(result)), {
