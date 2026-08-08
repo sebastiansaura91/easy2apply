@@ -92,7 +92,7 @@ export interface CVMeta {
    * always show the same themes).
    */
   demandProfile?: {
-    competence_themes?: { theme: string; importance: "must" | "nice"; supporting_terms: string[] }[];
+    competence_themes?: { theme: string; importance: "must" | "nice"; supporting_terms: string[]; canonical_id?: string | null }[];
     knockout_requirements?: string[];
   };
   /** Themes the user has consciously accepted as honest gaps — shown muted, never nagged. */
@@ -105,6 +105,14 @@ export interface CVMeta {
    * answered once is never asked again and never lost.
    */
   verifiedEvidence?: { keyword: string; answer: string; at: string }[];
+  /** Marks the hidden resume row that stores the canonical competence registry. */
+  isRegistryRow?: boolean;
+  /** The registry itself — only present on the registry row. See lib/competence-registry. */
+  competenceRegistry?: {
+    version: number;
+    updatedAt: string;
+    competences: { id: string; name_sv: string; name_en: string; aliases: string[] }[];
+  };
   createdFrom?: string;
   /**
    * Your one true "base profile" — the canonical set of real facts. Role templates are

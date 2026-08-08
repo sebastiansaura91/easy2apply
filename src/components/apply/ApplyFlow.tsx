@@ -16,6 +16,7 @@ import { roleLabel, getRoleAdvice } from "@/lib/role-advice";
 import { getResumeMeta } from "@/lib/resume-grouping";
 import { cvScanSignature } from "@/lib/cv-signature";
 import { deriveRoleFromTitle } from "@/lib/role-from-title";
+import { REGISTRY_ROW_TITLE } from "@/lib/competence-registry";
 import { MatchScorecard } from "@/components/editor/MatchScorecard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CVMeta } from "@/types/cv";
@@ -100,10 +101,16 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
 
     setBusy(true);
     try {
-      // 1) Parse the ad → job title, company, demand profile.
+      // 1) Parse the ad → job title, company, demand profile. The canonical registry
+      // rides along so every theme comes back tagged with a stable competence id.
       let ja: any = null;
       try {
-        const { data } = await supabase.functions.invoke("analyze-job-posting", { body: { job_posting_text: jobText.trim() } });
+        let registry: any = undefined;
+        try {
+          const { data: regRow } = await supabase.from("resumes").select("content_json").eq("title", REGISTRY_ROW_TITLE).maybeSingle();
+          registry = (regRow?.content_json as any)?.__meta?.competenceRegistry || undefined;
+        } catch { /* no registry yet — themes simply come back untagged */ }
+        const { data } = await supabase.functions.invoke("analyze-job-posting", { body: { job_posting_text: jobText.trim(), registry } });
         if (!(data as any)?.error) ja = data;
       } catch { /* non-fatal: still show the ATS match */ }
 

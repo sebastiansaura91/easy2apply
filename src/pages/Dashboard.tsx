@@ -51,7 +51,8 @@ const Dashboard = () => {
       .eq("user_id", user.id).order("updated_at", { ascending: false });
     if (error) { setFetchError(true); setLoading(false); return; }
     setFetchError(false);
-    setResumes((data as ResumeRow[]) || []);
+    // The registry row is app infrastructure, not a CV — never list it.
+    setResumes(((data as ResumeRow[]) || []).filter(r => !(r.content_json?.__meta as any)?.isRegistryRow));
     setLoading(false);
   };
 

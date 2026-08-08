@@ -25,6 +25,8 @@ interface Props {
   onPersistRoleFit?: (hash: string, result: RoleFitResult) => void;
   onUpdateMeta?: (patch: Partial<CVContent["__meta"] & object>) => void;
   onDownload?: () => void;
+  /** Cross-CV evidence lookup — see InsightsPanel. */
+  profileEvidence?: (name: string) => { keyword: string; answer: string }[];
 }
 
 /**
@@ -35,7 +37,7 @@ interface Props {
  */
 export function TailorPanel({
   open, onOpenChange, cv, cvLanguage, t, seededJob, seededResult,
-  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit, onUpdateMeta, onDownload,
+  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit, onUpdateMeta, onDownload, profileEvidence,
 }: Props) {
   const isSv = cvLanguage === "sv";
   const hasRole = !!(cv.__meta?.targetRole || cv.__meta?.targetRoleLabel);
@@ -71,6 +73,7 @@ export function TailorPanel({
               autoRun={open}
               onUpdateMeta={onUpdateMeta}
               onDownload={onDownload}
+              profileEvidence={profileEvidence}
             />
           </TabsContent>
 

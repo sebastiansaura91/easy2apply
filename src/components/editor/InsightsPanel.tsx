@@ -42,6 +42,12 @@ interface Props {
   onUpdateMeta?: (patch: Partial<CVMeta>) => void;
   /** Download the PDF — surfaced in the "ready to send" success state. */
   onDownload?: () => void;
+  /**
+   * Cross-CV evidence lookup (name → saved verified answers from ANY CV). When a
+   * competence is already verified somewhere, the question is skipped and the saved
+   * answer becomes the placement evidence directly.
+   */
+  profileEvidence?: (name: string) => { keyword: string; answer: string }[];
 }
 
 interface SinceLast {
@@ -68,7 +74,7 @@ function severityBorder(severity: CvIssue["severity"]) {
 
 export function InsightsPanel({
   cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
-  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta, onDownload,
+  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta, onDownload, profileEvidence,
 }: Props) {
   const { toast } = useToast();
   // Restore the stored full analysis so buckets are populated from the start.
@@ -376,10 +382,39 @@ export function InsightsPanel({
       ? scope.filter(p => !kwConfirm[p])
       : Array.from(new Set([...weakThemes, ...missingKw.filter(p => !kwConfirm[p])]));
     if (!unknowns.length) return;
+
+    // Cross-CV reuse: a competence verified in ANY CV is never asked about again —
+    // the saved answer becomes the evidence directly.
+    const reuse: { keyword: string; answer: string }[] = [];
+    let toAsk = unknowns;
+    if (profileEvidence) {
+      toAsk = [];
+      for (const u of unknowns) {
+        const saved = profileEvidence(u).filter(e => (e.answer || "").trim().length > 2);
+        if (saved.length) reuse.push({ keyword: u, answer: saved.map(e => e.answer).join(". ").slice(0, 500) });
+        else toAsk.push(u);
+      }
+      if (reuse.length) {
+        setKwConfirm(prev => {
+          const next = { ...prev };
+          reuse.forEach(r => { next[r.keyword] = "yes"; });
+          return next;
+        });
+        toast({
+          title: isSv ? `${reuse.length} redan besvarade` : `${reuse.length} already answered`,
+          description: isSv ? "Sparade svar från tidigare ansökningar återanvänds som underlag." : "Saved answers from earlier applications are reused as evidence.",
+        });
+      }
+      if (!toAsk.length) {
+        if (reuse.length) runPlacements(reuse.map(r => r.keyword), reuse);
+        return;
+      }
+      answeredRef.current.push(...reuse);
+    }
     setLoadingQ(true);
     try {
       const { data, error } = await supabase.functions.invoke("verify-keywords", {
-        body: { resume_content_json: cv, missing_phrases: unknowns, locale: cvLanguage },
+        body: { resume_content_json: cv, missing_phrases: toAsk, locale: cvLanguage },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -475,7 +510,11 @@ export function InsightsPanel({
       answered.forEach(q => { next[q.keyword] = "yes"; });
       return next;
     });
-    const evidence = answered.map(q => ({ keyword: q.keyword, answer: composedAnswer(q) }));
+    // Include cross-CV answers stashed at fetch time, so reused evidence flows into
+    // the same placement run as the fresh answers.
+    const stashed = answeredRef.current;
+    answeredRef.current = [];
+    const evidence = [...stashed, ...answered.map(q => ({ keyword: q.keyword, answer: composedAnswer(q) }))];
     persistEvidence(evidence);
     const tapped = missingKw.filter(p => kwConfirm[p] === "yes" && !evidence.some(e => e.keyword === p));
     setKwQuestions(null);

@@ -29,6 +29,7 @@ import { cvHeadings } from "@/i18n/cvHeadings";
 import { exportToPdf, buildPdf } from "@/lib/export-pdf";
 import { TEMPLATE_STYLES, getTemplateStyle, withAccent, ACCENT_PRESETS } from "@/lib/templates";
 import { detectCvLanguages } from "@/lib/language-detection";
+import { buildEvidenceLookup } from "@/lib/competence-registry";
 
 const CVEditor = () => {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +39,9 @@ const CVEditor = () => {
   const flow = useFlow();
   const { toast } = useToast();
   const [tailorOpen, setTailorOpen] = useState(false);
+  // Cross-CV evidence lookup (name → verified answers from any CV), loaded when the
+  // tailor panel first opens so answered questions are never asked again.
+  const [profileEvidence, setProfileEvidence] = useState<((name: string) => { keyword: string; answer: string }[]) | null>(null);
   const [syncOpen, setSyncOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const autoOpenedRef = useRef(false);
@@ -99,6 +103,17 @@ const CVEditor = () => {
   const saveCVRef = useRef(saveCV);
   const dirtyRef = useRef(false);
   useEffect(() => { saveCVRef.current = saveCV; }, [saveCV]);
+
+  useEffect(() => {
+    if (!tailorOpen || profileEvidence) return;
+    (async () => {
+      const { data } = await supabase.from("resumes").select("title, content_json");
+      const rows = (data || []).map((r: any) => ({ title: r.title, meta: (r.content_json?.__meta || {}) as CVContent["__meta"] & object }));
+      const registry = rows.find(r => (r.meta as any)?.isRegistryRow)?.meta?.competenceRegistry || null;
+      const lookup = buildEvidenceLookup(rows as any, registry as any);
+      setProfileEvidence(() => lookup);
+    })();
+  }, [tailorOpen, profileEvidence]);
 
   const prevLangRef = useRef(cvLanguage);
   useEffect(() => {
@@ -502,6 +517,7 @@ const CVEditor = () => {
         onUpdateMeta={(patch) =>
           setCv(prev => ({ ...prev, __meta: { ...prev.__meta, ...patch } }))}
         onDownload={doExport}
+        profileEvidence={profileEvidence ?? undefined}
       />
 
       {/* Sync structural facts across the whole lineage */}

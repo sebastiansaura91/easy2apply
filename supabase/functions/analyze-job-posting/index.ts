@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { job_posting_text } = await req.json();
+    const { job_posting_text, registry } = await req.json();
     if (!job_posting_text?.trim()) {
       return new Response(JSON.stringify({ error: "job_posting_text is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -57,7 +57,12 @@ supporting terms (3–6 short terms, the employer's exact words).
 Extract binary hard requirements that application forms screen on: work authorization,
 location/relocation, required languages, mandatory certifications/licenses, non-negotiable
 years of experience or degree. Only list requirements the posting states as absolute.
-Empty array if none.`,
+Empty array if none.${Array.isArray(registry?.competences) && registry.competences.length ? `
+
+## CANONICAL COMPETENCES (the candidate's registry)
+For each competence theme, set canonical_id to the id of the registry competence it means,
+or null if none matches. Match across languages ("prissättning" maps to a pricing competence).
+${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / ${c.name_en}${(c.aliases || []).length ? ` (${c.aliases.slice(0, 6).join(", ")})` : ""}`).join("\n")}` : ""}`,
           },
           {
             role: "user",
@@ -90,6 +95,7 @@ Empty array if none.`,
                       theme: { type: "string" },
                       importance: { type: "string", enum: ["must", "nice"] },
                       supporting_terms: { type: "array", items: { type: "string" } },
+                      canonical_id: { type: ["string", "null"], description: "Id from the candidate's registry this theme maps to, or null" },
                     },
                     required: ["theme", "importance", "supporting_terms"],
                     additionalProperties: false,
@@ -130,6 +136,25 @@ Empty array if none.`,
     const result = typeof toolCall.function.arguments === "string"
       ? JSON.parse(toolCall.function.arguments)
       : toolCall.function.arguments;
+
+    // Deterministic fallback: themes the model left unmapped still resolve when a
+    // registry name or alias matches by normalized equality or containment.
+    if (Array.isArray(registry?.competences) && Array.isArray(result.competence_themes)) {
+      const norm = (s: string) => String(s || "").toLowerCase().trim().replace(/\s+/g, " ");
+      const validIds = new Set(registry.competences.map((c: any) => c.id));
+      for (const t of result.competence_themes) {
+        if (t.canonical_id && validIds.has(t.canonical_id)) continue;
+        t.canonical_id = null;
+        const n = norm(t.theme);
+        for (const c of registry.competences) {
+          const names = [c.name_sv, c.name_en, ...(c.aliases || [])].map(norm).filter(Boolean);
+          if (names.includes(n) || (n.length >= 4 && names.some((a: string) => a.length >= 4 && (a.includes(n) || n.includes(a))))) {
+            t.canonical_id = c.id;
+            break;
+          }
+        }
+      }
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
