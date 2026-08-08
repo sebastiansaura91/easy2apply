@@ -1049,66 +1049,82 @@ export function InsightsPanel({
         const markHandled = (theme: string) => setHandledThemes(prev => new Set(prev).add(theme));
 
         const card = (body: React.ReactNode) => (
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-2">{body}</div>
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-3">{body}</div>
         );
+
+        // The trail: one dot per gap this round, filled as they're handled. The trail is
+        // the whole progress meter — no counter to read.
+        const trailTotal = Math.min(gaps.length + handledThemes.size, 10);
+        const trailDone = Math.min(handledThemes.size, trailTotal);
+        const trail = trailTotal > 1 ? (
+          <div className="flex items-center justify-center gap-1.5 py-1">
+            {Array.from({ length: trailTotal }, (_, i) => (
+              <span key={i} className={`h-2 w-2 rounded-full transition-colors ${i < trailDone ? "bg-primary" : i === trailDone ? "ring-2 ring-primary ring-offset-1 ring-offset-background bg-transparent" : "bg-muted"}`} />
+            ))}
+          </div>
+        ) : null;
 
         let content: React.ReactNode;
         if (knockouts.length > 0 && !cv.__meta?.knockoutsAcked) {
           content = card(<>
-            <p className="text-xs font-semibold">{isSv ? "Hårda krav — svara ärligt i ansökan" : "Hard requirements — answer honestly in the application"}</p>
-            <ul className="list-disc pl-4 text-xs">{knockouts.map(k => <li key={k}>{k}</li>)}</ul>
-            <p className="text-[10px] text-muted-foreground">{isSv ? "De enda automatiska avslagen — CV-formuleringar hjälper inte här." : "The only automatic rejections — CV wording can't help here."}</p>
-            {onUpdateMeta && <Button size="sm" className="h-9 w-full text-xs" onClick={() => onUpdateMeta({ knockoutsAcked: true })}>{isSv ? "OK, förstått" : "Got it"}</Button>}
+            <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{isSv ? "Hårda krav i annonsen" : "Hard requirements in the ad"}</p>
+            <ul className="list-disc space-y-1 pl-4 text-sm">{knockouts.map(k => <li key={k}>{k}</li>)}</ul>
+            <p className="text-xs text-muted-foreground">{isSv ? "Svara ärligt på dessa i ansökan. Det är de enda automatiska avslagen, CV-formuleringar hjälper inte här." : "Answer these honestly in the application. They are the only automatic rejections, CV wording can't help here."}</p>
+            {onUpdateMeta && <Button className="h-11 w-full text-sm" onClick={() => onUpdateMeta({ knockoutsAcked: true })}>{isSv ? "OK, förstått" : "Got it"}</Button>}
           </>);
         } else if (busyQ) {
           content = card(<p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{loadingQ ? (isSv ? "Skapar fråga…" : "Creating question…") : (isSv ? "Letar ärliga placeringar…" : "Finding honest placements…")}</p>);
         } else if (pendingQ) {
           content = card(<>
             <div className="flex items-center justify-between gap-2">
-              <Badge variant="secondary" className="h-5 text-[9px]">{pendingQ.keyword}</Badge>
-              <span className="text-[10px] text-muted-foreground">{(kwQuestions || []).length} {isSv ? "fråga kvar" : "left"}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Fråga" : "Question"}</span>
+              <span className="text-[10px] text-muted-foreground">{(kwQuestions || []).length} {isSv ? "kvar" : "left"}</span>
             </div>
-            <p className="text-sm leading-relaxed">{pendingQ.question}</p>
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Kryssa det som stämmer — flera går bra" : "Tick what's true — several ok"}</p>
+            <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{pendingQ.question}</p>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">{isSv ? "Kryssa det som stämmer, flera går bra" : "Tick what's true, several ok"}</p>
               {optionsFor(pendingQ).map(opt => (
                 <button key={opt} type="button" onClick={() => toggleChoice(pendingQ.keyword, opt)}
-                  className={`w-full rounded-lg border p-2.5 text-left text-xs leading-relaxed transition-colors ${(kwChoice[pendingQ.keyword] || []).includes(opt) ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
+                  className={`w-full rounded-xl border p-3 text-left text-sm leading-relaxed transition-colors ${(kwChoice[pendingQ.keyword] || []).includes(opt) ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
                   {opt}
                 </button>
               ))}
             </div>
             <Textarea rows={2} value={kwAnswers[pendingQ.keyword] || ""}
               onChange={e => setKwAnswers(prev => ({ ...prev, [pendingQ.keyword]: e.target.value }))}
-              placeholder={pendingQ.hint || (isSv ? "Frivillig detalj: system, omfattning, resultat…" : "Optional detail: system, scope, outcome…")} className="text-sm" />
-            <div className="flex gap-1.5">
-              <Button size="sm" className="h-9 flex-1 text-xs" disabled={!canSubmitQ(pendingQ)} onClick={() => submitOneAnswer(pendingQ)}>
+              placeholder={pendingQ.hint || (isSv ? "Var? Vad blev resultatet?" : "Where? What was the outcome?")} className="text-sm" />
+            <div className="flex gap-2">
+              <Button className="h-11 flex-1 text-sm" disabled={!canSubmitQ(pendingQ)} onClick={() => submitOneAnswer(pendingQ)}>
                 {isSv ? "Skicka" : "Submit"}
               </Button>
-              <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => dismissQuestion(pendingQ.keyword)}>{isSv ? "Har inte" : "Don't have it"}</Button>
+              <Button variant="outline" className="h-11 text-sm" onClick={() => dismissQuestion(pendingQ.keyword)}>{isSv ? "Har inte" : "Don't have it"}</Button>
             </div>
           </>);
         } else if (pIdx >= 0) {
           const p = placements![pIdx];
           content = card(<>
-            <Badge variant="secondary" className="h-5 text-[9px]">{p.keyword}</Badge>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ordbyte" : "Word swap"}</span>
+              <Badge variant="secondary" className="h-5 text-[9px]">{p.keyword}</Badge>
+            </div>
+            <p className="text-lg font-semibold leading-snug">{isSv ? "Byt några ord i en punkt:" : "Swap a few words in one bullet:"}</p>
             {renderPlacementDiff(p)}
-            <div className="flex gap-1.5">
-              <Button size="sm" className="h-9 flex-1 text-xs" onClick={() => applyPlacement(p, pIdx)}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{isSv ? "Använd" : "Accept"}</Button>
-              <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setDismissedPlacements(prev => new Set(prev).add(pIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
+            <div className="flex gap-2">
+              <Button className="h-11 flex-1 text-sm" onClick={() => applyPlacement(p, pIdx)}><CheckCircle2 className="mr-1 h-4 w-4" />{isSv ? "Använd" : "Accept"}</Button>
+              <Button variant="outline" className="h-11 text-sm" onClick={() => setDismissedPlacements(prev => new Set(prev).add(pIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
             </div>
           </>);
         } else if (nbIdx >= 0) {
           const nb = newBullets![nbIdx];
           content = card(<>
-            <div className="flex items-center gap-1.5">
-              <Badge className="h-5 text-[9px]">{isSv ? "NY PUNKT" : "NEW BULLET"}</Badge>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ny punkt, byggd på ditt svar" : "New bullet, built from your answer"}</span>
               <Badge variant="secondary" className="h-5 text-[9px]">{nb.keyword}</Badge>
             </div>
             <p className="text-sm leading-relaxed">{nb.bullet}</p>
-            <div className="flex gap-1.5">
-              <Button size="sm" className="h-9 flex-1 text-xs" onClick={() => applyNewBullet(nb, nbIdx)}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{isSv ? "Lägg till" : "Add"}</Button>
-              <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setDismissedNew(prev => new Set(prev).add(nbIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
+            <div className="flex gap-2">
+              <Button className="h-11 flex-1 text-sm" onClick={() => applyNewBullet(nb, nbIdx)}><CheckCircle2 className="mr-1 h-4 w-4" />{isSv ? "Lägg till" : "Add"}</Button>
+              <Button variant="outline" className="h-11 text-sm" onClick={() => setDismissedNew(prev => new Set(prev).add(nbIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
             </div>
           </>);
         } else if (gaps.length > 0) {
@@ -1117,58 +1133,70 @@ export function InsightsPanel({
           const terms = g.supporting_terms_missing || [];
           content = card(<>
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold">{g.theme}</span>
-              {g.importance === "must" && <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">{isSv ? "Krav" : "Must"}</span>}
+              {g.importance === "must" && <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">{isSv ? "Krav i annonsen" : "Required in the ad"}</span>}
               <span className="ml-auto flex items-center gap-0.5">{[1, 2, 3, 4, 5].map(n => <span key={n} className={`h-1.5 w-1.5 rounded-full ${n <= r ? (r >= 4 ? "bg-green-600" : r >= 2 ? "bg-warning" : "bg-destructive") : "bg-muted"}`} />)}</span>
             </div>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">{g.evidence_note}</p>
-            <div className="space-y-1.5">
+            <p className="text-lg font-semibold leading-snug [text-wrap:balance]">
+              {isSv ? <>Annonsen kräver: {g.theme}</> : <>The ad requires: {g.theme}</>}
+            </p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{g.evidence_note || (isSv ? "Ditt CV visar det inte än." : "Your CV doesn't show it yet.")}</p>
+            <div className="space-y-2 pt-1">
               {canFix && (
-                <Button size="sm" className="h-9 w-full text-xs" onClick={() => { markHandled(g.theme); fetchQuestions([g.theme, ...terms]); }}>
-                  <Wrench className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Svara på en fråga om detta" : "Answer one question about this"}
+                <Button className="h-11 w-full text-sm" onClick={() => { markHandled(g.theme); fetchQuestions([g.theme, ...terms]); }}>
+                  <Wrench className="mr-1.5 h-4 w-4" />{isSv ? "Svara på en fråga" : "Answer one question"}
                 </Button>
               )}
-              <div className="flex gap-1.5">
+              <div className="flex gap-2">
                 {terms.length > 0 && canFix && (
-                  <Button variant="outline" size="sm" className="h-9 flex-1 text-xs" onClick={() => { markHandled(g.theme); runPlacements(terms); }}>
+                  <Button variant="outline" className="h-10 flex-1 text-sm" onClick={() => { markHandled(g.theme); runPlacements(terms); }}>
                     <Sparkles className="mr-1 h-3.5 w-3.5" />{isSv ? `Ordval (${terms.length})` : `Wording (${terms.length})`}
                   </Button>
                 )}
                 {onUpdateMeta && (
-                  <Button variant="outline" size="sm" className="h-9 flex-1 text-xs" onClick={() => onUpdateMeta({ acceptedGaps: [...(cv.__meta?.acceptedGaps || []), g.theme] })}>
+                  <Button variant="outline" className="h-10 flex-1 text-sm" onClick={() => onUpdateMeta({ acceptedGaps: [...(cv.__meta?.acceptedGaps || []), g.theme] })}>
                     {isSv ? "Ärligt gap" : "Honest gap"}
                   </Button>
                 )}
               </div>
-              <button type="button" className="w-full text-center text-[11px] text-muted-foreground underline-offset-2 hover:underline" onClick={() => markHandled(g.theme)}>
+              <button type="button" className="w-full text-center text-xs text-muted-foreground underline-offset-2 hover:underline" onClick={() => markHandled(g.theme)}>
                 {isSv ? "Hoppa över →" : "Skip →"}
               </button>
             </div>
           </>);
         } else {
           const anyHandled = handledThemes.size > 0;
+          const curScore = computeMatchScore(themes) ?? (deepResult ? Math.round(deepResult.overall_score) : null);
+          const showDelta = !anyHandled && curScore !== null && lastDelta !== null && lastDelta !== 0;
           content = card(<>
-            <p className="text-sm font-semibold text-green-700 dark:text-green-500">✓ {isSv ? "Alla kort hanterade" : "All cards handled"}</p>
-            <p className="text-[11px] text-muted-foreground">
+            {showDelta ? (
+              <p className="font-serif text-4xl font-medium tabular-nums">
+                <span className="text-muted-foreground/50">{curScore! - lastDelta!}</span>
+                <span className="mx-2 text-muted-foreground/50">→</span>
+                <span className={scoreColor(curScore!)}>{curScore}</span>
+              </p>
+            ) : (
+              <p className="text-lg font-semibold leading-snug text-green-700 dark:text-green-500">✓ {isSv ? "Alla kort hanterade" : "All cards handled"}</p>
+            )}
+            <p className="text-sm text-muted-foreground">
               {anyHandled
-                ? (isSv ? "Kör om analysen så uppdateras poängen efter dina ändringar." : "Re-run the analysis to refresh the score after your changes.")
+                ? (isSv ? "Kör om analysen så ser du nya poängen." : "Re-run the analysis to see the new score.")
                 : (isSv ? "Alla gap är åtgärdade eller ärligt accepterade." : "Every gap is fixed or honestly accepted.")}
             </p>
-            <div className="flex gap-1.5">
+            <div className="flex gap-2">
               {anyHandled && (
-                <Button size="sm" className="h-9 flex-1 text-xs" disabled={loading} onClick={() => { setHandledThemes(new Set()); runDeep(); }}>
-                  {loading ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}{isSv ? "Uppdatera poängen" : "Update the score"}
+                <Button className="h-11 flex-1 text-sm" disabled={loading} onClick={() => { setHandledThemes(new Set()); runDeep(); }}>
+                  {loading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}{isSv ? "Uppdatera poängen" : "Update the score"}
                 </Button>
               )}
               {onDownload && (
-                <Button variant={anyHandled ? "outline" : "default"} size="sm" className="h-9 flex-1 text-xs" onClick={onDownload}>
+                <Button variant={anyHandled ? "outline" : "default"} className="h-11 flex-1 text-sm" onClick={onDownload}>
                   {isSv ? "Ladda ner PDF" : "Download PDF"}
                 </Button>
               )}
             </div>
           </>);
         }
-        return <div className="space-y-2">{content}</div>;
+        return <div className="space-y-2">{trail}{content}</div>;
       })()}
 
       {/* One toggle between guided queue and the full dashboard. */}
