@@ -99,6 +99,12 @@ export interface CVMeta {
   acceptedGaps?: string[];
   /** The knockout-requirements card has been acknowledged — don't lead the queue with it again. */
   knockoutsAcked?: boolean;
+  /**
+   * Verified answers from the guided interview — permanent evidence of real experience.
+   * The competence map (Profilen) aggregates these across every CV, so a question
+   * answered once is never asked again and never lost.
+   */
+  verifiedEvidence?: { keyword: string; answer: string; at: string }[];
   createdFrom?: string;
   /**
    * Your one true "base profile" — the canonical set of real facts. Role templates are

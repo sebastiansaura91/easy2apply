@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, FilePlus, Settings, LogOut, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Home, FilePlus, Compass, Settings, LogOut, PanelLeftClose, PanelLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ export function AppSidebar() {
   const items: NavItem[] = [
     { label: isSv ? "Hem" : "Home", icon: Home, to: "/dashboard", match: (p) => p === "/dashboard" || p.startsWith("/editor") },
     { label: isSv ? "Nytt CV" : "New CV", icon: FilePlus, to: "/wizard/create", match: (p) => p.startsWith("/wizard") },
+    { label: isSv ? "Profilen" : "Profile", icon: Compass, to: "/profile", match: (p) => p.startsWith("/profile") },
     { label: isSv ? "Inställningar" : "Settings", icon: Settings, to: "/settings", match: (p) => p.startsWith("/settings") },
   ];
 

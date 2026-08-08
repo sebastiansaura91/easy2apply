@@ -440,10 +440,22 @@ export function InsightsPanel({
     [(kwChoice[q.keyword] || []).join("; "), (kwAnswers[q.keyword] || "").trim()].filter(Boolean).join(" — ");
   const canSubmitQ = (q: KwQuestion) => composedAnswer(q).length > 2;
 
+  // Every verified answer is profile evidence — persist it so the competence map can
+  // aggregate it and the same question is never asked twice.
+  const persistEvidence = (items: { keyword: string; answer: string }[]) => {
+    if (!onUpdateMeta || !items.length) return;
+    const prev = cv.__meta?.verifiedEvidence || [];
+    const fresh = items.filter(e => !prev.some(p => p.keyword === e.keyword && p.answer === e.answer));
+    if (!fresh.length) return;
+    const at = new Date().toISOString();
+    onUpdateMeta({ verifiedEvidence: [...prev, ...fresh.map(e => ({ ...e, at }))] });
+  };
+
   // Queue mode: answer questions one card at a time; the batch placement runs after the last.
   const submitOneAnswer = (q: KwQuestion) => {
     const answer = composedAnswer(q);
     if (answer.length <= 2) return;
+    persistEvidence([{ keyword: q.keyword, answer }]);
     answeredRef.current.push({ keyword: q.keyword, answer });
     setKwConfirm(prev => ({ ...prev, [q.keyword]: "yes" }));
     const rest = (kwQuestions || []).filter(x => x.keyword !== q.keyword);
@@ -464,6 +476,7 @@ export function InsightsPanel({
       return next;
     });
     const evidence = answered.map(q => ({ keyword: q.keyword, answer: composedAnswer(q) }));
+    persistEvidence(evidence);
     const tapped = missingKw.filter(p => kwConfirm[p] === "yes" && !evidence.some(e => e.keyword === p));
     setKwQuestions(null);
     runPlacements([...tapped, ...evidence.map(e => e.keyword)], evidence);
