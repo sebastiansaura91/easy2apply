@@ -99,6 +99,30 @@ const Dashboard = () => {
     .filter(x => !x.meta.applicationStatus && (x.score === undefined || x.score < 80))
     .sort((a, b) => (a.score ?? 998) - (b.score ?? 998))[0];
 
+  // Pipeline (the Huntr/Teal model): where an application LIVES on the page answers
+  // "where does this process stand" — the pill is just the control for moving it.
+  type Stage = "fix" | "ready" | "sent" | "interview" | "done";
+  const stageOf = (meta: CVMeta): Stage => {
+    const st = meta.applicationStatus?.stage;
+    if (st === "interview") return "interview";
+    if (st === "sent") return "sent";
+    if (st === "offer" || st === "rejected") return "done";
+    return (meta.lastAtsScore?.score ?? 0) >= 80 ? "ready" : "fix";
+  };
+  const pipeline: Record<Stage, ResumeRow[]> = { fix: [], ready: [], sent: [], interview: [], done: [] };
+  for (const r of applications) pipeline[stageOf(getResumeMeta(r))].push(r);
+  const STAGE_META: { key: Stage; label: string }[] = [
+    { key: "fix", label: isSv ? "Att fixa" : "To fix" },
+    { key: "ready", label: isSv ? "Redo att skicka" : "Ready to send" },
+    { key: "sent", label: isSv ? "Skickad" : "Sent" },
+    { key: "interview", label: isSv ? "Intervju" : "Interview" },
+  ];
+  const overview = STAGE_META
+    .filter(s => pipeline[s.key].length > 0)
+    .map(s => `${pipeline[s.key].length} ${s.label.toLowerCase()}`)
+    .join(" · ");
+  const [doneOpen, setDoneOpen] = useState(false);
+
   const duplicateResume = async (r: ResumeRow) => {
     if (!user) return;
     const { data } = await supabase.from("resumes").select("content_json").eq("id", r.id).single();
@@ -244,7 +268,10 @@ const Dashboard = () => {
           </div>
         ) : (
           <div className="space-y-8">
-            <h1 className="font-serif text-3xl font-medium tracking-tight">{isSv ? "Hem" : "Home"}</h1>
+            <div>
+              <h1 className="font-serif text-3xl font-medium tracking-tight">{isSv ? "Hem" : "Home"}</h1>
+              {overview && <p className="mt-1.5 text-sm text-muted-foreground tabular-nums">{overview}</p>}
+            </div>
 
             {/* Hero action — the one move that matters */}
             <section className="flex flex-col gap-4 rounded-xl border border-border bg-accent/50 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
@@ -283,44 +310,31 @@ const Dashboard = () => {
               </section>
             )}
 
-            {/* Templates */}
-            <section>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Mallar" : "Templates"}</p>
-                </div>
-                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => navigate("/wizard/create")}>
-                  <Plus className="mr-1 h-3.5 w-3.5" />{isSv ? "Ny mall" : "New template"}
-                </Button>
+            {/* Pipeline: one section per stage, in process order — where a card sits
+                IS its status. Templates live on their own page now. */}
+            {applications.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+                {isSv ? "Inga ansökningar än. Tryck “Sök en ny tjänst” ovan så börjar pipelinen fyllas." : "No applications yet. Hit “Apply for a new position” above and the pipeline starts filling."}
               </div>
-              {templates.length > 0 ? (
-                <div className="space-y-2">{templates.map((r) => renderCard(r, "template"))}</div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-                  {isSv ? "Inga mallar än." : "No templates yet."}
-                </div>
-              )}
-            </section>
-
-            {/* Applications */}
-            <section>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ansökningar" : "Applications"}</p>
-                </div>
-                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => openApply()} disabled={templates.length === 0}>
-                  {isSv ? "Sök en tjänst" : "Apply for a role"}
-                </Button>
-              </div>
-              {applications.length > 0 ? (
-                <div className="space-y-2">{applications.map((r) => renderCard(r, "application"))}</div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-                  {isSv ? "Inga ansökningar än. Rikta en mall mot ett jobb." : "No applications yet. Tailor a template to a job."}
-                </div>
-              )}
-            </section>
+            ) : (
+              STAGE_META.filter(s => pipeline[s.key].length > 0).map(s => (
+                <section key={s.key}>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground tabular-nums">
+                    {s.label} · {pipeline[s.key].length}
+                  </p>
+                  <div className="space-y-2">{pipeline[s.key].map((r) => renderCard(r, "application"))}</div>
+                </section>
+              ))
+            )}
+            {pipeline.done.length > 0 && (
+              <section>
+                <button type="button" onClick={() => setDoneOpen(o => !o)}
+                  className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground underline-offset-4 hover:underline tabular-nums">
+                  {isSv ? "Avslutade" : "Closed"} · {pipeline.done.length} {doneOpen ? "▴" : "▾"}
+                </button>
+                {doneOpen && <div className="space-y-2">{pipeline.done.map((r) => renderCard(r, "application"))}</div>}
+              </section>
+            )}
           </div>
         )}
       </div>
