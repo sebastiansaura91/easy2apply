@@ -70,7 +70,9 @@ const CVEditor = () => {
     });
   const [stepIdx, setStepIdx] = useState(0);
   const [styleOpen, setStyleOpen] = useState(false);
-  const [pageBreaksOpen, setPageBreaksOpen] = useState(false);
+  // Split view (category standard: form left, live document right). On narrow screens
+  // or when the improve panel is docked, one pane at a time via the Redigera/Förhandsgranska toggle.
+  const [view, setView] = useState<"edit" | "preview">("edit");
   const saveTimeout = useRef<number | null>(null);
 
   const sensors = useSensors(
@@ -349,10 +351,12 @@ const CVEditor = () => {
 
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">{t("loading")}</p></div>;
 
+  const showBoth = isWide && !tailorOpen;
+
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       <AppSidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex h-full min-w-0 flex-1 flex-col">
       {/* Top bar */}
       <nav className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-5xl mx-auto flex items-center justify-between h-14 px-4">
@@ -390,12 +394,21 @@ const CVEditor = () => {
                 <ListChecks className="h-4 w-4" />
               </button>
             </div>
-            <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => setTailorOpen(true)}>
+            <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => { setTailorOpen(true); if (isWide) setView("preview"); }}>
               {cvLanguage === "en" ? "Improve" : "Förbättra"}
             </Button>
-            <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => setPageBreaksOpen(true)}>
-              <Eye className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Preview" : "Förhandsgranska"}
-            </Button>
+            {!showBoth && (
+              <div className="flex items-center rounded-md border border-border bg-muted/30 p-0.5">
+                <button type="button" onClick={() => setView("edit")}
+                  className={`h-8 whitespace-nowrap rounded px-2.5 text-xs ${view === "edit" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
+                  {cvLanguage === "en" ? "Edit" : "Redigera"}
+                </button>
+                <button type="button" onClick={() => setView("preview")}
+                  className={`h-8 whitespace-nowrap rounded px-2.5 text-xs ${view === "preview" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
+                  {cvLanguage === "en" ? "Preview" : "Förhandsgranska"}
+                </button>
+              </div>
+            )}
             <Button variant="outline" size="icon" className="h-9 w-9" title={cvLanguage === "en" ? "Save" : "Spara"} onClick={manualSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             </Button>
@@ -435,8 +448,10 @@ const CVEditor = () => {
       )}
 
       {/* Main */}
-      {mode === "step" ? (
-        <main className="flex-1">
+      <div className="flex min-h-0 flex-1">
+      {(showBoth || view === "edit") && (
+      mode === "step" ? (
+        <main className="min-w-0 flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto px-6 py-8">
             <div className="rounded-lg border border-border bg-card/40 p-8">
               {/* Progress bar */}
@@ -497,7 +512,7 @@ const CVEditor = () => {
           </div>
         </main>
       ) : (
-        <main className="flex-1">
+        <main className="min-w-0 flex-1 overflow-hidden">
           <ScrollArea className="h-full">
             <div className="max-w-3xl mx-auto p-4 sm:p-6">
               {/* Unified section list: drag to reorder, chevron to edit, eye to show/hide */}
@@ -524,7 +539,21 @@ const CVEditor = () => {
             </div>
           </ScrollArea>
         </main>
+      )
       )}
+
+      {/* The document itself, always in sight (visibility of system status): live A4,
+          updated on every keystroke. */}
+      {(showBoth || view === "preview") && (
+        <div className={`min-w-0 flex-1 overflow-auto bg-muted/40 ${showBoth ? "border-l border-border" : ""}`}>
+          <div className="flex justify-center p-6">
+            <div style={{ zoom: 0.62 }}>
+              <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} style={templateStyle} />
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
 
       {/* Unified tailoring surface — overlay sheet on narrow screens only; wide screens
           get the docked column beside the document instead. */}
@@ -601,26 +630,6 @@ const CVEditor = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Page breaks dialog */}
-      <Dialog open={pageBreaksOpen} onOpenChange={setPageBreaksOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{cvLanguage === "en" ? "Preview" : "Förhandsgranskning"}</DialogTitle>
-          </DialogHeader>
-          {pageCount !== null && (
-            <p className={`text-xs ${pageCount > 2 ? "text-warning" : "text-muted-foreground"}`}>
-              {cvLanguage === "en"
-                ? `${pageCount} ${pageCount === 1 ? "page" : "pages"} in the exported PDF${pageCount > 2 ? " — aim for max 2. Shorten the longest bullets or hide a section." : "."}`
-                : `${pageCount} ${pageCount === 1 ? "sida" : "sidor"} i exporterad PDF${pageCount > 2 ? " — sikta på max 2. Korta de längsta punkterna eller dölj en sektion." : "."}`}
-            </p>
-          )}
-          <div className="bg-muted/40 p-4 rounded-lg flex justify-center overflow-auto">
-            <div className="transform scale-[0.75] origin-top">
-              <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} style={templateStyle} />
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
       </div>
 
       {/* Docked improve column (the Grammarly pattern): the CV changes in view while
