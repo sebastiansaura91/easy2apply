@@ -25,6 +25,8 @@ interface Props {
   onDownload?: () => void;
   /** Cross-CV evidence lookup — see InsightsPanel. */
   profileEvidence?: (name: string) => { keyword: string; answer: string }[];
+  /** Snapshot hook for one-step undo — see InsightsPanel. */
+  onSnapshot?: (label: string) => void;
   /**
    * Docked mode: rendered as a fixed right column beside the document instead of an
    * overlay sheet — you watch the CV change while you answer (the Grammarly pattern).
@@ -39,7 +41,7 @@ interface Props {
  */
 export function TailorPanel({
   open, onOpenChange, cv, cvLanguage, t, seededJob, seededResult,
-  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit, onUpdateMeta, onDownload, profileEvidence, docked,
+  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit, onUpdateMeta, onDownload, profileEvidence, onSnapshot, docked,
 }: Props) {
   const isSv = cvLanguage === "sv";
 
@@ -60,6 +62,7 @@ export function TailorPanel({
       onUpdateMeta={onUpdateMeta}
       onDownload={onDownload}
       profileEvidence={profileEvidence}
+      onSnapshot={onSnapshot}
       onApplyReframe={onApplyReframe}
       onPersistRoleFit={onPersistRoleFit}
     />

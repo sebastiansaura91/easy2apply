@@ -99,6 +99,12 @@ export interface CVMeta {
   acceptedGaps?: string[];
   /** The knockout-requirements card has been acknowledged — don't lead the queue with it again. */
   knockoutsAcked?: boolean;
+  /** Honest answers to the ad's hard requirements — "no" means likely screen-out, said out loud. */
+  knockoutAnswers?: Record<string, "yes" | "no">;
+  /** Lifecycle after the CV leaves the app — the tracking half. Readiness statuses stop here. */
+  applicationStatus?: { stage: "sent" | "interview" | "offer" | "rejected"; at: string };
+  /** One-step undo: the document as it was before the last automatic change (swap = redo). */
+  lastSnapshot?: { at: string; label: string; doc: Omit<CVContent, "__meta"> };
   /**
    * Verified answers from the guided interview — permanent evidence of real experience.
    * The competence map (Profilen) aggregates these across every CV, so a question

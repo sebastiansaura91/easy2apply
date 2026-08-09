@@ -53,6 +53,8 @@ interface Props {
   /** Apply a whole-bullet reframe — reframes are queue cards, not a separate tab. */
   onApplyReframe?: (experienceId: string, original: string, suggested: string) => boolean;
   onPersistRoleFit?: (hash: string, result: RoleFitResult) => void;
+  /** Take a document snapshot right before an automatic change — powers one-step undo. */
+  onSnapshot?: (label: string) => void;
 }
 
 interface SinceLast {
@@ -79,7 +81,7 @@ function severityBorder(severity: CvIssue["severity"]) {
 
 export function InsightsPanel({
   cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
-  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta, onDownload, profileEvidence, onApplyReframe, onPersistRoleFit,
+  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta, onDownload, profileEvidence, onApplyReframe, onPersistRoleFit, onSnapshot,
 }: Props) {
   const { toast } = useToast();
   // Restore the stored full analysis so buckets are populated from the start.
@@ -349,6 +351,7 @@ export function InsightsPanel({
 
   const applyAutoFix = () => {
     if (!autoFixPreview) return;
+    onSnapshot?.(isSv ? "Auto-fix" : "Auto-fix");
     const { target, targetIdx, text } = autoFixPreview;
     // The CV is plain text — strip any markdown/bullet characters the AI might emit
     // so they never end up printed literally in the PDF.
@@ -586,6 +589,7 @@ export function InsightsPanel({
   const applyNewBullet = (nb: NewBullet, idx: number) => {
     const exp = cv.experience[nb.exp_index];
     if (!exp) return;
+    onSnapshot?.(isSv ? "Ny punkt" : "New bullet");
     onUpdateExperienceBullets?.(nb.exp_index, [...exp.bullets, nb.bullet]);
     setAppliedNew(prev => new Set(prev).add(idx));
     toast({ title: isSv ? "Ny punkt tillagd — sparas i CV:t" : "New bullet added — saved to the CV" });
@@ -599,6 +603,7 @@ export function InsightsPanel({
     }
     const next = [...bullets];
     next[p.bullet_index] = p.revised;
+    onSnapshot?.(isSv ? `Ordbyte: ${p.keyword}` : `Swap: ${p.keyword}`);
     onUpdateExperienceBullets?.(p.exp_index, next);
     setAppliedPlacements(prev => new Set(prev).add(idx));
     toast({ title: isSv ? "Nyckelord inlagt — sparas i CV:t" : "Keyword placed — saved to the CV" });
@@ -1146,6 +1151,16 @@ export function InsightsPanel({
         </div>
       </div>
 
+      {/* A failed hard requirement is the one thing tailoring can't fix — keep it visible. */}
+      {Object.entries(cv.__meta?.knockoutAnswers || {}).some(([, v]) => v === "no") && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs">
+          <span className="font-semibold text-destructive">
+            {Object.values(cv.__meta?.knockoutAnswers || {}).filter(v => v === "no").length} {isSv ? "hårt krav ej uppfyllt." : "hard requirement not met."}
+          </span>{" "}
+          {isSv ? "Trolig gallring i ansökningsformuläret. Sök ändå om rollen är värd det, men vet om oddsen." : "Likely screen-out in the application form. Apply anyway if the role is worth it, but know the odds."}
+        </div>
+      )}
+
       {/* ── FIX QUEUE: one card at a time (guided mode) ── */}
       {themes.length > 0 && !showDetails && (() => {
         const accepted = new Set(cv.__meta?.acceptedGaps || []);
@@ -1180,11 +1195,36 @@ export function InsightsPanel({
 
         let content: React.ReactNode;
         if (knockouts.length > 0 && !cv.__meta?.knockoutsAcked) {
+          // Hard requirements answered one by one — the only true auto-rejections,
+          // so a "no" is said out loud instead of discovered after four hours of tailoring.
+          const answers = cv.__meta?.knockoutAnswers || {};
+          const allAnswered = knockouts.every(k => answers[k]);
           content = card(<>
-            <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{isSv ? "Hårda krav i annonsen" : "Hard requirements in the ad"}</p>
-            <ul className="list-disc space-y-1 pl-4 text-sm">{knockouts.map(k => <li key={k}>{k}</li>)}</ul>
-            <p className="text-xs text-muted-foreground">{isSv ? "Svara ärligt på dessa i ansökan. Det är de enda automatiska avslagen, CV-formuleringar hjälper inte här." : "Answer these honestly in the application. They are the only automatic rejections, CV wording can't help here."}</p>
-            {onUpdateMeta && <Button className="h-11 w-full text-sm" onClick={() => onUpdateMeta({ knockoutsAcked: true })}>{isSv ? "OK, förstått" : "Got it"}</Button>}
+            <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{isSv ? "Uppfyller du de hårda kraven?" : "Do you meet the hard requirements?"}</p>
+            <p className="text-xs text-muted-foreground">{isSv ? "De enda automatiska avslagen. CV-formuleringar hjälper inte här, bara ärliga svar." : "The only automatic rejections. CV wording can't help here, only honest answers."}</p>
+            <div className="space-y-2">
+              {knockouts.map(k => (
+                <div key={k} className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5">
+                  <span className="text-sm leading-snug">{k}</span>
+                  <span className="flex shrink-0 gap-1">
+                    {(["yes", "no"] as const).map(v => (
+                      <button key={v} type="button"
+                        onClick={() => onUpdateMeta?.({ knockoutAnswers: { ...answers, [k]: v } })}
+                        className={`rounded-md border px-2.5 py-1.5 text-xs font-medium ${answers[k] === v
+                          ? v === "yes" ? "border-green-700 bg-green-600/10 text-green-700 dark:text-green-500" : "border-destructive bg-destructive/10 text-destructive"
+                          : "border-border text-muted-foreground hover:bg-muted"}`}>
+                        {v === "yes" ? (isSv ? "Ja" : "Yes") : (isSv ? "Nej" : "No")}
+                      </button>
+                    ))}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {onUpdateMeta && (
+              <Button className="h-11 w-full text-sm" disabled={!allAnswered} onClick={() => onUpdateMeta({ knockoutsAcked: true })}>
+                {allAnswered ? (isSv ? "Fortsätt" : "Continue") : (isSv ? "Svara på alla först" : "Answer all first")}
+              </Button>
+            )}
           </>);
         } else if (busyQ) {
           content = card(<p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{loadingQ ? (isSv ? "Skapar fråga…" : "Creating question…") : (isSv ? "Letar ärliga placeringar…" : "Finding honest placements…")}</p>);

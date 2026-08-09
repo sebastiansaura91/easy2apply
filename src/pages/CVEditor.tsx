@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw, MoreHorizontal, Check, Eye, ListOrdered, Save } from "lucide-react";
+import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw, RotateCcw, MoreHorizontal, Check, Eye, ListOrdered, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -238,6 +238,27 @@ const CVEditor = () => {
   const updateExperienceBullets = (expIdx: number, bullets: string[]) =>
     setCv(prev => ({ ...prev, experience: prev.experience.map((e, i) => i === expIdx ? { ...e, bullets } : e) }));
   const updateSkills = (skills: string[]) => updateCv("skills", skills);
+
+  // One-step undo for automatic changes: snapshot the document BEFORE the change;
+  // undo swaps current and snapshot, so pressing it twice is a redo.
+  const takeSnapshot = useCallback((label: string) => {
+    setCv(prev => {
+      const { __meta, ...doc } = prev;
+      return { ...prev, __meta: { ...__meta, lastSnapshot: { at: new Date().toISOString(), label, doc: doc as any } } };
+    });
+  }, []);
+  const undoLast = () => {
+    setCv(prev => {
+      const snap = prev.__meta?.lastSnapshot;
+      if (!snap) return prev;
+      const { __meta, ...cur } = prev;
+      return {
+        ...(snap.doc as any),
+        __meta: { ...__meta, lastSnapshot: { at: new Date().toISOString(), label: cvLanguage === "en" ? `Undid: ${snap.label}` : `Ångrade: ${snap.label}`, doc: cur as any } },
+      };
+    });
+    toast({ title: cvLanguage === "en" ? "Undone" : "Ångrat", description: cvLanguage === "en" ? "Press again to redo." : "Tryck igen för att göra om." });
+  };
   // Replace a bullet with its reframe. Matches tolerantly (trimmed, then across all
   // experiences as a fallback) and reports whether anything actually changed, so the
   // panel never claims "Applied" when nothing was. The change autosaves like any edit.
@@ -257,7 +278,13 @@ const CVEditor = () => {
       // The AI sometimes returns a slightly-off experience id — fall back to any experience.
       next = { ...cv, experience: cv.experience.map(e => ({ ...e, bullets: replaceIn(e.bullets) })) };
     }
-    if (changed) setCv(next);
+    if (changed) {
+      takeSnapshot(cvLanguage === "en" ? "Reframe" : "Omformulering");
+      setCv(prev => {
+        // Recompute against the freshest state (snapshot updated __meta an instant ago).
+        return { ...prev, experience: next.experience };
+      });
+    }
     return changed;
   };
   const navigateToSection = (sectionType: string) => {
@@ -328,6 +355,7 @@ const CVEditor = () => {
   // One prop set for both homes of the improve panel: docked column (wide screens)
   // and overlay sheet (narrow).
   const tailorPanelProps = {
+    onSnapshot: takeSnapshot,
     open: tailorOpen,
     onOpenChange: setTailorOpen,
     cv, cvLanguage, t,
@@ -423,6 +451,12 @@ const CVEditor = () => {
                 <DropdownMenuItem onClick={() => setStyleOpen(true)}><Palette className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Style" : "Stil"}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSyncOpen(true)}><RefreshCw className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Sync facts" : "Synka fakta"}</DropdownMenuItem>
                 <DropdownMenuItem onClick={applyAtsOrder}><ListOrdered className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Arrange for ATS" : "Ordna för ATS"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={undoLast} disabled={!cv.__meta?.lastSnapshot}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  {cv.__meta?.lastSnapshot
+                    ? `${cvLanguage === "en" ? "Undo" : "Ångra"}: ${cv.__meta.lastSnapshot.label}`
+                    : (cvLanguage === "en" ? "Undo last change" : "Ångra senaste ändring")}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Globe className="h-3 w-3" />{cvLanguage === "en" ? "Language" : "Språk"}</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => setCvLanguage("sv")}>Svenska {cvLanguage === "sv" && <Check className="ml-auto h-4 w-4" />}</DropdownMenuItem>

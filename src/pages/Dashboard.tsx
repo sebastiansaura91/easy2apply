@@ -9,6 +9,7 @@ import { FileText, Copy, Trash2, Edit3, Settings, LogOut, Briefcase, Target, Plu
 import { RolePicker, CUSTOM_ROLE } from "@/components/role/RolePicker";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -61,17 +62,41 @@ const Dashboard = () => {
 
   // Status per application, GOV.UK task-list style. Thresholds follow the industry
   // convention (Jobscan: 75 minimum, 80 sweet spot): 80+ ready, 60–79 improve.
+  // After sending, the lifecycle stage takes over from the readiness score.
+  const LIFECYCLE: Record<string, { sv: string; en: string; cls: string }> = {
+    sent: { sv: "Skickad", en: "Sent", cls: "bg-accent text-accent-foreground" },
+    interview: { sv: "Intervju", en: "Interview", cls: "bg-primary text-primary-foreground" },
+    offer: { sv: "Erbjudande", en: "Offer", cls: "bg-green-600/15 text-green-700 dark:text-green-500" },
+    rejected: { sv: "Avslag", en: "Rejected", cls: "bg-muted text-muted-foreground" },
+  };
   const statusOf = (meta: CVMeta) => {
+    const st = meta.applicationStatus;
+    if (st && LIFECYCLE[st.stage]) {
+      const l = LIFECYCLE[st.stage];
+      return { label: `${isSv ? l.sv : l.en} ${format(new Date(st.at), "d/M")}`, cls: l.cls, lifecycle: true };
+    }
     const s = meta.lastAtsScore?.score;
-    if (s === undefined) return { label: isSv ? "Utkast" : "Draft", cls: "bg-muted text-muted-foreground" };
-    if (s >= 80) return { label: isSv ? "Redo att skicka" : "Ready to send", cls: "bg-green-600/10 text-green-700 dark:text-green-500" };
-    if (s >= 60) return { label: isSv ? "Att förbättra" : "To improve", cls: "bg-warning/15 text-warning" };
-    return { label: isSv ? "Svag match" : "Weak match", cls: "bg-destructive/10 text-destructive" };
+    if (s === undefined) return { label: isSv ? "Utkast" : "Draft", cls: "bg-muted text-muted-foreground", lifecycle: false };
+    if (s >= 80) return { label: isSv ? "Redo att skicka" : "Ready to send", cls: "bg-green-600/10 text-green-700 dark:text-green-500", lifecycle: false };
+    if (s >= 60) return { label: isSv ? "Att förbättra" : "To improve", cls: "bg-warning/15 text-warning", lifecycle: false };
+    return { label: isSv ? "Svag match" : "Weak match", cls: "bg-destructive/10 text-destructive", lifecycle: false };
+  };
+  const setStage = async (r: ResumeRow, stage: "sent" | "interview" | "offer" | "rejected" | null) => {
+    const { data } = await supabase.from("resumes").select("content_json").eq("id", r.id).single();
+    const prev = (data?.content_json as any) || {};
+    const content = {
+      ...prev,
+      __meta: { ...(prev.__meta || {}), applicationStatus: stage ? { stage, at: new Date().toISOString() } : undefined },
+    };
+    const { error } = await supabase.from("resumes").update({ content_json: content }).eq("id", r.id);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else fetchResumes();
   };
   // The one application that needs you most: lowest score under 80, unanalyzed last.
+  // Sent/finished applications are out of the fix queue.
   const nextStep = applications
     .map(r => ({ r, meta: getResumeMeta(r), score: getResumeMeta(r).lastAtsScore?.score }))
-    .filter(x => x.score === undefined || x.score < 80)
+    .filter(x => !x.meta.applicationStatus && (x.score === undefined || x.score < 80))
     .sort((a, b) => (a.score ?? 998) - (b.score ?? 998))[0];
 
   const duplicateResume = async (r: ResumeRow) => {
@@ -154,9 +179,27 @@ const Dashboard = () => {
               const st = statusOf(meta);
               const sc = meta.lastAtsScore?.score;
               return (
-                <span className={`hidden items-center rounded-full px-2.5 py-1 text-[11px] font-medium tabular-nums sm:inline-flex ${st.cls}`}>
-                  {sc !== undefined && <>{sc} · </>}{st.label}
-                </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className={`hidden items-center rounded-full px-2.5 py-1 text-[11px] font-medium tabular-nums sm:inline-flex ${st.cls}`}
+                      title={isSv ? "Sätt status" : "Set status"}>
+                      {!st.lifecycle && sc !== undefined && <>{sc} · </>}{st.label}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">{isSv ? "Ansökan" : "Application"}</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => setStage(r, "sent")}>{isSv ? "Skickad" : "Sent"}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setStage(r, "interview")}>{isSv ? "Intervju" : "Interview"}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setStage(r, "offer")}>{isSv ? "Erbjudande" : "Offer"}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setStage(r, "rejected")}>{isSv ? "Avslag" : "Rejected"}</DropdownMenuItem>
+                    {meta.applicationStatus && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setStage(r, null)}>{isSv ? "Tillbaka till utkast" : "Back to draft"}</DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               );
             })()}
             {isTemplate && (
