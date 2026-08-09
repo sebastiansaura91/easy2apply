@@ -6,33 +6,37 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Loader2, ListChecks, X } from "lucide-react";
+import { ChevronDown, Loader2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { CVMeta, emptyCV } from "@/types/cv";
+import { CVMeta, ExperienceItem, emptyCV } from "@/types/cv";
 import {
-  CanonicalCompetence, CompetenceRegistry, REGISTRY_ROW_TITLE, resolveCompetence, normName,
+  CanonicalCompetence, CompetenceRegistry, REGISTRY_ROW_TITLE, buildEvidenceLookup, normName,
 } from "@/lib/competence-registry";
 import { format } from "date-fns";
 
-interface Row { id: string; title: string; meta: CVMeta; skills: string[] }
-interface EvidenceItem { keyword: string; answer: string; at: string; cvTitle: string }
-interface ThemeAgg {
+interface Row { id: string; title: string; meta: CVMeta; experience: ExperienceItem[] }
+interface EvidenceItem { keyword: string; answer: string; at: string; role?: string }
+
+/** One role in the chronological profile, merged across every CV that mentions it. */
+interface RoleAgg {
   key: string;
-  name: string;
-  best: number | null;
-  scans: number;
-  must: number;
-  nice: number;
+  title: string;
+  company: string;
+  startDate: string;
+  endDate: string;
+  isPresent: boolean;
+  bullets: string[];
   evidence: EvidenceItem[];
-  cvs: Set<string>;
-  aliases: Set<string>;
+  cvCount: number;
 }
 
+const yearOf = (d: string) => (d || "").slice(0, 4);
+
 /**
- * The competence map: your permanent supply side, grouped by the canonical
- * registry when one exists. Ads are demand; this page is what you have,
- * independent of any single CV.
+ * The profile: your career in chronological order — the roles you have actually held,
+ * merged from every CV, with verified answers filed under the role they belong to.
+ * Competence themes stay invisible matching machinery; the ads bring the themes,
+ * your history brings the proof.
  */
 export default function Profile() {
   const { user } = useAuth();
@@ -44,7 +48,6 @@ export default function Profile() {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [building, setBuilding] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Proposed registry under review — the user edits names and aliases before saving.
   const [draft, setDraft] = useState<CanonicalCompetence[] | null>(null);
 
   const fetchRows = useCallback(async () => {
@@ -56,7 +59,7 @@ export default function Profile() {
       id: r.id,
       title: r.title,
       meta: (r.content_json?.__meta || {}) as CVMeta,
-      skills: Array.isArray(r.content_json?.skills) ? r.content_json.skills : [],
+      experience: Array.isArray(r.content_json?.experience) ? r.content_json.experience : [],
     })));
     setLoading(false);
   }, []);
@@ -67,64 +70,78 @@ export default function Profile() {
   const registry: CompetenceRegistry | null = registryRow?.meta.competenceRegistry || null;
   const cvRows = useMemo(() => rows.filter(r => !r.meta.isRegistryRow), [rows]);
 
-  const { themes, evidenceCount, cvCount } = useMemo(() => {
-    const map = new Map<string, ThemeAgg>();
-    const get = (rawName: string) => {
-      const c = resolveCompetence(registry, rawName);
-      const key = c ? `id:${c.id}` : `raw:${normName(rawName)}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
-          name: c ? (isSv ? c.name_sv : c.name_en) : rawName,
-          best: null, scans: 0, must: 0, nice: 0, evidence: [], cvs: new Set(), aliases: new Set(),
-        });
-      }
-      const agg = map.get(key)!;
-      if (normName(rawName) !== normName(agg.name)) agg.aliases.add(rawName);
-      return agg;
-    };
-    let evTotal = 0;
-    const cvsSeen = new Set<string>();
-
-    for (const { title, meta } of cvRows) {
-      for (const t of meta.demandProfile?.competence_themes || []) {
-        const agg = get(t.theme);
-        if (t.importance === "must") agg.must++; else agg.nice++;
-        agg.cvs.add(title); cvsSeen.add(title);
-      }
-      const scanned = (meta.lastAtsResult?.result as any)?.job_language_match?.competence_themes || [];
-      for (const t of scanned) {
-        const r = Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
-        const agg = get(t.theme);
-        agg.scans++;
-        agg.best = agg.best === null ? r : Math.max(agg.best, r);
-        agg.cvs.add(title); cvsSeen.add(title);
-      }
-      for (const ev of meta.verifiedEvidence || []) {
-        const agg = get(ev.keyword);
-        // Reused answers are copied into each CV that used them — show the quote once.
-        if (!agg.evidence.some(e => e.answer === ev.answer)) {
-          evTotal++;
-          agg.evidence.push({ ...ev, cvTitle: title });
+  const { roles, looseEvidence, evidenceCount, toFill } = useMemo(() => {
+    // 1) Merge roles across CVs. Company + start date identify a role even when
+    //    different CV angles phrase the title differently.
+    const map = new Map<string, RoleAgg>();
+    for (const { experience } of cvRows) {
+      for (const e of experience) {
+        if (!e.title && !e.company) continue;
+        const key = `${normName(e.company || "")}|${e.startDate || normName(e.title)}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            key, title: e.title, company: e.company, startDate: e.startDate || "",
+            endDate: e.endDate || "", isPresent: !!e.isPresent, bullets: [], evidence: [], cvCount: 0,
+          });
         }
-        agg.cvs.add(title); cvsSeen.add(title);
+        const agg = map.get(key)!;
+        agg.cvCount++;
+        if ((e.title || "").length > agg.title.length) agg.title = e.title;
+        if (e.isPresent) agg.isPresent = true;
+        if ((e.endDate || "") > agg.endDate) agg.endDate = e.endDate || "";
+        for (const b of e.bullets || []) {
+          const t = b.trim();
+          if (t && !agg.bullets.some(x => normName(x) === normName(t))) agg.bullets.push(t);
+        }
+      }
+    }
+    const list = Array.from(map.values()).sort((a, b) =>
+      (Number(b.isPresent) - Number(a.isPresent)) || b.startDate.localeCompare(a.startDate));
+
+    // 2) File every verified answer under its role; the rest go to "outside the roles".
+    const loose: EvidenceItem[] = [];
+    let evTotal = 0;
+    const seen = new Set<string>();
+    for (const { meta } of cvRows) {
+      for (const ev of meta.verifiedEvidence || []) {
+        const dedupe = `${ev.keyword}|${ev.answer}`;
+        if (seen.has(dedupe)) continue;
+        seen.add(dedupe);
+        evTotal++;
+        const rn = normName(ev.role || "");
+        const hit = rn && list.find(r =>
+          rn.includes(normName(r.company)) || (normName(r.title).length >= 4 && rn.includes(normName(r.title))));
+        if (hit) hit.evidence.push(ev);
+        else loose.push(ev);
       }
     }
 
-    const list = Array.from(map.values()).sort((a, b) =>
-      ((b.best ?? 0) - (a.best ?? 0)) || (b.evidence.length - a.evidence.length) || (b.must - a.must));
-    return { themes: list, evidenceCount: evTotal, cvCount: cvsSeen.size };
-  }, [cvRows, registry, isSv]);
+    // 3) What the ads keep demanding but nothing in the profile proves yet.
+    const lookup = buildEvidenceLookup(cvRows as any, registry);
+    const demanded = new Map<string, number>();
+    for (const { meta } of cvRows) {
+      for (const t of meta.demandProfile?.competence_themes || []) {
+        if (t.importance !== "must") continue;
+        const scanned = (meta.lastAtsResult?.result as any)?.job_language_match?.competence_themes || [];
+        const rated = scanned.find((s: any) => normName(s.theme) === normName(t.theme));
+        const r = rated ? Math.round(rated.rating ?? (rated.evidence === "strong" ? 4 : rated.evidence === "missing" ? 1 : 3)) : 0;
+        if (r >= 4 || lookup(t.theme).length > 0) continue;
+        demanded.set(t.theme, (demanded.get(t.theme) || 0) + 1);
+      }
+    }
+    const fill = Array.from(demanded.entries()).sort((a, b) => b[1] - a[1]).map(([theme, n]) => ({ theme, n }));
 
-  /** Every raw signal the registry should organise. */
+    return { roles: list, looseEvidence: loose, evidenceCount: evTotal, toFill: fill };
+  }, [cvRows, registry]);
+
+  /** Signals for the registry build — unchanged matching machinery, now backstage. */
   const collectSignals = () => {
     const out = new Set<string>();
-    for (const { meta, skills } of cvRows) {
+    for (const { meta } of cvRows) {
       for (const t of meta.demandProfile?.competence_themes || []) out.add(t.theme);
       const scanned = (meta.lastAtsResult?.result as any)?.job_language_match?.competence_themes || [];
       for (const t of scanned) out.add(t.theme);
       for (const ev of meta.verifiedEvidence || []) out.add(ev.keyword);
-      for (const s of skills) out.add(s);
     }
     return Array.from(out).filter(Boolean);
   };
@@ -165,7 +182,7 @@ export default function Profile() {
         if (error) throw error;
       }
       setDraft(null);
-      toast({ title: isSv ? "Registret sparat" : "Registry saved", description: isSv ? `${cleaned.length} kompetenser. Kartan och nya annonser använder det nu.` : `${cleaned.length} competences. The map and new ads use it now.` });
+      toast({ title: isSv ? "Registret sparat" : "Registry saved", description: isSv ? `${cleaned.length} kompetenser i matchningsmotorn.` : `${cleaned.length} competences in the matching engine.` });
       fetchRows();
     } catch (e: any) {
       toast({ title: isSv ? "Kunde inte spara" : "Couldn't save", description: e.message, variant: "destructive" });
@@ -181,7 +198,11 @@ export default function Profile() {
     return n;
   });
 
-  const dotColor = (r: number) => (r >= 4 ? "bg-green-600" : r >= 2 ? "bg-warning" : "bg-destructive");
+  const period = (r: RoleAgg) => {
+    const from = yearOf(r.startDate);
+    const to = r.isPresent ? (isSv ? "nu" : "now") : yearOf(r.endDate);
+    return [from, to].filter(Boolean).join("–");
+  };
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -190,126 +211,126 @@ export default function Profile() {
         <div className="mx-auto max-w-3xl px-6 py-12">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{isSv ? "Profilen" : "Profile"}</h1>
+              <h1 className="text-3xl">{isSv ? "Profilen" : "Profile"}</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                {isSv ? "Ditt lager av kompetenser, oavsett annons. Byggd ur skanningar och verifierade svar." : "Your competence inventory, independent of any ad. Built from scans and verified answers."}
+                {isSv ? "Allt du gjort, i den ordning du gjorde det. Varje verifierat svar sparas under rätt roll." : "Everything you have done, in the order you did it. Every verified answer is filed under its role."}
               </p>
             </div>
-            <Button variant={registry ? "outline" : "default"} className="h-10 text-sm" onClick={buildRegistry} disabled={building || loading}>
-              {building ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ListChecks className="mr-1.5 h-4 w-4" />}
-              {building ? (isSv ? "Klustrar…" : "Clustering…") : registry ? (isSv ? "Uppdatera registret" : "Update the registry") : (isSv ? "Bygg registret" : "Build the registry")}
+            <Button variant="outline" className="h-9 text-xs" onClick={buildRegistry} disabled={building || loading}>
+              {building && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              {building ? (isSv ? "Klustrar…" : "Clustering…") : (isSv ? "Uppdatera matchningsmotorn" : "Update the matching engine")}
             </Button>
           </div>
-          {!loading && themes.length > 0 && (
+          {!loading && roles.length > 0 && (
             <p className="mt-2 text-xs text-muted-foreground tabular-nums">
-              {themes.length} {isSv ? "kompetenser" : "competences"} · {evidenceCount} {isSv ? "verifierade bevis" : "verified answers"} · {isSv ? "ur" : "from"} {cvCount} {isSv ? "CV:n" : "CVs"}
-              {registry && <> · {isSv ? "register v" : "registry v"}{registry.version}</>}
-            </p>
-          )}
-          {!loading && !registry && themes.length > 3 && (
-            <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-              {isSv
-                ? "Utan register är varje annons-formulering en egen rad. Bygg registret så slås samma kompetens ihop till ett kort, oavsett vad annonsen kallade den."
-                : "Without a registry every ad phrasing is its own row. Build the registry and the same competence merges into one card no matter what the ad called it."}
+              {roles.length} {isSv ? "roller" : "roles"} · {evidenceCount} {isSv ? "verifierade bevis" : "verified answers"}
+              {registry && <> · {isSv ? "motor v" : "engine v"}{registry.version}</>}
             </p>
           )}
 
+          {/* What ads keep demanding but nothing here proves yet — the complement queue. */}
+          {!loading && toFill.length > 0 && (
+            <div className="mt-5 rounded-lg border border-dashed border-warning/60 p-4">
+              <p className="text-sm font-medium">{isSv ? "Annonserna kräver, profilen saknar bevis" : "The ads demand it, the profile lacks proof"}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {toFill.slice(0, 6).map(f => (
+                  <span key={f.theme} className="rounded-full border border-border px-2.5 py-1 text-xs">
+                    {f.theme}{f.n > 1 && <span className="text-muted-foreground"> · {f.n} {isSv ? "annonser" : "ads"}</span>}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {isSv ? "Frågorna ställs i Förbättra-flödet. Svaren hamnar här, under rätt roll, och frågas aldrig igen." : "The questions are asked in the improve flow. Answers land here, under the right role, and are never asked twice."}
+              </p>
+            </div>
+          )}
+
           {loading ? (
-            <p className="mt-10 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{isSv ? "Bygger kartan…" : "Building the map…"}</p>
-          ) : themes.length === 0 ? (
-            <div className="mt-10 rounded-2xl border border-dashed border-border p-8 text-center">
-              <p className="font-medium">{isSv ? "Kartan är tom än" : "The map is empty so far"}</p>
+            <p className="mt-10 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{isSv ? "Bygger profilen…" : "Building the profile…"}</p>
+          ) : roles.length === 0 ? (
+            <div className="mt-10 rounded-lg border border-dashed border-border p-8 text-center">
+              <p className="font-medium">{isSv ? "Inga roller än" : "No roles yet"}</p>
               <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                {isSv
-                  ? "Den byggs av dina analyser och svar. Skapa en ansökan och kör Förbättra-flödet, varje skanning och varje svar hamnar här."
-                  : "It builds from your analyses and answers. Create an application and run the improve flow; every scan and every answer lands here."}
+                {isSv ? "Profilen byggs ur dina CV:n. Skapa eller importera ett CV så fylls den." : "The profile builds from your CVs. Create or import one and it fills in."}
               </p>
             </div>
           ) : (
-            <div className="mt-8 space-y-3">
-              {themes.map(t => {
-                const thin = t.must >= 1 && (t.best ?? 0) < 4;
-                const isOpen = open.has(t.key);
+            <div className="mt-8">
+              {roles.map((r, i) => {
+                const isOpen = open.has(r.key);
                 return (
-                  <Collapsible key={t.key} open={isOpen} onOpenChange={() => toggle(t.key)}>
-                    <div className={`rounded-2xl border p-4 ${thin ? "border-dashed border-warning/60" : "border-border"} bg-card`}>
-                      <CollapsibleTrigger asChild>
-                        <button type="button" className="flex w-full items-center gap-3 text-left">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium">{t.name}</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                              {t.evidence.length > 0 && <>{t.evidence.length} {isSv ? "bevis" : "proofs"} · </>}
-                              {t.must > 0 && <>{isSv ? "krav i" : "required in"} {t.must} {isSv ? "annonser" : "ads"} · </>}
-                              {t.scans > 0 ? <>{t.scans} {isSv ? "skanningar" : "scans"}</> : <>{isSv ? "aldrig skannad" : "never scanned"}</>}
-                              {thin && <span className="ml-1 text-warning">· {isSv ? "tunt och efterfrågat" : "thin and in demand"}</span>}
-                            </p>
-                          </div>
-                          <span className="flex items-center gap-1">
-                            {t.best !== null
-                              ? [1, 2, 3, 4, 5].map(n => (
-                                  <span key={n} className={`h-2 w-2 rounded-full ${n <= t.best! ? dotColor(t.best!) : "bg-muted"}`} />
-                                ))
-                              : <span className="text-xs text-muted-foreground">–</span>}
-                          </span>
-                          <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                        </button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="mt-3 space-y-2 border-t border-border pt-3">
-                          {t.aliases.size > 0 && (
-                            <p className="text-[11px] text-muted-foreground">
-                              {isSv ? "Även kallad:" : "Also called:"} {Array.from(t.aliases).slice(0, 5).join(" · ")}
-                            </p>
-                          )}
-                          {t.evidence.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">
-                              {isSv ? "Inga verifierade svar än. Svara på frågor i Förbättra-flödet så sparas bevisen här." : "No verified answers yet. Answer questions in the improve flow and the proof is stored here."}
-                            </p>
-                          ) : (
-                            t.evidence.map((ev, i) => (
-                              <blockquote key={i} className="rounded-r-lg border-l-2 border-primary/50 bg-muted/40 px-3 py-2">
-                                <p className="text-sm italic leading-relaxed">"{ev.answer}"</p>
-                                <p className="mt-1 text-[11px] text-muted-foreground">
-                                  {isSv ? "Verifierat svar" : "Verified answer"} · {ev.cvTitle} · {format(new Date(ev.at), "d MMM yyyy")}
-                                </p>
-                              </blockquote>
-                            ))
-                          )}
-                          {t.cvs.size > 0 && (
-                            <p className="text-[11px] text-muted-foreground">
-                              {isSv ? "Förekommer i:" : "Appears in:"} {Array.from(t.cvs).slice(0, 4).join(" · ")}{t.cvs.size > 4 ? ` · +${t.cvs.size - 4}` : ""}
-                            </p>
-                          )}
+                  <div key={r.key} className={`grid grid-cols-[64px_1fr] gap-4 ${i > 0 ? "border-t border-border" : ""} py-5`}>
+                    <div className="pt-0.5 text-right text-xs text-muted-foreground tabular-nums">{period(r)}</div>
+                    <div className="min-w-0">
+                      <button type="button" className="flex w-full items-baseline justify-between gap-3 text-left" onClick={() => toggle(r.key)}>
+                        <div className="min-w-0">
+                          <p className="font-medium leading-snug">{r.title}</p>
+                          <p className="text-sm text-muted-foreground">{r.company}</p>
                         </div>
-                      </CollapsibleContent>
+                        <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground tabular-nums">
+                          {r.evidence.length > 0 && <span className="rounded-full bg-accent px-2 py-0.5 text-accent-foreground">{r.evidence.length} {isSv ? "bevis" : "proofs"}</span>}
+                          {r.bullets.length} {isSv ? "punkter" : "bullets"}
+                          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        </span>
+                      </button>
+                      {isOpen && (
+                        <div className="mt-3 space-y-2">
+                          <ul className="list-disc space-y-1.5 pl-4 text-sm leading-relaxed">
+                            {r.bullets.map((b, j) => <li key={j}>{b}</li>)}
+                          </ul>
+                          {r.evidence.map((ev, j) => (
+                            <blockquote key={j} className="border-l-2 border-primary/50 bg-muted/40 px-3 py-2">
+                              <p className="text-sm italic leading-relaxed">"{ev.answer}"</p>
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                {isSv ? "Verifierat svar" : "Verified answer"} · {ev.keyword} · {format(new Date(ev.at), "d MMM yyyy")}
+                              </p>
+                            </blockquote>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </Collapsible>
+                  </div>
                 );
               })}
+
+              {looseEvidence.length > 0 && (
+                <div className="grid grid-cols-[64px_1fr] gap-4 border-t border-border py-5">
+                  <div className="pt-0.5 text-right text-xs text-muted-foreground">{isSv ? "Övrigt" : "Other"}</div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">{isSv ? "Bevis utan roll. Ange roll när du svarar så hamnar de rätt." : "Answers without a role. Pick a role when answering and they land in place."}</p>
+                    {looseEvidence.map((ev, j) => (
+                      <blockquote key={j} className="border-l-2 border-border bg-muted/40 px-3 py-2">
+                        <p className="text-sm italic leading-relaxed">"{ev.answer}"</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{ev.keyword} · {format(new Date(ev.at), "d MMM yyyy")}</p>
+                      </blockquote>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </main>
 
-      {/* Registry review: the model proposes, you decide. */}
+      {/* Matching-engine review: the model proposes clusters, you approve them. */}
       <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{isSv ? "Granska registret" : "Review the registry"}</DialogTitle>
+            <DialogTitle>{isSv ? "Granska matchningsmotorn" : "Review the matching engine"}</DialogTitle>
             <DialogDescription>
               {isSv
-                ? "Döp om, ta bort fel, stryk kompetenser du inte vill ha. Det du sparar blir kartans facit."
-                : "Rename, remove mistakes, drop competences you don't want. What you save becomes the map's source of truth."}
+                ? "Så här slår motorn ihop annonsernas formuleringar. Döp om, ta bort fel. Syns aldrig i profilen, styr bara matchning och frågor."
+                : "How the engine merges ad phrasings. Rename, remove mistakes. Never shown in the profile; only drives matching and questions."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             {(draft || []).map((c, i) => (
-              <div key={c.id} className="rounded-xl border border-border p-3 space-y-2">
+              <div key={c.id} className="space-y-2 rounded-md border border-border p-3">
                 <div className="flex items-center gap-2">
                   <Input value={c.name_sv} onChange={e => editDraft(i, { name_sv: e.target.value })} className="h-9 text-sm" placeholder="Namn (svenska)" />
                   <Input value={c.name_en} onChange={e => editDraft(i, { name_en: e.target.value })} className="h-9 text-sm" placeholder="Name (English)" />
                   <button type="button" className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-                    title={isSv ? "Ta bort kompetensen" : "Remove competence"}
+                    title={isSv ? "Ta bort" : "Remove"}
                     onClick={() => setDraft(prev => prev ? prev.filter((_, j) => j !== i) : prev)}>
                     <X className="h-4 w-4" />
                   </button>

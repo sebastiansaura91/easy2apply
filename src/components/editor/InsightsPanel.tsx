@@ -110,6 +110,20 @@ export function InsightsPanel({
   // Recognition over recall: the user ticks the concrete statements that are true
   // (several allowed), then optionally adds specifics. Choices + detail = the evidence.
   const [kwChoice, setKwChoice] = useState<Record<string, string[]>>({});
+  // Which of your roles the experience belongs to — files the evidence in the right
+  // place in the chronological profile.
+  const [kwRole, setKwRole] = useState<Record<string, string>>({});
+  const roleSelect = (keyword: string, cls: string) => (
+    <select value={kwRole[keyword] || ""} onChange={e => setKwRole(prev => ({ ...prev, [keyword]: e.target.value }))}
+      className={`${cls} w-full rounded-md border border-input bg-background px-2 text-muted-foreground`}>
+      <option value="">{isSv ? "Var hände detta? (frivilligt)" : "Where did this happen? (optional)"}</option>
+      {cv.experience.filter(e => e.title || e.company).map(e => {
+        const v = [e.title, e.company].filter(Boolean).join(" · ");
+        return <option key={e.id} value={v}>{v}</option>;
+      })}
+      <option value={isSv ? "Utanför CV:t" : "Outside the CV"}>{isSv ? "Utanför rollerna i CV:t" : "Outside the CV roles"}</option>
+    </select>
+  );
   const toggleChoice = (k: string, opt: string) =>
     setKwChoice(prev => {
       const cur = prev[k] || [];
@@ -475,9 +489,10 @@ export function InsightsPanel({
     [(kwChoice[q.keyword] || []).join("; "), (kwAnswers[q.keyword] || "").trim()].filter(Boolean).join(" — ");
   const canSubmitQ = (q: KwQuestion) => composedAnswer(q).length > 2;
 
-  // Every verified answer is profile evidence — persist it so the competence map can
-  // aggregate it and the same question is never asked twice.
-  const persistEvidence = (items: { keyword: string; answer: string }[]) => {
+  // Every verified answer is profile evidence — persist it (with the role it belongs to)
+  // so the chronological profile files it under the right role and the same question is
+  // never asked twice.
+  const persistEvidence = (items: { keyword: string; answer: string; role?: string }[]) => {
     if (!onUpdateMeta || !items.length) return;
     const prev = cv.__meta?.verifiedEvidence || [];
     const fresh = items.filter(e => !prev.some(p => p.keyword === e.keyword && p.answer === e.answer));
@@ -486,12 +501,20 @@ export function InsightsPanel({
     onUpdateMeta({ verifiedEvidence: [...prev, ...fresh.map(e => ({ ...e, at }))] });
   };
 
+  // The chosen role rides along into placement evidence too, so the model targets
+  // the right experience when it builds bullets.
+  const answerWithRole = (q: KwQuestion) => {
+    const role = (kwRole[q.keyword] || "").trim();
+    const answer = composedAnswer(q);
+    return role ? `${answer} (i rollen: ${role})` : answer;
+  };
+
   // Queue mode: answer questions one card at a time; the batch placement runs after the last.
   const submitOneAnswer = (q: KwQuestion) => {
     const answer = composedAnswer(q);
     if (answer.length <= 2) return;
-    persistEvidence([{ keyword: q.keyword, answer }]);
-    answeredRef.current.push({ keyword: q.keyword, answer });
+    persistEvidence([{ keyword: q.keyword, answer, role: kwRole[q.keyword] || undefined }]);
+    answeredRef.current.push({ keyword: q.keyword, answer: answerWithRole(q) });
     setKwConfirm(prev => ({ ...prev, [q.keyword]: "yes" }));
     const rest = (kwQuestions || []).filter(x => x.keyword !== q.keyword);
     setKwQuestions(rest.length ? rest : null);
@@ -514,8 +537,8 @@ export function InsightsPanel({
     // the same placement run as the fresh answers.
     const stashed = answeredRef.current;
     answeredRef.current = [];
-    const evidence = [...stashed, ...answered.map(q => ({ keyword: q.keyword, answer: composedAnswer(q) }))];
-    persistEvidence(evidence);
+    persistEvidence(answered.map(q => ({ keyword: q.keyword, answer: composedAnswer(q), role: kwRole[q.keyword] || undefined })));
+    const evidence = [...stashed, ...answered.map(q => ({ keyword: q.keyword, answer: answerWithRole(q) }))];
     const tapped = missingKw.filter(p => kwConfirm[p] === "yes" && !evidence.some(e => e.keyword === p));
     setKwQuestions(null);
     runPlacements([...tapped, ...evidence.map(e => e.keyword)], evidence);
@@ -812,6 +835,7 @@ export function InsightsPanel({
                         placeholder={q.hint || (isSv ? "Frivillig detalj: system, omfattning, resultat…" : "Optional detail: system, scope, outcome…")}
                         className="text-xs"
                       />
+                      {roleSelect(q.keyword, "h-9 text-[11px]")}
                     </div>
                   ))}
                   <div className="flex gap-1.5">
@@ -1141,7 +1165,8 @@ export function InsightsPanel({
             </div>
             <Textarea rows={2} value={kwAnswers[pendingQ.keyword] || ""}
               onChange={e => setKwAnswers(prev => ({ ...prev, [pendingQ.keyword]: e.target.value }))}
-              placeholder={pendingQ.hint || (isSv ? "Var? Vad blev resultatet?" : "Where? What was the outcome?")} className="text-sm" />
+              placeholder={pendingQ.hint || (isSv ? "Detalj: system, omfattning, resultat…" : "Detail: system, scope, outcome…")} className="text-sm" />
+            {roleSelect(pendingQ.keyword, "h-10 text-xs")}
             <div className="flex gap-2">
               <Button className="h-11 flex-1 text-sm" disabled={!canSubmitQ(pendingQ)} onClick={() => submitOneAnswer(pendingQ)}>
                 {isSv ? "Skicka" : "Submit"}

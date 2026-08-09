@@ -104,7 +104,7 @@ export interface CVMeta {
    * The competence map (Profilen) aggregates these across every CV, so a question
    * answered once is never asked again and never lost.
    */
-  verifiedEvidence?: { keyword: string; answer: string; at: string }[];
+  verifiedEvidence?: { keyword: string; answer: string; at: string; role?: string }[];
   /** Marks the hidden resume row that stores the canonical competence registry. */
   isRegistryRow?: boolean;
   /** The registry itself — only present on the registry row. See lib/competence-registry. */
