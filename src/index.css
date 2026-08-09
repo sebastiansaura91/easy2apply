@@ -2,105 +2,106 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 
 @layer base {
   :root {
-    /* "Atelier": warm bone paper, ink text, one deep muted bottle-green, editorial not SaaS. */
-    --background: 43 18% 91%;
-    --foreground: 100 7% 11%;
+    /* "Bläcket": gallery white, blue-black text, ONE signature — archival blue-black ink
+       (fountain-pen blue, not SaaS blue). Hairlines over shadows, tight radius. */
+    --background: 45 15% 98%;
+    --foreground: 240 8% 10%;
 
-    --card: 42 26% 96%;
-    --card-foreground: 100 7% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 8% 10%;
 
-    --popover: 42 30% 97%;
-    --popover-foreground: 100 7% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 8% 10%;
 
-    --primary: 165 32% 20%;
-    --primary-foreground: 42 30% 96%;
-    --primary-hover: 165 32% 16%;
+    --primary: 233 45% 26%;
+    --primary-foreground: 45 15% 98%;
+    --primary-hover: 233 48% 20%;
 
-    --secondary: 43 16% 88%;
-    --secondary-foreground: 100 10% 20%;
+    --secondary: 240 8% 95%;
+    --secondary-foreground: 240 8% 18%;
 
-    --muted: 43 16% 89%;
-    --muted-foreground: 80 4% 41%;
+    --muted: 240 6% 95%;
+    --muted-foreground: 240 5% 42%;
 
-    --accent: 165 22% 86%;
-    --accent-foreground: 165 32% 20%;
+    --accent: 233 40% 94%;
+    --accent-foreground: 233 45% 26%;
 
-    --destructive: 8 50% 42%;
-    --destructive-foreground: 42 30% 96%;
+    --destructive: 0 55% 42%;
+    --destructive-foreground: 45 15% 98%;
 
-    --border: 43 17% 83%;
-    --input: 43 17% 83%;
-    --ring: 165 32% 20%;
+    --border: 240 8% 88%;
+    --input: 240 8% 85%;
+    --ring: 233 45% 26%;
 
-    --radius: 0.4rem;
+    --radius: 0.25rem;
 
-    --sidebar-background: 42 24% 94%;
-    --sidebar-foreground: 90 6% 30%;
-    --sidebar-primary: 165 32% 20%;
-    --sidebar-primary-foreground: 42 30% 96%;
-    --sidebar-accent: 165 22% 88%;
-    --sidebar-accent-foreground: 165 32% 20%;
-    --sidebar-border: 43 17% 85%;
-    --sidebar-ring: 165 32% 20%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 6% 32%;
+    --sidebar-primary: 233 45% 26%;
+    --sidebar-primary-foreground: 45 15% 98%;
+    --sidebar-accent: 233 40% 94%;
+    --sidebar-accent-foreground: 233 45% 26%;
+    --sidebar-border: 240 8% 90%;
+    --sidebar-ring: 233 45% 26%;
 
-    --success: 141 34% 37%;
-    --success-foreground: 42 30% 96%;
-    --warning: 35 61% 43%;
-    --warning-foreground: 42 30% 96%;
+    --success: 150 40% 30%;
+    --success-foreground: 45 15% 98%;
+    --warning: 32 70% 40%;
+    --warning-foreground: 45 15% 98%;
 
-    --surface-alt: 42 26% 96%;
+    --surface-alt: 240 10% 97%;
   }
 
   .dark {
-    /* Warm forest-ink night: deep green-black ground, bone text, brighter green accent. */
-    --background: 95 19% 7%;
-    --foreground: 45 17% 90%;
+    /* Night ink: blue-black ground, bone text, the signature ink lightened to stay legible. */
+    --background: 240 10% 8%;
+    --foreground: 45 12% 92%;
 
-    --card: 96 15% 11%;
-    --card-foreground: 45 17% 90%;
+    --card: 240 9% 11%;
+    --card-foreground: 45 12% 92%;
 
-    --popover: 96 15% 11%;
-    --popover-foreground: 45 17% 90%;
+    --popover: 240 9% 11%;
+    --popover-foreground: 45 12% 92%;
 
-    --primary: 154 27% 49%;
-    --primary-foreground: 100 20% 6%;
-    --primary-hover: 154 27% 55%;
+    --primary: 233 55% 74%;
+    --primary-foreground: 240 10% 10%;
+    --primary-hover: 233 60% 80%;
 
-    --secondary: 96 12% 16%;
-    --secondary-foreground: 45 15% 86%;
+    --secondary: 240 8% 16%;
+    --secondary-foreground: 45 10% 88%;
 
-    --muted: 96 12% 15%;
-    --muted-foreground: 90 5% 56%;
+    --muted: 240 8% 15%;
+    --muted-foreground: 240 5% 58%;
 
-    --accent: 154 20% 16%;
-    --accent-foreground: 45 17% 90%;
+    --accent: 233 30% 20%;
+    --accent-foreground: 45 12% 92%;
 
-    --destructive: 8 46% 50%;
-    --destructive-foreground: 42 30% 96%;
+    --destructive: 0 50% 55%;
+    --destructive-foreground: 240 10% 8%;
 
-    --border: 90 11% 16%;
-    --input: 90 11% 16%;
-    --ring: 154 27% 49%;
+    --border: 240 8% 18%;
+    --input: 240 8% 18%;
+    --ring: 233 55% 74%;
 
-    --sidebar-background: 95 18% 8%;
-    --sidebar-foreground: 45 12% 82%;
-    --sidebar-primary: 154 27% 49%;
-    --sidebar-primary-foreground: 100 20% 6%;
-    --sidebar-accent: 96 12% 15%;
-    --sidebar-accent-foreground: 45 15% 86%;
-    --sidebar-border: 90 11% 16%;
-    --sidebar-ring: 154 27% 49%;
+    --sidebar-background: 240 10% 9%;
+    --sidebar-foreground: 45 10% 82%;
+    --sidebar-primary: 233 55% 74%;
+    --sidebar-primary-foreground: 240 10% 10%;
+    --sidebar-accent: 233 25% 17%;
+    --sidebar-accent-foreground: 45 10% 88%;
+    --sidebar-border: 240 8% 18%;
+    --sidebar-ring: 233 55% 74%;
 
-    --success: 141 30% 56%;
-    --success-foreground: 100 20% 6%;
-    --warning: 38 57% 55%;
-    --warning-foreground: 100 20% 6%;
+    --success: 150 35% 55%;
+    --success-foreground: 240 10% 8%;
+    --warning: 38 60% 55%;
+    --warning-foreground: 240 10% 8%;
 
-    --surface-alt: 96 15% 11%;
+    --surface-alt: 240 9% 11%;
   }
 }
 
@@ -111,16 +112,17 @@
 
   body {
     @apply bg-background text-foreground font-sans;
-    font-family: 'Schibsted Grotesk', system-ui, sans-serif;
+    font-family: 'Instrument Sans', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Editorial serif for headings + figures; UI stays in the grotesque. */
+  /* Sharp editorial serif for headings + figures; UI stays in the sans.
+     Instrument Serif ships in ONE weight — the contrast comes from size, not boldness. */
   h1, h2, h3, .font-display {
-    font-family: 'Newsreader', Georgia, serif;
-    font-weight: 500;
-    letter-spacing: -0.005em;
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-weight: 400;
+    letter-spacing: 0.005em;
   }
 
   .tnum { font-variant-numeric: tabular-nums; }
