@@ -59,6 +59,21 @@ const Dashboard = () => {
   // The apply journey is a full page (/apply), not a modal.
   const openApply = (roleId?: string) => navigate(roleId ? `/apply?role=${encodeURIComponent(roleId)}` : "/apply");
 
+  // Status per application, GOV.UK task-list style. Thresholds follow the industry
+  // convention (Jobscan: 75 minimum, 80 sweet spot): 80+ ready, 60–79 improve.
+  const statusOf = (meta: CVMeta) => {
+    const s = meta.lastAtsScore?.score;
+    if (s === undefined) return { label: isSv ? "Utkast" : "Draft", cls: "bg-muted text-muted-foreground" };
+    if (s >= 80) return { label: isSv ? "Redo att skicka" : "Ready to send", cls: "bg-green-600/10 text-green-700 dark:text-green-500" };
+    if (s >= 60) return { label: isSv ? "Att förbättra" : "To improve", cls: "bg-warning/15 text-warning" };
+    return { label: isSv ? "Svag match" : "Weak match", cls: "bg-destructive/10 text-destructive" };
+  };
+  // The one application that needs you most: lowest score under 80, unanalyzed last.
+  const nextStep = applications
+    .map(r => ({ r, meta: getResumeMeta(r), score: getResumeMeta(r).lastAtsScore?.score }))
+    .filter(x => x.score === undefined || x.score < 80)
+    .sort((a, b) => (a.score ?? 998) - (b.score ?? 998))[0];
+
   const duplicateResume = async (r: ResumeRow) => {
     if (!user) return;
     const { data } = await supabase.from("resumes").select("content_json").eq("id", r.id).single();
@@ -134,7 +149,16 @@ const Dashboard = () => {
               </p>
             </div>
           </button>
-          <div className="flex flex-shrink-0 items-center gap-0.5">
+          <div className="flex flex-shrink-0 items-center gap-1.5">
+            {!isTemplate && (() => {
+              const st = statusOf(meta);
+              const sc = meta.lastAtsScore?.score;
+              return (
+                <span className={`hidden items-center rounded-full px-2.5 py-1 text-[11px] font-medium tabular-nums sm:inline-flex ${st.cls}`}>
+                  {sc !== undefined && <>{sc} · </>}{st.label}
+                </span>
+              );
+            })()}
             {isTemplate && (
               <Button size="sm" className="h-9 text-xs" onClick={() => openApply(getResumeMeta(r).targetRole)}>
                 {isSv ? "Sök" : "Apply"}
@@ -192,6 +216,29 @@ const Dashboard = () => {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </section>
+
+            {/* The task that needs you most, GOV.UK task-list style. */}
+            {nextStep && (
+              <section className="rounded-xl border border-warning/50 p-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Nästa steg" : "Next step"}</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">
+                      {nextStep.meta.tailoredForJob || nextStep.r.title}
+                      {nextStep.meta.tailoredForCompany ? ` @ ${nextStep.meta.tailoredForCompany}` : ""}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {nextStep.score !== undefined
+                        ? (isSv ? `${nextStep.score} av 100. Kör Förbättra så stiger den.` : `${nextStep.score} of 100. Run Improve to raise it.`)
+                        : (isSv ? "Ingen analys än. Öppna och kör en skanning." : "No analysis yet. Open it and run a scan.")}
+                    </p>
+                  </div>
+                  <Button className="h-10 shrink-0" onClick={() => navigate(`/editor/${nextStep.r.id}`)}>
+                    {isSv ? "Fortsätt" : "Continue"}<ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+              </section>
+            )}
 
             {/* Templates */}
             <section>

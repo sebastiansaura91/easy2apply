@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -16,7 +16,10 @@ import { roleLabel, getRoleAdvice } from "@/lib/role-advice";
 import { getResumeMeta } from "@/lib/resume-grouping";
 import { cvScanSignature } from "@/lib/cv-signature";
 import { deriveRoleFromTitle } from "@/lib/role-from-title";
-import { REGISTRY_ROW_TITLE, buildStrengthLookup } from "@/lib/competence-registry";
+import { REGISTRY_ROW_TITLE, buildStrengthLookup, buildEvidenceLookup } from "@/lib/competence-registry";
+import { InsightsPanel } from "@/components/editor/InsightsPanel";
+import { exportToPdf } from "@/lib/export-pdf";
+import { cvHeadings } from "@/i18n/cvHeadings";
 import { MatchScorecard } from "@/components/editor/MatchScorecard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CVMeta } from "@/types/cv";
@@ -68,7 +71,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
   const flow = useFlow();
   const isSv = language === "sv";
 
-  const [step, setStep] = useState<"input" | "report">("input");
+  const [step, setStep] = useState<"input" | "report" | "improve" | "done">("input");
   const [roleId, setRoleId] = useState<string>(initialRoleId || "");
   const [customLabel, setCustomLabel] = useState("");
   const [jobText, setJobText] = useState("");
@@ -82,11 +85,15 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
   // The ad's themes matched against the WHOLE profile (all CVs + saved answers) —
   // coverage you have somewhere, even if the chosen template doesn't show it.
   const [mapCover, setMapCover] = useState<{ theme: string; status: "covered" | "partial" | "gap" }[] | null>(null);
+  // Page mode carries the created CV through steps 3–4 (improve + done) in the flow.
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [createdCv, setCreatedCv] = useState<any | null>(null);
+  const [profileLookup, setProfileLookup] = useState<((n: string) => { keyword: string; answer: string }[]) | null>(null);
 
   const isCustom = roleId === CUSTOM_ROLE;
   const label = isCustom ? (customLabel.trim() || (isSv ? "Egen roll" : "Custom role")) : roleLabel(roleId, null, language);
 
-  const reset = () => { setStep("input"); setJobText(""); setReport(null); setBase(null); setBusy(false); setCompany(""); setRoleMode(false); setMapCover(null); };
+  const reset = () => { setStep("input"); setJobText(""); setReport(null); setBase(null); setBusy(false); setCompany(""); setRoleMode(false); setMapCover(null); setCreatedId(null); setCreatedCv(null); };
   const close = (o: boolean) => { if (!o) reset(); onOpenChange(o); };
 
   // Pick the template whose role matches; else the most recent; else none (→ create first).
@@ -136,6 +143,8 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
           const rows = (all || []).map((r: any) => ({ title: r.title, meta: (r.content_json?.__meta || {}) }));
           const reg = rows.find((r: any) => r.meta.isRegistryRow)?.meta.competenceRegistry || null;
           const lookup = buildStrengthLookup(rows as any, reg);
+          // Same fetch feeds the cross-CV evidence lookup for the improve step.
+          setProfileLookup(() => buildEvidenceLookup(rows as any, reg));
           setMapCover(ja.competence_themes.map((t: any) => {
             const s = lookup(t.theme, t.canonical_id);
             const status = (s.best ?? 0) >= 4 || s.evidence > 0 ? "covered" as const : (s.best ?? 0) >= 2 ? "partial" as const : "gap" as const;
@@ -228,9 +237,16 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
       flow.setJobPostingText(jobText.trim());
       flow.setAnalysis(report?.kind === "job" ? report.ats : null);
       onCreated?.();
-      onOpenChange(false);
-      reset();
-      navigate(`/editor/${id}`);
+      if (asPage) {
+        // The journey continues in the flow: improve → done → PDF. Editor is opt-in.
+        setCreatedId(id);
+        setCreatedCv(content);
+        setStep("improve");
+      } else {
+        onOpenChange(false);
+        reset();
+        navigate(`/editor/${id}`);
+      }
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
       setBusy(false);
@@ -241,8 +257,57 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
   const reportThemes = report?.kind === "job" ? (report.ats.job_language_match?.competence_themes ?? []) : [];
   const gapCount = reportThemes.filter(t => Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3)) < 4).length;
 
+  // ── Improve-in-flow helpers (page mode): the created CV lives here through steps 3–4. ──
+  const cvLang: "sv" | "en" = base?.language === "en" ? "en" : "sv";
+  const mutateCreated = (fn: (cv: any) => any) => setCreatedCv((prev: any) => (prev ? fn(prev) : prev));
+  // Persist every change; updates are sparse (one per accepted card), no debounce needed.
+  useEffect(() => {
+    if (createdId && createdCv && (step === "improve" || step === "done")) {
+      supabase.from("resumes").update({ content_json: createdCv }).eq("id", createdId).then(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createdCv]);
+
+  const applyReframeCreated = (experienceId: string, original: string, suggested: string): boolean => {
+    const cv = createdCv;
+    if (!cv) return false;
+    const norm = (s: string) => s.trim().toLowerCase();
+    let changed = false;
+    const replaceIn = (bullets: string[]) => bullets.map(b => (!changed && norm(b) === norm(original) ? (changed = true, suggested) : b));
+    let next = { ...cv, experience: cv.experience.map((e: any) => (e.id === experienceId ? { ...e, bullets: replaceIn(e.bullets || []) } : e)) };
+    if (!changed) next = { ...cv, experience: cv.experience.map((e: any) => ({ ...e, bullets: replaceIn(e.bullets || []) })) };
+    if (changed) setCreatedCv(next);
+    return changed;
+  };
+
+  const downloadCreated = () => {
+    if (!createdCv) return;
+    const tCv = (k: string) => cvHeadings[cvLang]?.[k] ?? k;
+    const enabled = [...(createdCv.sections || [])].filter((s: any) => s.enabled).sort((a: any, b: any) => a.order - b.order);
+    const name = (createdCv.contact?.name || "cv").replace(/[^\wåäöÅÄÖ -]/g, "").trim() || "cv";
+    exportToPdf(createdCv, enabled, tCv, `${name}.pdf`, createdCv.__meta?.templateStyle, createdCv.__meta?.templateAccent, cvLang)
+      .catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
+  };
+
+  const STEPS = isSv ? ["Annons", "Rapport", "Förbättra", "Klart"] : ["Ad", "Report", "Improve", "Done"];
+  const stepIdx = step === "input" ? 0 : step === "report" ? 1 : step === "improve" ? 2 : 3;
+
   const body = (
     <>
+        {/* Visible sequence with numerator and denominator (Baymard) — page mode only. */}
+        {asPage && (
+          <div className="mb-8">
+            <p className="text-xs text-muted-foreground tabular-nums">{isSv ? "Steg" : "Step"} {stepIdx + 1} {isSv ? "av" : "of"} 4</p>
+            <div className="mt-2 flex items-center gap-2">
+              {STEPS.map((s, i) => (
+                <div key={s} className="flex flex-1 flex-col gap-1.5">
+                  <div className={`h-1 rounded-full ${i <= stepIdx ? "bg-primary" : "bg-muted"}`} />
+                  <span className={`text-[11px] ${i === stepIdx ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {step === "input" ? (
           <>
             <Head>
@@ -297,7 +362,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
               </Button>
             </Foot>
           </>
-        ) : (
+        ) : step === "report" ? (
           <>
             <Head>
               <Title className="flex items-center gap-2">
@@ -404,6 +469,61 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
                   : (isSv ? "Skapa riktat CV" : "Create tailored CV")}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setStep("input")} disabled={busy}>{isSv ? "Tillbaka" : "Back"}</Button>
+            </Foot>
+          </>
+        ) : step === "improve" ? (
+          <>
+            <Head>
+              <Title>{isSv ? "Förbättra" : "Improve"}</Title>
+              <Desc>{isSv ? "Ett kort i taget. Hoppa över fritt, allt går att göra senare i editorn." : "One card at a time. Skip freely; everything can be done later in the editor."}</Desc>
+            </Head>
+            {createdCv && (
+              <InsightsPanel
+                cv={createdCv}
+                cvLanguage={cvLang}
+                t={(k: any) => String(k)}
+                jobPostingText={jobText.trim() || undefined}
+                initialResult={report?.kind === "job" ? report.ats : undefined}
+                autoRun
+                onNavigateToSection={() => {}}
+                onUpdateProfile={(text) => mutateCreated(cv => ({ ...cv, profile: text }))}
+                onUpdateExperienceBullets={(i, bullets) => mutateCreated(cv => ({ ...cv, experience: cv.experience.map((e: any, j: number) => (j === i ? { ...e, bullets } : e)) }))}
+                onUpdateSkills={(skills) => mutateCreated(cv => ({ ...cv, skills }))}
+                onUpdateMeta={(patch) => mutateCreated(cv => ({ ...cv, __meta: { ...cv.__meta, ...patch } }))}
+                onPersistScore={(score, grade, subscores) => mutateCreated(cv => ({ ...cv, __meta: { ...cv.__meta, lastAtsScore: { score, grade, at: new Date().toISOString(), subscores } } }))}
+                onPersistResult={(hash, result) => mutateCreated(cv => ({ ...cv, __meta: { ...cv.__meta, lastAtsResult: { hash, at: new Date().toISOString(), result } } }))}
+                onPersistRoleFit={(hash, result) => mutateCreated(cv => ({ ...cv, __meta: { ...cv.__meta, lastRoleFit: { hash, at: new Date().toISOString(), result } } }))}
+                onApplyReframe={applyReframeCreated}
+                onDownload={downloadCreated}
+                profileEvidence={profileLookup ?? undefined}
+              />
+            )}
+            <Foot>
+              <Button size="lg" className="w-full text-base" onClick={() => setStep("done")}>
+                {isSv ? "Klar för nu" : "Done for now"}<ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => createdId && navigate(`/editor/${createdId}`)}>
+                {isSv ? "Öppna i editorn i stället" : "Open in the editor instead"}
+              </Button>
+            </Foot>
+          </>
+        ) : (
+          <>
+            <Head>
+              <Title>{isSv ? "Klart" : "Done"}</Title>
+              <Desc>
+                {(report?.kind === "job" && report.jobTitle) ? report.jobTitle : label}
+                {company.trim() ? ` @ ${company.trim()}` : ""} · {isSv ? "CV:t är sparat under Ansökningar." : "The CV is saved under Applications."}
+              </Desc>
+            </Head>
+            <p className="font-serif text-6xl tabular-nums">
+              {createdCv?.__meta?.lastAtsScore?.score ?? "–"}
+              <span className="text-lg text-muted-foreground"> / 100</span>
+            </p>
+            <Foot>
+              <Button size="lg" className="w-full text-base" onClick={downloadCreated}>{isSv ? "Ladda ner PDF" : "Download PDF"}</Button>
+              <Button variant="outline" onClick={() => createdId && navigate(`/editor/${createdId}`)}>{isSv ? "Öppna i editorn" : "Open in the editor"}</Button>
+              <Button variant="ghost" size="sm" onClick={reset}>{isSv ? "Ny ansökan" : "New application"}</Button>
             </Foot>
           </>
         )}

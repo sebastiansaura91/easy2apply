@@ -11,6 +11,8 @@ import { runAtsCheck } from "@/components/cv-editor/AtsCheck";
 import { detectCvLanguages } from "@/lib/language-detection";
 import { findCvIssues, analyzeAllBullets, CvIssue } from "@/lib/cv-quality";
 import { cvScanSignature } from "@/lib/cv-signature";
+import { RoleFitResult, BulletReframe } from "@/types/role-fit";
+import { getRoleAdvice } from "@/lib/role-advice";
 import { computeMatchScore, biggestGap } from "@/lib/match-score";
 import { CVMeta } from "@/types/cv";
 import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
@@ -48,6 +50,9 @@ interface Props {
    * answer becomes the placement evidence directly.
    */
   profileEvidence?: (name: string) => { keyword: string; answer: string }[];
+  /** Apply a whole-bullet reframe — reframes are queue cards, not a separate tab. */
+  onApplyReframe?: (experienceId: string, original: string, suggested: string) => boolean;
+  onPersistRoleFit?: (hash: string, result: RoleFitResult) => void;
 }
 
 interface SinceLast {
@@ -74,7 +79,7 @@ function severityBorder(severity: CvIssue["severity"]) {
 
 export function InsightsPanel({
   cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
-  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta, onDownload, profileEvidence,
+  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta, onDownload, profileEvidence, onApplyReframe, onPersistRoleFit,
 }: Props) {
   const { toast } = useToast();
   // Restore the stored full analysis so buckets are populated from the start.
@@ -137,6 +142,11 @@ export function InsightsPanel({
   const [handledThemes, setHandledThemes] = useState<Set<string>>(new Set());
   const [dismissedPlacements, setDismissedPlacements] = useState<Set<number>>(new Set());
   const [dismissedNew, setDismissedNew] = useState<Set<number>>(new Set());
+  // Whole-bullet reframes toward the target role — queue cards after the gap cards.
+  const [reframes, setReframes] = useState<BulletReframe[] | null>(null);
+  const [appliedReframes, setAppliedReframes] = useState<Set<number>>(new Set());
+  const [dismissedReframes, setDismissedReframes] = useState<Set<number>>(new Set());
+  const reframesTried = useRef(false);
   const answeredRef = useRef<{ keyword: string; answer: string }[]>([]);
   const cycleKw = (k: string) =>
     setKwConfirm(prev => {
@@ -178,6 +188,35 @@ export function InsightsPanel({
   // Stale detection — has the CV changed since last analysis? __meta is excluded so
   // persisting the analysis itself never marks the result stale.
   const cvSignature = useMemo(() => cvScanSignature(cv, jobText), [cv, jobText]);
+
+  // Load reframes once per panel-open: the stored analysis when input is unchanged,
+  // otherwise one role-fit call. They join the queue after the gap cards.
+  useEffect(() => {
+    if (!autoRun || reframesTried.current || !onApplyReframe) return;
+    const hasRole = !!(cv.__meta?.targetRole || cv.__meta?.targetRoleLabel);
+    if (!hasRole) return;
+    reframesTried.current = true;
+    const sig = cvScanSignature(cv, jobText) + "|role:" + (cv.__meta?.targetRole || cv.__meta?.targetRoleLabel || "");
+    const stored = cv.__meta?.lastRoleFit;
+    if (stored && stored.hash === sig) {
+      setReframes(((stored.result as any)?.reframes || []) as BulletReframe[]);
+      return;
+    }
+    (async () => {
+      try {
+        const advice = getRoleAdvice(cv.__meta?.targetRole);
+        const role = advice
+          ? { label: advice.label[cvLanguage], focus: advice.focus[cvLanguage], emphasize: advice.emphasize[cvLanguage], deemphasize: advice.deemphasize[cvLanguage], keywords: advice.keywords, metrics: advice.metrics[cvLanguage] }
+          : { label: cv.__meta?.targetRoleLabel || cv.__meta?.targetRole || "" };
+        const { data, error } = await supabase.functions.invoke("analyze-role-fit", {
+          body: { resume_content_json: cv, role, job_posting_text: jobText || undefined, system_language: cvLanguage },
+        });
+        if (error || (data as any)?.error) return;
+        onPersistRoleFit?.(sig, data as RoleFitResult);
+        setReframes(((data as any)?.reframes || []) as BulletReframe[]);
+      } catch { /* reframes are optional — the queue works without them */ }
+    })();
+  }, [autoRun]); // eslint-disable-line react-hooks/exhaustive-deps
   const isStale = !!deepResult && analyzedSnapshot !== null && analyzedSnapshot !== cvSignature;
 
   const runDeep = async (opts?: { silent?: boolean }) => {
@@ -1118,6 +1157,8 @@ export function InsightsPanel({
         const pendingQ = (kwQuestions || [])[0] || null;
         const pIdx = (placements || []).findIndex((_, i) => !appliedPlacements.has(i) && !dismissedPlacements.has(i));
         const nbIdx = (newBullets || []).findIndex((_, i) => !appliedNew.has(i) && !dismissedNew.has(i));
+        const rfIdx = (reframes || []).findIndex((_, i) => !appliedReframes.has(i) && !dismissedReframes.has(i));
+        const rfLeft = (reframes || []).filter((_, i) => !appliedReframes.has(i) && !dismissedReframes.has(i)).length;
         const busyQ = loadingQ || placing;
         const markHandled = (theme: string) => setHandledThemes(prev => new Set(prev).add(theme));
 
@@ -1237,8 +1278,27 @@ export function InsightsPanel({
               </button>
             </div>
           </>);
+        } else if (rfIdx >= 0) {
+          const rf = reframes![rfIdx];
+          content = card(<>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Omformulering" : "Reframe"}</span>
+              <span className="text-[10px] text-muted-foreground">{rfLeft} {isSv ? "kvar" : "left"}</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted-foreground line-through">{rf.original}</p>
+            <p className="text-sm leading-relaxed">{rf.suggested}</p>
+            <p className="text-[11px] text-muted-foreground">{rf.reason}</p>
+            <div className="flex gap-2">
+              <Button className="h-11 flex-1 text-sm" onClick={() => {
+                const ok = onApplyReframe?.(rf.experience_id, rf.original, rf.suggested);
+                if (ok === false) toast({ title: isSv ? "Hittade inte punkten" : "Couldn't find the bullet", description: isSv ? "Punkten kan ha ändrats sedan analysen." : "The bullet may have changed since the analysis.", variant: "destructive" });
+                setAppliedReframes(prev => new Set(prev).add(rfIdx));
+              }}>{isSv ? "Använd" : "Accept"}</Button>
+              <Button variant="outline" className="h-11 text-sm" onClick={() => setDismissedReframes(prev => new Set(prev).add(rfIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
+            </div>
+          </>);
         } else {
-          const anyHandled = handledThemes.size > 0;
+          const anyHandled = handledThemes.size > 0 || appliedReframes.size > 0;
           const curScore = computeMatchScore(themes) ?? (deepResult ? Math.round(deepResult.overall_score) : null);
           const showDelta = !anyHandled && curScore !== null && lastDelta !== null && lastDelta !== 0;
           content = card(<>
