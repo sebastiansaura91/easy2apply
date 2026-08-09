@@ -31,3 +31,39 @@ verify_jwt = true
 # Draft an executive summary from the candidate's own experience; requires a valid JWT.
 [functions.draft-summary]
 verify_jwt = true
+
+# All remaining AI-gateway functions: same rule — a valid Supabase JWT is required so
+# they can't be called anonymously (cost/DoS + user CV text to a 3rd party). The mcp
+# function is intentionally absent: it authenticates via its own OAuth flow.
+[functions.analyze-job-posting]
+verify_jwt = true
+
+[functions.ats-check]
+verify_jwt = true
+
+[functions.build-competence-registry]
+verify_jwt = true
+
+[functions.generate-bullets]
+verify_jwt = true
+
+[functions.improve-bullet]
+verify_jwt = true
+
+[functions.parse-cv]
+verify_jwt = true
+
+[functions.place-keywords]
+verify_jwt = true
+
+[functions.refine-bullet]
+verify_jwt = true
+
+[functions.suggest-best-cv]
+verify_jwt = true
+
+[functions.translate-cv]
+verify_jwt = true
+
+[functions.verify-keywords]
+verify_jwt = true
