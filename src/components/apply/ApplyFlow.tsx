@@ -247,8 +247,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
           <>
             <Head>
               <Title className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                {isSv ? "Sök en ny tjänst" : "Apply for a new position"}
+                                {isSv ? "Sök en ny tjänst" : "Apply for a new position"}
               </Title>
               <Desc>
                 {isSv ? "Klistra in annonsen — vi listar ut roll, mall och företag åt dig." : "Paste the ad — we work out the role, template and company for you."}
@@ -302,8 +301,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
           <>
             <Head>
               <Title className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                {label}
+                                {label}
               </Title>
               <Desc>
                 {report?.kind === "job"

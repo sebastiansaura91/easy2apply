@@ -272,7 +272,7 @@ export function FixIssueWizard({
           ))}
 
           <Button onClick={goToSuggestion} disabled={!allAnswered || loadingSuggestion} className="w-full text-xs h-9">
-            {loadingSuggestion ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
+            {loadingSuggestion && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
             {loadingSuggestion ? (isSv ? "Genererar förslag..." : "Generating suggestion...") : (isSv ? "Generera förslag" : "Generate suggestion")}
           </Button>
         </div>

@@ -611,7 +611,6 @@ export function InsightsPanel({
         autoFixPreview?.issueIdx === i ? (
           <div className="space-y-2 mt-1 rounded-md border border-primary/30 bg-background p-2">
             <span className="text-[9px] font-semibold uppercase tracking-wider text-primary flex items-center gap-1">
-              <Sparkles className="h-2.5 w-2.5" />
               {isSv ? "Förslag" : "Suggestion"} →{" "}
               {autoFixPreview.target === "profile" ? (isSv ? "Profil" : "Profile")
                 : autoFixPreview.target === "skills" ? (isSv ? "Kompetenser" : "Skills")
@@ -626,7 +625,7 @@ export function InsightsPanel({
             <p className="text-[9px] text-muted-foreground italic">{autoFixPreview.explanation}</p>
             <div className="flex gap-1.5">
               <Button size="sm" className="flex-1 h-9 text-[10px] gap-1" onClick={applyAutoFix}>
-                <CheckCircle2 className="h-3 w-3" />{isSv ? "Applicera" : "Apply"}
+                {isSv ? "Applicera" : "Apply"}
               </Button>
               <Button variant="ghost" size="sm" className="h-9 text-[10px]" onClick={() => setAutoFixPreview(null)}>
                 {isSv ? "Avbryt" : "Cancel"}
@@ -636,11 +635,11 @@ export function InsightsPanel({
         ) : (
           <div className="flex gap-1.5 mt-1">
             <Button variant="default" size="sm" className="flex-1 h-9 text-[10px] gap-1.5" disabled={autoFixingIdx !== null} onClick={() => runAutoFix(issue, i)}>
-              {autoFixingIdx === i ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+              {autoFixingIdx === i && <Loader2 className="h-3 w-3 animate-spin" />}
               {autoFixingIdx === i ? (isSv ? "Fixar..." : "Fixing...") : (isSv ? "Auto-fixa" : "Auto-fix")}
             </Button>
             <Button variant="outline" size="sm" className="h-9 text-[10px] gap-1" onClick={() => setFixingIssue(issue)}>
-              <Wrench className="h-3 w-3" />{isSv ? "Anpassa" : "Refine"}
+              {isSv ? "Anpassa" : "Refine"}
             </Button>
           </div>
         )
@@ -729,7 +728,7 @@ export function InsightsPanel({
                                   <div className="flex gap-1.5 pt-0.5">
                                     <Button variant="outline" size="sm" className="h-8 flex-1 text-[10px]" disabled={loadingQ || placing}
                                       onClick={() => fetchQuestions([th.theme, ...(th.supporting_terms_missing || [])])}>
-                                      <Wrench className="mr-1 h-3 w-3" />{isSv ? "Överbrygga — fråga mig" : "Bridge — ask me"}
+                                      {isSv ? "Överbrygga: fråga mig" : "Bridge: ask me"}
                                     </Button>
                                     {onUpdateMeta && (
                                       <Button variant="ghost" size="sm" className="h-8 text-[10px] text-muted-foreground"
@@ -772,14 +771,14 @@ export function InsightsPanel({
                   <div className="mt-1 space-y-1.5">
                     {unknowns.length > 0 && (
                       <Button variant="default" size="sm" className="h-9 w-full text-xs" onClick={() => fetchQuestions()} disabled={loadingQ || placing}>
-                        {loadingQ ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Wrench className="mr-1.5 h-3.5 w-3.5" />}
+                        {loadingQ && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                         {loadingQ ? (isSv ? "Skapar frågor…" : "Creating questions…") : (isSv ? `Fråga mig om ${unknowns.length} nyckelord` : `Ask me about ${unknowns.length} keywords`)}
                       </Button>
                     )}
                     {confirmed.length > 0 && (
                       <Button variant="outline" size="sm" className="h-9 w-full text-xs"
                         onClick={() => runPlacements(confirmed)} disabled={placing}>
-                        {placing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                        {placing && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                         {placing ? (isSv ? "Letar placeringar…" : "Finding placements…") : (isSv ? `Placera ${confirmed.length} bekräftade nyckelord` : `Place ${confirmed.length} confirmed keywords`)}
                       </Button>
                     )}
@@ -818,7 +817,7 @@ export function InsightsPanel({
                   <div className="flex gap-1.5">
                     <Button size="sm" className="h-9 flex-1 text-xs" onClick={submitAnswers}
                       disabled={placing || !(kwQuestions || []).some(canSubmitQ)}>
-                      {placing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />}
+                      {placing && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                       {isSv ? "Skicka svar & placera" : "Submit answers & place"}
                     </Button>
                     <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => setKwQuestions(null)} disabled={placing}>
@@ -838,8 +837,7 @@ export function InsightsPanel({
                   <p className="text-[9px] italic text-muted-foreground">{nb.note}</p>
                   <Button size="sm" variant={appliedNew.has(i) ? "secondary" : "outline"} className="h-9 w-full text-xs"
                     disabled={appliedNew.has(i)} onClick={() => applyNewBullet(nb, i)}>
-                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                    {appliedNew.has(i) ? (isSv ? "Tillagd" : "Added") : (isSv ? "Lägg till" : "Add")}
+                                        {appliedNew.has(i) ? (isSv ? "Tillagd" : "Added") : (isSv ? "Lägg till" : "Add")}
                   </Button>
                 </div>
               ))}
@@ -855,8 +853,7 @@ export function InsightsPanel({
                     disabled={appliedPlacements.has(i)}
                     onClick={() => applyPlacement(p, i)}
                   >
-                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                    {appliedPlacements.has(i) ? (isSv ? "Inlagd" : "Applied") : (isSv ? "Använd" : "Apply")}
+                                        {appliedPlacements.has(i) ? (isSv ? "Inlagd" : "Applied") : (isSv ? "Använd" : "Apply")}
                   </Button>
                 </div>
               ))}
@@ -885,7 +882,7 @@ export function InsightsPanel({
           {totalBullets > 0 && (
             <div className="rounded-lg border border-border p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium flex items-center gap-1.5"><Target className="h-3.5 w-3.5" />{isSv ? "Punktkvalitet" : "Bullet quality"}</span>
+                <span className="text-xs font-medium flex items-center gap-1.5">{isSv ? "Punktkvalitet" : "Bullet quality"}</span>
                 <span className="text-[10px] text-muted-foreground">{totalBullets} totalt</span>
               </div>
               <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
@@ -1162,7 +1159,7 @@ export function InsightsPanel({
             <p className="text-lg font-semibold leading-snug">{isSv ? "Byt några ord i en punkt:" : "Swap a few words in one bullet:"}</p>
             {renderPlacementDiff(p)}
             <div className="flex gap-2">
-              <Button className="h-11 flex-1 text-sm" onClick={() => applyPlacement(p, pIdx)}><CheckCircle2 className="mr-1 h-4 w-4" />{isSv ? "Använd" : "Accept"}</Button>
+              <Button className="h-11 flex-1 text-sm" onClick={() => applyPlacement(p, pIdx)}>{isSv ? "Använd" : "Accept"}</Button>
               <Button variant="outline" className="h-11 text-sm" onClick={() => setDismissedPlacements(prev => new Set(prev).add(pIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
             </div>
           </>);
@@ -1175,7 +1172,7 @@ export function InsightsPanel({
             </div>
             <p className="text-sm leading-relaxed">{nb.bullet}</p>
             <div className="flex gap-2">
-              <Button className="h-11 flex-1 text-sm" onClick={() => applyNewBullet(nb, nbIdx)}><CheckCircle2 className="mr-1 h-4 w-4" />{isSv ? "Lägg till" : "Add"}</Button>
+              <Button className="h-11 flex-1 text-sm" onClick={() => applyNewBullet(nb, nbIdx)}>{isSv ? "Lägg till" : "Add"}</Button>
               <Button variant="outline" className="h-11 text-sm" onClick={() => setDismissedNew(prev => new Set(prev).add(nbIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
             </div>
           </>);
@@ -1195,13 +1192,13 @@ export function InsightsPanel({
             <div className="space-y-2 pt-1">
               {canFix && (
                 <Button className="h-11 w-full text-sm" onClick={() => { markHandled(g.theme); fetchQuestions([g.theme, ...terms]); }}>
-                  <Wrench className="mr-1.5 h-4 w-4" />{isSv ? "Svara på en fråga" : "Answer one question"}
+                  {isSv ? "Svara på en fråga" : "Answer one question"}
                 </Button>
               )}
               <div className="flex gap-2">
                 {terms.length > 0 && canFix && (
                   <Button variant="outline" className="h-10 flex-1 text-sm" onClick={() => { markHandled(g.theme); runPlacements(terms); }}>
-                    <Sparkles className="mr-1 h-3.5 w-3.5" />{isSv ? `Ordval (${terms.length})` : `Wording (${terms.length})`}
+                    {isSv ? `Ordval (${terms.length})` : `Wording (${terms.length})`}
                   </Button>
                 )}
                 {onUpdateMeta && (

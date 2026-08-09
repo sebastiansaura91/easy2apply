@@ -49,8 +49,7 @@ export function RolePicker({ value, onChange, selectedLabel, onCustomLabel }: Pr
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" aria-expanded={open} className="h-11 w-full justify-between font-normal">
           <span className="flex min-w-0 items-center gap-2">
-            <Target className="h-3.5 w-3.5 shrink-0 text-primary" />
-            <span className="truncate">{triggerLabel}</span>
+                        <span className="truncate">{triggerLabel}</span>
           </span>
           <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>

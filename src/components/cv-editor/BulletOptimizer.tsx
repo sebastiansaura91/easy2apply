@@ -276,7 +276,7 @@ export function BulletOptimizerPanel({ cv, cvLanguage, jobPostingText, onApplyBu
   if (!result) {
     return (
       <Button onClick={runOptimize} disabled={loading} variant="outline" size="sm" className="w-full gap-1.5 mt-2">
-        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+        {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         {loading
           ? (cvLanguage === "en" ? "Analyzing all bullets..." : "Analyserar alla punkter...")
           : (cvLanguage === "en" ? "Optimize All Bullets" : "Optimera alla punkter")}
@@ -348,7 +348,7 @@ export function BulletOptimizerPanel({ cv, cvLanguage, jobPostingText, onApplyBu
 
       {/* Re-run */}
       <Button onClick={runOptimize} disabled={loading} variant="outline" size="sm" className="w-full gap-1.5">
-        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+        {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         {loading
           ? (cvLanguage === "en" ? "Re-analyzing..." : "Analyserar om...")
           : (cvLanguage === "en" ? "Re-analyze All Bullets" : "Analysera om alla punkter")}

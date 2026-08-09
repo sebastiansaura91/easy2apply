@@ -24,7 +24,7 @@ export function RoleAdvicePanel({ roleId }: { roleId?: string | null }) {
   return (
     <div className="space-y-4 text-sm">
       <div className="flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/15 p-3">
-        <Target className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+        <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
         <p className="leading-relaxed">{advice.focus[language]}</p>
       </div>
 

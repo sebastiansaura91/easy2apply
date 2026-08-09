@@ -24,12 +24,12 @@ interface BulletResultsProps {
 }
 
 const REFINEMENT_ACTIONS: { action: RefinementAction; label: string; icon: React.ReactNode }[] = [
-  { action: "shorter", label: "Kortare", icon: <ArrowDownRight className="h-3 w-3" /> },
-  { action: "concrete", label: "Mer konkret", icon: <Target className="h-3 w-3" /> },
-  { action: "impact", label: "Mer impact", icon: <Zap className="h-3 w-3" /> },
-  { action: "verb", label: "Byt verb", icon: <RotateCcw className="h-3 w-3" /> },
-  { action: "metrics", label: "Mätetal", icon: <Hash className="h-3 w-3" /> },
-  { action: "ats", label: "ATS-keywords", icon: <Search className="h-3 w-3" /> },
+  { action: "shorter", label: "Kortare", icon: null },
+  { action: "concrete", label: "Mer konkret", icon: null },
+  { action: "impact", label: "Mer impact", icon: null },
+  { action: "verb", label: "Byt verb", icon: null },
+  { action: "metrics", label: "Mätetal", icon: null },
+  { action: "ats", label: "ATS-keywords", icon: null },
 ];
 
 function computeSkarpaScore(bullets: GeneratedBullet[]): number {

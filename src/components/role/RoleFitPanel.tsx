@@ -172,7 +172,7 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
         />
       </div>
       <Button onClick={() => run()} disabled={loading} className="w-full">
-        {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+        {loading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
         {isSv ? `Analysera fit mot ${label}` : `Analyse fit for ${label}`}
       </Button>
 
@@ -223,7 +223,7 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
                 {isSv ? `${applied.size} ändring${applied.size === 1 ? "" : "ar"} applicerad${applied.size === 1 ? "" : "e"} — poängen är inaktuell.` : `${applied.size} change${applied.size === 1 ? "" : "s"} applied — the score is out of date.`}
               </p>
               <Button size="sm" className="h-9 flex-shrink-0 text-xs" onClick={() => run()} disabled={loading}>
-                {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                {loading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                 {isSv ? "Uppdatera poängen" : "Update the score"}
               </Button>
             </div>
@@ -283,7 +283,7 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
                       <p className="text-xs text-muted-foreground line-through">{r.original}</p>
                       <p className="text-sm">{r.suggested}</p>
                       <p className="text-[11px] text-muted-foreground italic flex items-start gap-1">
-                        <Target className="h-3 w-3 mt-0.5 flex-shrink-0" />{r.reason}
+                        {r.reason}
                       </p>
                       <Button
                         size="sm"
@@ -325,7 +325,7 @@ export function RoleFitPanel({ cv, cvLanguage, onApplyReframe, autoRun, onUpdate
                     {canCoach && (
                       <Button variant="outline" size="sm" className="mt-2 h-8 text-xs"
                         onClick={() => setGapIssue({ title: g.requirement, why_it_matters: g.why, fix: g.suggestion })}>
-                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Har jag detta egentligen?" : "Do I actually have this?"}
+                        {isSv ? "Har jag detta egentligen?" : "Do I actually have this?"}
                       </Button>
                     )}
                   </div>

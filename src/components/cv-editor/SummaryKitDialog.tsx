@@ -93,8 +93,7 @@ export function SummaryKitDialog({ open, onOpenChange, cv, cvLanguage, onApply }
       <DialogContent className="max-w-lg max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            {isSv ? "Positionera & skriv sammanfattning" : "Position & write summary"}
+                        {isSv ? "Positionera & skriv sammanfattning" : "Position & write summary"}
           </DialogTitle>
           <DialogDescription>
             {isSv
@@ -166,7 +165,7 @@ export function SummaryKitDialog({ open, onOpenChange, cv, cvLanguage, onApply }
           </Button>
           {draft === null ? (
             <Button onClick={generate} disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+              {loading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               {isSv ? "Skapa sammanfattning" : "Generate summary"}
             </Button>
           ) : (

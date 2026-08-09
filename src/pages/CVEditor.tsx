@@ -391,7 +391,7 @@ const CVEditor = () => {
               </button>
             </div>
             <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => setTailorOpen(true)}>
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Improve" : "Förbättra"}
+              {cvLanguage === "en" ? "Improve" : "Förbättra"}
             </Button>
             <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => setPageBreaksOpen(true)}>
               <Eye className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Preview" : "Förhandsgranska"}

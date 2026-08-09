@@ -117,15 +117,14 @@ const Dashboard = () => {
         <CardContent className="flex items-center justify-between gap-3 p-4">
           <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => navigate(`/editor/${r.id}`)}>
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              {isTemplate ? <Star className="h-5 w-5 text-primary" /> : <FileText className="h-5 w-5 text-primary" />}
+              <FileText className="h-5 w-5 text-primary" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="truncate font-medium">{r.title}</h3>
                 {(meta.targetRole || meta.targetRoleLabel) && (
-                  <Badge variant="outline" className="h-5 gap-0.5 border-primary/30 text-[10px] text-primary">
-                    <Target className="h-2.5 w-2.5" />
-                    {roleLabel(meta.targetRole, meta.targetRoleLabel, language)}
+                  <Badge variant="outline" className="h-5 max-w-[200px] truncate whitespace-nowrap border-primary/30 text-[10px] text-primary">
+                                        {roleLabel(meta.targetRole, meta.targetRoleLabel, language)}
                   </Badge>
                 )}
               </div>
@@ -138,7 +137,7 @@ const Dashboard = () => {
           <div className="flex flex-shrink-0 items-center gap-0.5">
             {isTemplate && (
               <Button size="sm" className="h-9 text-xs" onClick={() => openApply(getResumeMeta(r).targetRole)}>
-                <Target className="mr-1.5 h-3.5 w-3.5" />{isSv ? "Sök" : "Apply"}
+                {isSv ? "Sök" : "Apply"}
               </Button>
             )}
             <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Kategorisera roll" : "Set role"} onClick={() => openRole(r)}><Tag className="h-4 w-4" /></Button>
@@ -166,7 +165,7 @@ const Dashboard = () => {
         ) : resumes.length === 0 ? (
           <div className="mx-auto max-w-md py-24 text-center">
             <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-              <Star className="h-6 w-6 text-primary" />
+              <FileText className="h-6 w-6 text-primary" />
             </div>
             <h1 className="font-serif text-3xl font-medium tracking-tight">{isSv ? "Skapa din första mall" : "Create your first template"}</h1>
             <p className="mx-auto mt-3 max-w-sm text-sm text-muted-foreground">
@@ -189,7 +188,7 @@ const Dashboard = () => {
                 </p>
               </div>
               <Button size="lg" className="h-12 shrink-0 px-6 text-base" onClick={() => openApply()} disabled={templates.length === 0}>
-                <Target className="mr-2 h-4 w-4" />{isSv ? "Sök en ny tjänst" : "Apply for a new position"}
+                {isSv ? "Sök en ny tjänst" : "Apply for a new position"}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </section>
@@ -198,8 +197,7 @@ const Dashboard = () => {
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Star className="h-3.5 w-3.5 text-primary" />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Mallar" : "Templates"}</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Mallar" : "Templates"}</p>
                 </div>
                 <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => navigate("/wizard/create")}>
                   <Plus className="mr-1 h-3.5 w-3.5" />{isSv ? "Ny mall" : "New template"}
@@ -222,7 +220,7 @@ const Dashboard = () => {
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ansökningar" : "Applications"}</p>
                 </div>
                 <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => openApply()} disabled={templates.length === 0}>
-                  <Target className="mr-1 h-3.5 w-3.5" />{isSv ? "Sök en tjänst" : "Apply for a role"}
+                  {isSv ? "Sök en tjänst" : "Apply for a role"}
                 </Button>
               </div>
               {applications.length > 0 ? (

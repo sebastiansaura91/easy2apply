@@ -155,8 +155,7 @@ export function ExplainWizard({ open, onClose, jobTitle, company, language = "sv
       <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            {isSv ? "Förklara vad du gjorde" : "Explain what you did"}
+                        {isSv ? "Förklara vad du gjorde" : "Explain what you did"}
           </SheetTitle>
           {jobTitle && (
             <p className="text-sm text-muted-foreground">{jobTitle}{company ? ` @ ${company}` : ""}</p>
@@ -298,7 +297,7 @@ export function ExplainWizard({ open, onClose, jobTitle, company, language = "sv
                 <ArrowLeft className="mr-1 h-4 w-4" /> {isSv ? "Tillbaka" : "Back"}
               </Button>
               <Button onClick={handleGenerate} disabled={!canProceedStep1}>
-                <Sparkles className="mr-1 h-4 w-4" /> {isSv ? "Generera förslag" : "Generate suggestions"}
+                {isSv ? "Generera förslag" : "Generate suggestions"}
               </Button>
             </div>
           </div>

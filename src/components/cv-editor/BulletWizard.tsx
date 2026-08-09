@@ -111,8 +111,7 @@ export function BulletWizard({
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Genererade bullets – {input.jobTitle}
+                            Genererade bullets – {input.jobTitle}
             </DialogTitle>
           </DialogHeader>
           <BulletResults
@@ -137,8 +136,7 @@ export function BulletWizard({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Skapa bullets – {STEPS[step]}
+                        Skapa bullets – {STEPS[step]}
           </DialogTitle>
         </DialogHeader>
 
@@ -350,7 +348,7 @@ export function BulletWizard({
             </Button>
           ) : (
             <Button onClick={handleGenerate} disabled={generating || !canAdvance()}>
-              {generating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+              {generating && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               {generating ? "Genererar…" : "Generera bullets"}
             </Button>
           )}

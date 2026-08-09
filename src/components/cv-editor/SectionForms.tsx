@@ -99,7 +99,7 @@ export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
             {isSv ? "Positionera & skriv" : "Position & write"}
           </Button>
           <Button variant="outline" size="sm" className="h-9 text-xs" onClick={draft} disabled={drafting}>
-            {drafting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+            {drafting && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
             {isSv ? "Utkast från erfarenhet" : "Draft from experience"}
           </Button>
         </div>
@@ -417,7 +417,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           onClick={() => improveAllBullets(idx)}
                           disabled={improvingAll === idx}
                         >
-                          {improvingAll === idx ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                          {improvingAll === idx && <Loader2 className="h-3 w-3 animate-spin" />}
                           {isSv ? "Förbättra alla" : "Improve all"}
                         </Button>
                       </TooltipTrigger>
@@ -494,8 +494,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                       {preview && (
                         <div className="ml-5 mt-1.5 rounded-md border border-primary/20 bg-primary/5 p-3 space-y-2">
                           <div className="flex items-start gap-2">
-                            <Sparkles className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
-                            <div className="flex-1 min-w-0 space-y-1.5">
+                                                        <div className="flex-1 min-w-0 space-y-1.5">
                               <Textarea
                                 rows={2}
                                 value={preview.improved}
@@ -594,8 +593,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                {isSv ? "Förhandsgranskning" : "Preview"} – {allPreviews.items.length} {isSv ? "förbättringar" : "improvements"}
+                                {isSv ? "Förhandsgranskning" : "Preview"} – {allPreviews.items.length} {isSv ? "förbättringar" : "improvements"}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
