@@ -42,6 +42,14 @@ const CVEditor = () => {
   // Cross-CV evidence lookup (name → verified answers from any CV), loaded when the
   // tailor panel first opens so answered questions are never asked again.
   const [profileEvidence, setProfileEvidence] = useState<((name: string) => { keyword: string; answer: string }[]) | null>(null);
+  // Wide screens dock the improve panel beside the document; narrow ones keep the sheet.
+  const [isWide, setIsWide] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1280px)");
+    const fn = (e: MediaQueryListEvent) => setIsWide(e.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
   const [syncOpen, setSyncOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const autoOpenedRef = useRef(false);
@@ -315,6 +323,30 @@ const CVEditor = () => {
     toast({ title: cvLanguage === "en" ? `Facts synced to ${n} CV${n === 1 ? "" : "s"}` : `Fakta synkade till ${n} CV:n` });
   };
 
+  // One prop set for both homes of the improve panel: docked column (wide screens)
+  // and overlay sheet (narrow).
+  const tailorPanelProps = {
+    open: tailorOpen,
+    onOpenChange: setTailorOpen,
+    cv, cvLanguage, t,
+    seededJob, seededResult,
+    onApplyReframe: applyReframe,
+    onNavigateToSection: navigateToSection,
+    onUpdateProfile: updateProfile,
+    onUpdateExperienceBullets: updateExperienceBullets,
+    onUpdateSkills: updateSkills,
+    onPersistScore: (score: number, grade: string, subscores?: any) =>
+      setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastAtsScore: { score, grade, at: new Date().toISOString(), subscores } } })),
+    onPersistResult: (hash: string, result: any) =>
+      setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastAtsResult: { hash, at: new Date().toISOString(), result } } })),
+    onPersistRoleFit: (hash: string, result: any) =>
+      setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastRoleFit: { hash, at: new Date().toISOString(), result } } })),
+    onUpdateMeta: (patch: any) =>
+      setCv(prev => ({ ...prev, __meta: { ...prev.__meta, ...patch } })),
+    onDownload: doExport,
+    profileEvidence: profileEvidence ?? undefined,
+  };
+
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">{t("loading")}</p></div>;
 
   return (
@@ -494,31 +526,9 @@ const CVEditor = () => {
         </main>
       )}
 
-      {/* Unified tailoring surface — role fit + ATS/keywords + role guide */}
-      <TailorPanel
-        open={tailorOpen}
-        onOpenChange={setTailorOpen}
-        cv={cv}
-        cvLanguage={cvLanguage}
-        t={t}
-        seededJob={seededJob}
-        seededResult={seededResult}
-        onApplyReframe={applyReframe}
-        onNavigateToSection={navigateToSection}
-        onUpdateProfile={updateProfile}
-        onUpdateExperienceBullets={updateExperienceBullets}
-        onUpdateSkills={updateSkills}
-        onPersistScore={(score, grade, subscores) =>
-          setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastAtsScore: { score, grade, at: new Date().toISOString(), subscores } } }))}
-        onPersistResult={(hash, result) =>
-          setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastAtsResult: { hash, at: new Date().toISOString(), result } } }))}
-        onPersistRoleFit={(hash, result) =>
-          setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastRoleFit: { hash, at: new Date().toISOString(), result } } }))}
-        onUpdateMeta={(patch) =>
-          setCv(prev => ({ ...prev, __meta: { ...prev.__meta, ...patch } }))}
-        onDownload={doExport}
-        profileEvidence={profileEvidence ?? undefined}
-      />
+      {/* Unified tailoring surface — overlay sheet on narrow screens only; wide screens
+          get the docked column beside the document instead. */}
+      {!isWide && <TailorPanel {...tailorPanelProps} />}
 
       {/* Sync structural facts across the whole lineage */}
       <Dialog open={syncOpen} onOpenChange={setSyncOpen}>
@@ -612,6 +622,14 @@ const CVEditor = () => {
         </DialogContent>
       </Dialog>
       </div>
+
+      {/* Docked improve column (the Grammarly pattern): the CV changes in view while
+          you answer. Sticky, own scroll, closable. */}
+      {isWide && tailorOpen && (
+        <aside className="sticky top-0 h-screen w-[400px] shrink-0 border-l border-border bg-card">
+          <TailorPanel {...tailorPanelProps} docked />
+        </aside>
+      )}
     </div>
   );
 };

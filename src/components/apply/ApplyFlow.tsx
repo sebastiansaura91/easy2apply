@@ -16,7 +16,7 @@ import { roleLabel, getRoleAdvice } from "@/lib/role-advice";
 import { getResumeMeta } from "@/lib/resume-grouping";
 import { cvScanSignature } from "@/lib/cv-signature";
 import { deriveRoleFromTitle } from "@/lib/role-from-title";
-import { REGISTRY_ROW_TITLE } from "@/lib/competence-registry";
+import { REGISTRY_ROW_TITLE, buildStrengthLookup } from "@/lib/competence-registry";
 import { MatchScorecard } from "@/components/editor/MatchScorecard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CVMeta } from "@/types/cv";
@@ -36,7 +36,15 @@ interface Props {
   userId: string | undefined;
   onCreated?: () => void;
   initialRoleId?: string;
+  /** Full-page mode: rendered as the /apply page instead of a modal dialog. */
+  asPage?: boolean;
 }
+
+// Page-mode stand-ins for the dialog chrome (Radix Dialog components crash outside a Dialog root).
+const PageHead = ({ children }: { children: React.ReactNode }) => <div className="mb-3 space-y-1.5">{children}</div>;
+const PageTitle = ({ className, ...p }: React.HTMLAttributes<HTMLHeadingElement>) => <h1 className={`text-2xl font-semibold tracking-tight ${className || ""}`} {...p} />;
+const PageDesc = (p: React.HTMLAttributes<HTMLParagraphElement>) => <p className="text-sm text-muted-foreground" {...p} />;
+const PageFoot = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={`mt-5 flex flex-col gap-2 ${className || ""}`} {...p} />;
 
 type Report =
   | { kind: "job"; ats: AtsCheckResult; jobTitle?: string; company?: string; ja?: import("@/contexts/FlowContext").JobAnalysis }
@@ -49,7 +57,11 @@ type Report =
  * Reuses analyze-job-posting/ats-check (ad path) and role-advice (no-ad path). The deep
  * role-fit runs in the editor's Improve panel afterward.
  */
-export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, initialRoleId }: Props) {
+export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, initialRoleId, asPage }: Props) {
+  const Head = asPage ? PageHead : DialogHeader;
+  const Title = asPage ? PageTitle : DialogTitle;
+  const Desc = asPage ? PageDesc : DialogDescription;
+  const Foot = asPage ? PageFoot : DialogFooter;
   const navigate = useNavigate();
   const { toast } = useToast();
   const { language } = useLanguage();
@@ -67,11 +79,14 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
   const [company, setCompany] = useState("");
   // Secondary path: no ad → target a role directly.
   const [roleMode, setRoleMode] = useState(false);
+  // The ad's themes matched against the WHOLE profile (all CVs + saved answers) —
+  // coverage you have somewhere, even if the chosen template doesn't show it.
+  const [mapCover, setMapCover] = useState<{ theme: string; status: "covered" | "partial" | "gap" }[] | null>(null);
 
   const isCustom = roleId === CUSTOM_ROLE;
   const label = isCustom ? (customLabel.trim() || (isSv ? "Egen roll" : "Custom role")) : roleLabel(roleId, null, language);
 
-  const reset = () => { setStep("input"); setJobText(""); setReport(null); setBase(null); setBusy(false); setCompany(""); setRoleMode(false); };
+  const reset = () => { setStep("input"); setJobText(""); setReport(null); setBase(null); setBusy(false); setCompany(""); setRoleMode(false); setMapCover(null); };
   const close = (o: boolean) => { if (!o) reset(); onOpenChange(o); };
 
   // Pick the template whose role matches; else the most recent; else none (→ create first).
@@ -113,6 +128,23 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
         const { data } = await supabase.functions.invoke("analyze-job-posting", { body: { job_posting_text: jobText.trim(), registry } });
         if (!(data as any)?.error) ja = data;
       } catch { /* non-fatal: still show the ATS match */ }
+
+      // 1b) Match the demand against the whole profile, before any CV exists.
+      if (ja?.competence_themes?.length) {
+        try {
+          const { data: all } = await supabase.from("resumes").select("title, content_json");
+          const rows = (all || []).map((r: any) => ({ title: r.title, meta: (r.content_json?.__meta || {}) }));
+          const reg = rows.find((r: any) => r.meta.isRegistryRow)?.meta.competenceRegistry || null;
+          const lookup = buildStrengthLookup(rows as any, reg);
+          setMapCover(ja.competence_themes.map((t: any) => {
+            const s = lookup(t.theme, t.canonical_id);
+            const status = (s.best ?? 0) >= 4 || s.evidence > 0 ? "covered" as const : (s.best ?? 0) >= 2 ? "partial" as const : "gap" as const;
+            return { theme: t.theme, status };
+          }));
+        } catch { setMapCover(null); }
+      } else {
+        setMapCover(null);
+      }
 
       // 2) Derive the role bucket from the ad title (user can still change it in the report).
       let rid = roleId;
@@ -209,20 +241,19 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
   const reportThemes = report?.kind === "job" ? (report.ats.job_language_match?.competence_themes ?? []) : [];
   const gapCount = reportThemes.filter(t => Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3)) < 4).length;
 
-  return (
-    <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+  const body = (
+    <>
         {step === "input" ? (
           <>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+            <Head>
+              <Title className="flex items-center gap-2">
                 <Target className="h-5 w-5 text-primary" />
                 {isSv ? "Sök en ny tjänst" : "Apply for a new position"}
-              </DialogTitle>
-              <DialogDescription>
+              </Title>
+              <Desc>
                 {isSv ? "Klistra in annonsen — vi listar ut roll, mall och företag åt dig." : "Paste the ad — we work out the role, template and company for you."}
-              </DialogDescription>
-            </DialogHeader>
+              </Desc>
+            </Head>
 
             <div className="space-y-3 py-1">
               {!roleMode ? (
@@ -260,26 +291,26 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
               )}
             </div>
 
-            <DialogFooter>
+            <Foot>
               <Button size="lg" className="w-full text-base" onClick={() => runReport()} disabled={busy || (roleMode ? !roleId : !jobText.trim())}>
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
                 {busy ? (isSv ? "Analyserar…" : "Analyzing…") : roleMode ? (isSv ? "Fortsätt" : "Continue") : (isSv ? "Analysera matchning" : "Analyze match")}
               </Button>
-            </DialogFooter>
+            </Foot>
           </>
         ) : (
           <>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+            <Head>
+              <Title className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
                 {label}
-              </DialogTitle>
-              <DialogDescription>
+              </Title>
+              <Desc>
                 {report?.kind === "job"
                   ? (isSv ? "Så väl matchar din mall den här annonsen." : "How well your template matches this ad.")
                   : (isSv ? "Vad den här rollen normalt kräver." : "What this role normally expects.")}
-              </DialogDescription>
-            </DialogHeader>
+              </Desc>
+            </Head>
 
             <div className="space-y-4 py-1">
               {/* Everything derived — shown as editable fields, never asked upfront. */}
@@ -342,6 +373,22 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
               )}
             </div>
 
+            {report?.kind === "job" && mapCover && mapCover.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <p className="text-[11px] font-medium text-muted-foreground">{isSv ? "Mot hela profilen: alla CV:n och sparade svar" : "Against your whole profile: every CV and saved answer"}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {mapCover.map(c => (
+                    <span key={c.theme} className={`rounded-full px-2 py-1 text-[10px] font-medium ${
+                      c.status === "covered" ? "bg-green-600/10 text-green-700 dark:text-green-500"
+                      : c.status === "partial" ? "bg-warning/15 text-warning"
+                      : "border border-dashed border-warning/60 text-warning"}`}>
+                      {c.theme} · {c.status === "covered" ? (isSv ? "Täckt" : "Covered") : c.status === "partial" ? (isSv ? "Delvis" : "Partial") : "Gap"}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1.5 pt-1">
               <label className="text-sm font-medium">{isSv ? "Företag" : "Company"} <span className="font-normal text-muted-foreground">({isSv ? "för din överblick" : "for your tracking"})</span></label>
               <Input
@@ -351,7 +398,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
               />
             </div>
 
-            <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Foot className="flex-col gap-2 sm:flex-col">
               <Button size="lg" className="w-full text-base" onClick={createAndOpen} disabled={busy}>
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
                 {gapCount > 0
@@ -359,10 +406,19 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
                   : (isSv ? "Skapa riktat CV" : "Create tailored CV")}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setStep("input")} disabled={busy}>{isSv ? "Tillbaka" : "Back"}</Button>
-            </DialogFooter>
+            </Foot>
           </>
         )}
-      </DialogContent>
+    </>
+  );
+
+  if (asPage) {
+    if (!open) return null;
+    return <div className="mx-auto w-full max-w-xl px-4 py-10 sm:px-6">{body}</div>;
+  }
+  return (
+    <Dialog open={open} onOpenChange={close}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">{body}</DialogContent>
     </Dialog>
   );
 }

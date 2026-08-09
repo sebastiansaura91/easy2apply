@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { ApplyFlow } from "@/components/apply/ApplyFlow";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { CVMeta } from "@/types/cv";
 import { getResumeMeta, splitTemplatesApplications } from "@/lib/resume-grouping";
@@ -35,8 +34,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [applyOpen, setApplyOpen] = useState(false);
-  const [applyRoleId, setApplyRoleId] = useState<string | undefined>(undefined);
   const [roleForId, setRoleForId] = useState<string | null>(null);
   const [roleDraft, setRoleDraft] = useState<string>("");
   const [roleCustom, setRoleCustom] = useState<string>("");
@@ -59,7 +56,8 @@ const Dashboard = () => {
   useEffect(() => { fetchResumes(); }, [user]);
 
   const { templates, applications } = splitTemplatesApplications(resumes);
-  const openApply = (roleId?: string) => { setApplyRoleId(roleId); setApplyOpen(true); };
+  // The apply journey is a full page (/apply), not a modal.
+  const openApply = (roleId?: string) => navigate(roleId ? `/apply?role=${encodeURIComponent(roleId)}` : "/apply");
 
   const duplicateResume = async (r: ResumeRow) => {
     if (!user) return;
@@ -239,16 +237,6 @@ const Dashboard = () => {
         )}
       </div>
       </main>
-
-      <ApplyFlow
-        key={`${applyOpen}-${applyRoleId ?? ""}`}
-        open={applyOpen}
-        onOpenChange={setApplyOpen}
-        templates={templates}
-        userId={user?.id}
-        onCreated={fetchResumes}
-        initialRoleId={applyRoleId}
-      />
 
       <Dialog open={!!roleForId} onOpenChange={(o) => !o && setRoleForId(null)}>
         <DialogContent className="max-w-md">
