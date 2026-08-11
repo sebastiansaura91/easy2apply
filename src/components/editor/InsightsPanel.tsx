@@ -446,8 +446,15 @@ export function InsightsPanel({
     setAppliedPlacements(new Set());
     setAppliedNew(new Set());
     try {
+      // Theme names are bucket labels, not CV language — placements work on the ad's
+      // actual missing terms; the label itself may only motivate a new evidence bullet.
+      const themeByName = new Map(themes.map(t => [t.theme.toLowerCase().trim(), t]));
+      const expanded = Array.from(new Set(phrases.flatMap(p => {
+        const t = themeByName.get(p.toLowerCase().trim());
+        return t?.supporting_terms_missing?.length ? [...t.supporting_terms_missing, p] : [p];
+      })));
       const { data, error } = await supabase.functions.invoke("place-keywords", {
-        body: { resume_content_json: cv, missing_phrases: phrases, locale: cvLanguage, evidence },
+        body: { resume_content_json: cv, missing_phrases: expanded, locale: cvLanguage, evidence },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

@@ -61,6 +61,21 @@ serve(async (req) => {
     }
 
     const hasEvidence = Array.isArray(evidence) && evidence.length > 0;
+
+    // Bucket labels ("Team Leadership & Development") and trait phrases ("strong
+    // business ownership") are ad/category language, never CV language: they may
+    // motivate a NEW bullet built from the candidate's answer, but must never be
+    // pasted into an existing sentence.
+    const TRAIT_LEAD = /^(strong|proven|excellent|solid|good|demonstrated|stark|starkt|god|gott|gedigen|dokumenterad|utm\u00e4rkt)\s/i;
+    const isLabel = (ph: string) => /&/.test(ph) || TRAIT_LEAD.test(ph) || ph.split(/\s+/).length > 4;
+    const allPhrases: string[] = (missing_phrases as unknown[]).map(ph => String(ph || "").trim()).filter(Boolean);
+    const placeable = allPhrases.filter(ph => !isLabel(ph));
+    const labelTopics = hasEvidence ? allPhrases.filter(ph => isLabel(ph)) : [];
+    if (!placeable.length && !labelTopics.length) {
+      return new Response(JSON.stringify({ placements: [], new_bullets: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const systemPrompt = `You place missing ATS keywords into existing CV bullets with MINIMAL edits.
 STRICT RULES:
 - For each keyword, choose the ONE bullet where it fits most naturally (a synonym or related phrasing already exists there).
@@ -71,10 +86,16 @@ STRICT RULES:
 - If a confirmed keyword has NO honest home in any existing bullet, you may instead propose ONE new bullet in new_bullets for the most relevant experience — built ONLY from facts in the candidate's answer (their system names, role, outcome). Use "${locale === "en" ? "[FILL IN]" : "[FYLL I]"}" for any number the answer does not state. Max 180 characters, outcome-first.` : ""}
 - LANGUAGE PURITY: every revised bullet must be written entirely in ${lang}. When a keyword comes from a job ad in the other language, place its natural ${lang} equivalent instead (Swedish "serieförvärvare" → English "serial acquirer"; "ledningsgrupp" → "management team"; "dotterbolag" → "subsidiaries"). Inserting the ad's word verbatim into a bullet of the other language ("...integrating acquired dotterbolag") is ALWAYS wrong. Recruiters and scanners match translations — never mix two languages inside one bullet.
 - EMPLOYER-CONTEXT TERMS: some keywords describe the COMPANY, not the person ("serieförvärvare"/"serial acquirer", "PE-backed", "family-owned", industry labels). Place these only as environment context ("…within a serial acquirer" / "…i en serieförvärvarkoncern") — never as a role or trait of the candidate ("as a serial acquirer" would be false). If no bullet can carry that context naturally, omit the keyword.
+- PRESERVE FACTS: a swap must never replace concrete words (ownership, scope, responsibilities, numbers) with vaguer phrasing. "Owned commercial and offering responsibility" → "Demonstrated strong business ownership" destroys information and is FORBIDDEN.
+- NEVER paste a category label or trait phrase into a sentence ("...services, including Team Leadership & Development" is nonsense). Labels prove themselves through new evidence bullets, or not at all.
 - Output all text in ${lang}.
 Return via the keyword_placements tool.`;
 
-    let userPrompt = `## MISSING KEYWORDS\n${missing_phrases.slice(0, 10).join("; ")}\n\n## BULLETS (with indices)\n\`\`\`json\n${JSON.stringify(bullets, null, 2)}\n\`\`\`\n\n`;
+    let userPrompt = `## PLACEABLE KEYWORDS (may be swapped into bullets)\n${placeable.slice(0, 10).join("; ") || "(none)"}\n\n`;
+    if (labelTopics.length) {
+      userPrompt += `## EVIDENCE-ONLY TOPICS (category labels: NEW bullets from the evidence only — the label text itself must NOT appear in any bullet)\n${labelTopics.slice(0, 6).join("; ")}\n\n`;
+    }
+    userPrompt += `## BULLETS (with indices)\n\`\`\`json\n${JSON.stringify(bullets, null, 2)}\n\`\`\`\n\n`;
     if (hasEvidence) {
       userPrompt += `## CANDIDATE EVIDENCE (verified answers — the only source of new facts)\n`;
       for (const ev of evidence.slice(0, 10)) userPrompt += `- ${ev.keyword}: ${String(ev.answer || "").slice(0, 400)}\n`;
@@ -175,6 +196,12 @@ Return via the keyword_placements tool.`;
       if (!p.revised || norm(p.revised) === norm(p.original)) return false;
       if (p.revised.length > p.original.length * 1.25 + 20) return false;
       if (digits(p.revised) !== digits(p.original)) return false; // numbers must be untouched
+      // The design is a 1-2 word swap: enforce it. Wide rewrites (5 words traded for
+      // an ad phrase) are exactly the keyword-stuffing this feature must never do.
+      const aw = String(p.original).trim().split(/\s+/), bw = String(p.revised).trim().split(/\s+/);
+      let pre = 0; while (pre < aw.length && pre < bw.length && aw[pre] === bw[pre]) pre++;
+      let suf = 0; while (suf < aw.length - pre && suf < bw.length - pre && aw[aw.length - 1 - suf] === bw[bw.length - 1 - suf]) suf++;
+      if (aw.length - pre - suf > 3 || bw.length - pre - suf > 3) return false;
       return true;
     });
 

@@ -281,6 +281,8 @@ serve(async (req) => {
         if (isPresent(p)) return false;
         const n = normalize(p);
         if (!n || SOFT_TRAITS.has(n)) return false;
+        // Trait phrases led by a qualifier adjective are self-description, not keywords.
+        if (/^(strong|proven|excellent|solid|good|demonstrated|stark|starkt|god|gott|gedigen|dokumenterad|utm\u00e4rkt)\s/.test(n)) return false;
         if (verbLed.test(n)) return false;
         if (n.split(" ").length > 4) return false;
         return true;

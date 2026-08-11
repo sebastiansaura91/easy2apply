@@ -21,6 +21,7 @@ import { InsightsPanel } from "@/components/editor/InsightsPanel";
 import { exportToPdf } from "@/lib/export-pdf";
 import { cvHeadings } from "@/i18n/cvHeadings";
 import { MatchScorecard } from "@/components/editor/MatchScorecard";
+import { computeMatchScore } from "@/lib/match-score";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CVMeta } from "@/types/cv";
 import { AtsCheckResult } from "@/types/ats-check";
@@ -517,7 +518,13 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
               </Desc>
             </Head>
             <p className="font-serif text-6xl tabular-nums">
-              {createdCv?.__meta?.lastAtsScore?.score ?? "–"}
+              {(() => {
+                // ONE score everywhere: the same Matchpoäng the improve panel shows —
+                // never the raw ATS subscore composite, which reads differently.
+                const themes = (createdCv?.__meta?.lastAtsResult?.result as any)?.job_language_match?.competence_themes;
+                const m = themes?.length ? computeMatchScore(themes) : null;
+                return m !== null && m !== undefined ? Math.round(m) : (createdCv?.__meta?.lastAtsScore?.score ?? "–");
+              })()}
               <span className="text-lg text-muted-foreground"> / 100</span>
             </p>
             <Foot>
