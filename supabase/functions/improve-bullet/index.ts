@@ -96,7 +96,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3.6-flash",
         messages: [
           { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
           { role: "user", content: `${lang === "en" ? "Improve this bullet point" : "Förbättra denna punkt"}:${context}\n\n${lang === "en" ? "Bullet" : "Punkt"}: "${bullet}"` },

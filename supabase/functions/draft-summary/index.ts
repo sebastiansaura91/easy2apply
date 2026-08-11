@@ -87,7 +87,7 @@ ${posLines ? "Use the POSITIONING guidance provided to decide what to emphasise 
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3.6-flash",
         messages: [
           { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
           { role: "user", content: userPrompt },

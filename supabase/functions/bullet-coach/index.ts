@@ -125,7 +125,7 @@ RULES:
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-3.6-flash",
       messages: [
         { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
         ...messages,
@@ -258,7 +258,7 @@ RULES:
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-3.6-flash",
       messages: [
         { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
         { role: "user", content: `Generate 3 suggestions (A/B/C) for this bullet. Use ONLY the verified facts provided.` },

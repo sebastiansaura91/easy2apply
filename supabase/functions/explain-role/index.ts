@@ -73,7 +73,7 @@ Generate 4-6 relevant CV bullets based on the above. Return as JSON array.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3.6-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

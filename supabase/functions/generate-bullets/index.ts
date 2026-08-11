@@ -174,7 +174,7 @@ ${lang === "en" ? "Generate 4-6 bullets per level (bas, skarpt, max). Return as 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3.6-flash",
         messages: [
           { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
           { role: "user", content: userPrompt },

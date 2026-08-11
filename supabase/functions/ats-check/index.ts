@@ -86,7 +86,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3.6-flash",
         // Deterministic: the same CV + posting must yield the same score and findings.
         temperature: 0,
         messages: [
