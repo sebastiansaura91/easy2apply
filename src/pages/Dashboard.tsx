@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Copy, Trash2, Edit3, Settings, LogOut, Briefcase, Target, Plus, Star, Tag, ArrowRight } from "lucide-react";
+import { FileText, Copy, Trash2, Edit3, Settings, LogOut, Briefcase, Target, Plus, Star, Tag, ArrowRight, Loader2 } from "lucide-react";
 import { RolePicker, CUSTOM_ROLE } from "@/components/role/RolePicker";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { AppSidebar } from "@/components/layout/AppSidebar";
-import { CVMeta } from "@/types/cv";
+import { CVMeta, emptyCV } from "@/types/cv";
 import { getResumeMeta, splitTemplatesApplications } from "@/lib/resume-grouping";
 import { roleLabel } from "@/lib/role-advice";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -122,6 +122,68 @@ const Dashboard = () => {
     .map(s => `${pipeline[s.key].length} ${s.label.toLowerCase()}`)
     .join(" · ");
   const [doneOpen, setDoneOpen] = useState(false);
+
+  // "Sökt jobb": log an application that already went out (often outside the app).
+  // Picking a CV stores a copy — the receipt of exactly what was sent.
+  const [addOpen, setAddOpen] = useState(false);
+  const [ajTitle, setAjTitle] = useState("");
+  const [ajCompany, setAjCompany] = useState("");
+  const [ajDate, setAjDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [ajCvId, setAjCvId] = useState<string>("");
+  const [ajSaving, setAjSaving] = useState(false);
+
+  const saveAppliedJob = async () => {
+    if (!user || !ajTitle.trim()) return;
+    setAjSaving(true);
+    try {
+      const at = new Date(`${ajDate}T12:00:00`).toISOString();
+      const source = resumes.find(r => r.id === ajCvId);
+      const isExistingApplication = source && applications.some(a => a.id === source.id);
+      if (source && isExistingApplication) {
+        // An in-app application was sent — move it to Skickad instead of duplicating it.
+        const { data } = await supabase.from("resumes").select("content_json").eq("id", source.id).single();
+        const prev = (data?.content_json as any) || {};
+        const content = {
+          ...prev,
+          __meta: {
+            ...(prev.__meta || {}),
+            tailoredForJob: prev.__meta?.tailoredForJob || ajTitle.trim(),
+            tailoredForCompany: ajCompany.trim() || prev.__meta?.tailoredForCompany,
+            applicationStatus: { stage: "sent", at },
+          },
+        };
+        const { error } = await supabase.from("resumes").update({ content_json: content }).eq("id", source.id);
+        if (error) throw error;
+      } else {
+        // External or template-based: create the pipeline row (with a copy of the CV if one was picked).
+        let content: any = { ...emptyCV };
+        if (source) {
+          const { data } = await supabase.from("resumes").select("content_json").eq("id", source.id).single();
+          content = { ...((data?.content_json as any) || emptyCV) };
+        }
+        content.__meta = {
+          ...(content.__meta || {}),
+          isTemplate: false,
+          tailoredForJob: ajTitle.trim(),
+          tailoredForCompany: ajCompany.trim() || undefined,
+          applicationStatus: { stage: "sent", at },
+          ...(source ? { createdFrom: source.id } : {}),
+        };
+        const { error } = await supabase.from("resumes").insert({
+          id: uuidv4(), user_id: user.id,
+          title: `${ajTitle.trim()}${ajCompany.trim() ? ` – ${ajCompany.trim()}` : ""}`,
+          language: source?.language || (isSv ? "sv" : "en"), template_id: "default", content_json: content,
+        });
+        if (error) throw error;
+      }
+      setAddOpen(false);
+      setAjTitle(""); setAjCompany(""); setAjCvId(""); setAjDate(format(new Date(), "yyyy-MM-dd"));
+      toast({ title: isSv ? "Sökt jobb loggat" : "Applied job logged", description: isSv ? "Ligger under Skickad i pipelinen." : "Now under Sent in the pipeline." });
+      fetchResumes();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally { setAjSaving(false); }
+  };
 
   const duplicateResume = async (r: ResumeRow) => {
     if (!user) return;
@@ -281,10 +343,16 @@ const Dashboard = () => {
                   {isSv ? "Välj roll — vi hämtar din mall, kollar mot annonsen och öppnar ett riktat CV på två steg." : "Pick a role — we pull your template, check it against the ad, and open a tailored CV in two steps."}
                 </p>
               </div>
-              <Button size="lg" className="h-12 shrink-0 px-6 text-base" onClick={() => openApply()} disabled={templates.length === 0}>
-                {isSv ? "Sök en ny tjänst" : "Apply for a new position"}
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+              <div className="flex shrink-0 flex-col items-stretch gap-2">
+                <Button size="lg" className="h-12 px-6 text-base" onClick={() => openApply()} disabled={templates.length === 0}>
+                  {isSv ? "Sök en ny tjänst" : "Apply for a new position"}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <button type="button" onClick={() => setAddOpen(true)}
+                  className="text-center text-xs text-muted-foreground underline-offset-4 hover:underline">
+                  {isSv ? "Redan sökt? Logga jobbet" : "Already applied? Log the job"}
+                </button>
+              </div>
             </section>
 
             {/* The task that needs you most, GOV.UK task-list style. */}
@@ -339,6 +407,46 @@ const Dashboard = () => {
         )}
       </div>
       </main>
+
+      {/* Log an already-sent application — it lands straight in the Skickad section. */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{isSv ? "Logga ett sökt jobb" : "Log an applied job"}</DialogTitle>
+            <DialogDescription>
+              {isSv ? "Ett jobb du redan skickat in ansökan till. Hamnar under Skickad." : "A job you already applied to. It lands under Sent."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <Input autoFocus value={ajTitle} onChange={e => setAjTitle(e.target.value)} placeholder={isSv ? "Jobbtitel *" : "Job title *"} />
+            <Input value={ajCompany} onChange={e => setAjCompany(e.target.value)} placeholder={isSv ? "Företag" : "Company"} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">{isSv ? "Skickad datum" : "Date sent"}</label>
+                <Input type="date" value={ajDate} onChange={e => setAjDate(e.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">{isSv ? "CV som skickades" : "CV that was sent"}</label>
+                <select value={ajCvId} onChange={e => setAjCvId(e.target.value)}
+                  className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
+                  <option value="">{isSv ? "Inget härifrån" : "None from here"}</option>
+                  {resumes.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}
+                </select>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {isSv ? "Väljer du ett CV sparas en kopia som kvitto på exakt vad som skickades. Väljer du en pågående ansökan flyttas den bara till Skickad." : "Pick a CV and a copy is stored as the receipt of exactly what was sent. Pick an ongoing application and it just moves to Sent."}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)} disabled={ajSaving}>{isSv ? "Avbryt" : "Cancel"}</Button>
+            <Button onClick={saveAppliedJob} disabled={ajSaving || !ajTitle.trim()}>
+              {ajSaving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              {isSv ? "Logga jobbet" : "Log the job"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!roleForId} onOpenChange={(o) => !o && setRoleForId(null)}>
         <DialogContent className="max-w-md">
