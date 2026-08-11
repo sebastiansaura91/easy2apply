@@ -221,6 +221,10 @@ export function InsightsPanel({
   }, [autoRun]); // eslint-disable-line react-hooks/exhaustive-deps
   const isStale = !!deepResult && analyzedSnapshot !== null && analyzedSnapshot !== cvSignature;
 
+  // True when the CV changed only through accepted suggestions since the last scan —
+  // the case where the score is guaranteed not to have gotten worse.
+  const appliedSinceScanRef = useRef(false);
+
   const runDeep = async (opts?: { silent?: boolean }) => {
     // Stability by construction: the model isn't perfectly deterministic even at
     // temperature 0, so if nothing changed since the stored analysis, reuse it.
@@ -255,7 +259,37 @@ export function InsightsPanel({
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      const newResult = data as AtsCheckResult;
+      let newResult = data as AtsCheckResult;
+      // Trust guarantee: accepting the app's OWN suggestions only adds content, so a
+      // rescan right after applying them must never read lower — otherwise sampling
+      // noise shows up as "Parse -2" on a word swap that cannot affect parsing.
+      // Ratchet against the previous result; manual edits score live as usual.
+      if (appliedSinceScanRef.current && prevFull) {
+        const prevByName = new Map((prevFull.job_language_match.competence_themes || []).map(t => [t.theme.toLowerCase().trim(), t]));
+        const evRank: Record<string, number> = { missing: 0, partial: 1, strong: 2 };
+        newResult = {
+          ...newResult,
+          overall_score: Math.max(newResult.overall_score, prevFull.overall_score),
+          grade: newResult.overall_score >= prevFull.overall_score ? newResult.grade : prevFull.grade,
+          subscores: {
+            parse: Math.max(newResult.subscores.parse, prevFull.subscores.parse),
+            scanability: Math.max(newResult.subscores.scanability, prevFull.subscores.scanability),
+            relevance: Math.max(newResult.subscores.relevance, prevFull.subscores.relevance),
+            evidence: Math.max(newResult.subscores.evidence, prevFull.subscores.evidence),
+          },
+          job_language_match: {
+            ...newResult.job_language_match,
+            competence_themes: (newResult.job_language_match.competence_themes || []).map(t => {
+              const p = prevByName.get(t.theme.toLowerCase().trim());
+              if (!p) return t;
+              const rating = Math.max((t.rating as number) ?? 0, (p.rating as number) ?? 0) || t.rating;
+              const evidence = (evRank[t.evidence as string] ?? 0) >= (evRank[p.evidence as string] ?? 0) ? t.evidence : p.evidence;
+              return { ...t, rating, evidence };
+            }),
+          },
+        };
+      }
+      appliedSinceScanRef.current = false;
       setDeepResult(newResult);
       onPersistScore?.(Math.round(newResult.overall_score), newResult.grade, newResult.subscores);
       onPersistResult?.(cvSignature, newResult);
@@ -352,6 +386,7 @@ export function InsightsPanel({
   const applyAutoFix = () => {
     if (!autoFixPreview) return;
     onSnapshot?.(isSv ? "Auto-fix" : "Auto-fix");
+    appliedSinceScanRef.current = true;
     const { target, targetIdx, text } = autoFixPreview;
     // The CV is plain text — strip any markdown/bullet characters the AI might emit
     // so they never end up printed literally in the PDF.
@@ -590,6 +625,7 @@ export function InsightsPanel({
     const exp = cv.experience[nb.exp_index];
     if (!exp) return;
     onSnapshot?.(isSv ? "Ny punkt" : "New bullet");
+    appliedSinceScanRef.current = true;
     onUpdateExperienceBullets?.(nb.exp_index, [...exp.bullets, nb.bullet]);
     setAppliedNew(prev => new Set(prev).add(idx));
     toast({ title: isSv ? "Ny punkt tillagd — sparas i CV:t" : "New bullet added — saved to the CV" });
@@ -604,6 +640,7 @@ export function InsightsPanel({
     const next = [...bullets];
     next[p.bullet_index] = p.revised;
     onSnapshot?.(isSv ? `Ordbyte: ${p.keyword}` : `Swap: ${p.keyword}`);
+    appliedSinceScanRef.current = true;
     onUpdateExperienceBullets?.(p.exp_index, next);
     setAppliedPlacements(prev => new Set(prev).add(idx));
     toast({ title: isSv ? "Nyckelord inlagt — sparas i CV:t" : "Keyword placed — saved to the CV" });
@@ -1330,6 +1367,7 @@ export function InsightsPanel({
             <p className="text-[11px] text-muted-foreground">{rf.reason}</p>
             <div className="flex gap-2">
               <Button className="h-11 flex-1 text-sm" onClick={() => {
+                appliedSinceScanRef.current = true;
                 const ok = onApplyReframe?.(rf.experience_id, rf.original, rf.suggested);
                 if (ok === false) toast({ title: isSv ? "Hittade inte punkten" : "Couldn't find the bullet", description: isSv ? "Punkten kan ha ändrats sedan analysen." : "The bullet may have changed since the analysis.", variant: "destructive" });
                 setAppliedReframes(prev => new Set(prev).add(rfIdx));
