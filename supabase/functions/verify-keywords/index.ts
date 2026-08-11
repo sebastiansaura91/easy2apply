@@ -6,6 +6,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+
+// Model chain: strongest first; on an unknown-model rejection (400/404) step down,
+// so a gateway id rename can never break the app.
+const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
+async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
+  let res: Response | null = null;
+  for (const m of MODEL_CHAIN) {
+    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
+    if (res.status !== 400 && res.status !== 404) return res;
+  }
+  return res as Response;
+}
+
 /**
  * For each missing keyword from a job ad, generate ONE short, role-agnostic verification
  * question ("Have you worked with X? In what role, and where?") plus multiple-choice
@@ -62,11 +75,11 @@ For EACH keyword return three things:
 
     const userPrompt = `## KEYWORDS TO VERIFY\n${missing_phrases.slice(0, 10).join("; ")}\n\n## CANDIDATE CV CONTEXT\n${cvContext || "(none)"}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await gatewayFetch((model) => ({
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3.6-flash",
+        model,
         // Deterministic: same keywords + CV must yield the same questions.
         temperature: 0,
         messages: [
@@ -105,7 +118,7 @@ For EACH keyword return three things:
         }],
         tool_choice: { type: "function", function: { name: "verification_questions" } },
       }),
-    });
+    }));
 
     if (response.status === 429 || response.status === 402) {
       return new Response(JSON.stringify({ error: response.status === 429 ? "Rate limit reached. Try again shortly." : "AI credits exhausted." }), {

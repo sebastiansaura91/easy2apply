@@ -6,6 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+
+// Model chain: strongest first; on an unknown-model rejection (400/404) step down,
+// so a gateway id rename can never break the app.
+const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
+async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
+  let res: Response | null = null;
+  for (const m of MODEL_CHAIN) {
+    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
+    if (res.status !== 400 && res.status !== 404) return res;
+  }
+  return res as Response;
+}
+
 const SYSTEM_PROMPT_SV = `Du är en expert-CV-skribent. Din uppgift är att förbättra en enskild punkt (bullet point) i ett CV.
 
 Regler:
@@ -89,14 +102,14 @@ serve(async (req) => {
     if (company) contextParts.push(`Företag: ${company}`);
     const context = contextParts.length > 0 ? `\n\nKontext:\n${contextParts.join("\n")}` : "";
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await gatewayFetch((model) => ({
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3.6-flash",
+        model,
         messages: [
           { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
           { role: "user", content: `${lang === "en" ? "Improve this bullet point" : "Förbättra denna punkt"}:${context}\n\n${lang === "en" ? "Bullet" : "Punkt"}: "${bullet}"` },
@@ -128,7 +141,7 @@ serve(async (req) => {
         ],
         tool_choice: { type: "function", function: { name: "return_improvement" } },
       }),
-    });
+    }));
 
     if (!response.ok) {
       if (response.status === 429) {

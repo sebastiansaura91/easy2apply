@@ -5,6 +5,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+
+// Model chain: strongest first; on an unknown-model rejection (400/404) step down,
+// so a gateway id rename can never break the app.
+const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
+async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
+  let res: Response | null = null;
+  for (const m of MODEL_CHAIN) {
+    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
+    if (res.status !== 400 && res.status !== 404) return res;
+  }
+  return res as Response;
+}
+
 // Distilled human-writing rules (from the "signs of AI writing" guide): suggested
 // text must read like a person wrote it. Recruiters discard obvious AI wording.
 const HUMAN_WRITING_RULES = `
@@ -100,14 +113,14 @@ FULL CV CONTEXT:
 
 Generate a concrete, ready-to-use text suggestion that fixes this issue. Return valid JSON.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await gatewayFetch((model) => ({
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3.6-flash",
+        model,
         messages: [
           { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
           { role: "user", content: userPrompt },
@@ -140,7 +153,7 @@ Generate a concrete, ready-to-use text suggestion that fixes this issue. Return 
         }],
         tool_choice: { type: "function", function: { name: "provide_fix_suggestion" } },
       }),
-    });
+    }));
 
     if (!response.ok) {
       if (response.status === 429) {

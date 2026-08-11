@@ -6,6 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+
+// Model chain: strongest first; on an unknown-model rejection (400/404) step down,
+// so a gateway id rename can never break the app.
+const MODEL_CHAIN = ["google/gemini-3.6-flash", "google/gemini-2.5-flash"];
+async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
+  let res: Response | null = null;
+  for (const m of MODEL_CHAIN) {
+    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
+    if (res.status !== 400 && res.status !== 404) return res;
+  }
+  return res as Response;
+}
+
 /**
  * Base64-encode bytes in chunks. `btoa(String.fromCharCode(...bytes))` spreads the
  * entire byte array as function arguments and overflows the call stack for any file
@@ -152,18 +165,18 @@ serve(async (req) => {
       ];
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await gatewayFetch((model) => ({
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3.6-flash",
+        model,
         messages,
         temperature: 0.1,
       }),
-    });
+    }));
 
     if (response.status === 429) {
       return new Response(JSON.stringify({ error: "Rate limit reached. Please try again in a moment." }), {

@@ -6,6 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+
+// Model chain: strongest first; on an unknown-model rejection (400/404) step down,
+// so a gateway id rename can never break the app.
+const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
+async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
+  let res: Response | null = null;
+  for (const m of MODEL_CHAIN) {
+    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
+    if (res.status !== 400 && res.status !== 404) return res;
+  }
+  return res as Response;
+}
+
 const REFINEMENT_PROMPTS_SV: Record<string, string> = {
   shorter: `Gör denna CV-bullet kortare. Max en rad. Behåll kärnan och starkaste verbet. Svara BARA med den nya texten.`,
   concrete: `Gör denna CV-bullet mer konkret. Lägg till specifika detaljer om vad som gjordes, vilka verktyg/metoder som användes. Hitta INTE på – använd [FYLL I] om du inte vet. Svara BARA med den nya texten.`,
@@ -83,21 +96,21 @@ serve(async (req) => {
       ? `You are an expert CV writer. You must NEVER fabricate facts, metrics, technologies, or responsibilities. Use [FILL IN] for unknown info. No buzzwords. ALWAYS respond in English only.`
       : `Du är en expert-CV-skribent. Du får ALDRIG hitta på fakta, mätetal, teknologier eller ansvar. Använd [FYLL I] för okänd info. Inga floskler. Svara ALLTID på svenska.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await gatewayFetch((model) => ({
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3.6-flash",
+        model,
         messages: [
           { role: "system", content: systemContent + HUMAN_WRITING_RULES },
           { role: "user", content: `${prompt}${contextStr}\n\nBullet: "${bullet}"` },
         ],
         temperature: 0.3,
       }),
-    });
+    }));
 
     if (!response.ok) {
       if (response.status === 429) {
