@@ -13,6 +13,8 @@ export interface CanonicalCompetence {
   aliases: string[];
   /** ESCO concept URI when the competence maps to the EU taxonomy — brings its synonym ring. */
   escoUri?: string;
+  /** Synonyms pulled from ESCO, kept separate from user aliases so the wording stays reviewable. */
+  escoLabels?: string[];
 }
 
 export interface CompetenceRegistry {
@@ -34,7 +36,7 @@ export function resolveCompetence(registry: CompetenceRegistry | null | undefine
   if (!registry?.competences?.length) return null;
   const n = normName(name);
   if (!n) return null;
-  const candidates = (c: CanonicalCompetence) => [c.name_sv, c.name_en, ...(c.aliases || [])].map(normName).filter(Boolean);
+  const candidates = (c: CanonicalCompetence) => [c.name_sv, c.name_en, ...(c.aliases || []), ...(c.escoLabels || [])].map(normName).filter(Boolean);
   for (const c of registry.competences) {
     if (candidates(c).includes(n)) return c;
   }

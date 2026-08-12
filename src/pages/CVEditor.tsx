@@ -30,6 +30,7 @@ import { exportToPdf, buildPdf } from "@/lib/export-pdf";
 import { TEMPLATE_STYLES, getTemplateStyle, withAccent, ACCENT_PRESETS } from "@/lib/templates";
 import { detectCvLanguages } from "@/lib/language-detection";
 import { buildEvidenceLookup } from "@/lib/competence-registry";
+import { runParseBackCheck } from "@/lib/parse-check";
 
 const CVEditor = () => {
   const { id } = useParams<{ id: string }>();
@@ -76,6 +77,7 @@ const CVEditor = () => {
   // Parse-back test: read the ACTUAL exported PDF with a real parser (pdf.js) and
   // verify every field survives — "ATS-safe" as a measurement, not a promise.
   const [parseChecks, setParseChecks] = useState<{ label: string; ok: boolean }[] | null>(null);
+  const [parseCtx, setParseCtx] = useState<"manual" | "export">("manual");
   const [parsing, setParsing] = useState(false);
   const saveTimeout = useRef<number | null>(null);
 
@@ -305,42 +307,31 @@ const CVEditor = () => {
     setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateStyle: id } }));
   const setTemplateAccent = (hex: string) =>
     setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateAccent: hex } }));
-  const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent, cvLanguage).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
+  // Every download runs the parse-back check first: a field a real parser can't
+  // recover must never be sent unseen. Clean → download; misses → dialog with an
+  // explicit "download anyway".
+  const exportNow = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent, cvLanguage).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
+  const doExport = async () => {
+    setParsing(true);
+    try {
+      const checks = await runParseBackCheck(cv, enabledSections, tCv, templateStyleId, templateAccent, cvLanguage);
+      if (checks.some(c => !c.ok)) {
+        setParseCtx("export");
+        setParseChecks(checks);
+        return;
+      }
+      exportNow();
+    } catch {
+      // The guard must never block a download when the checker itself fails.
+      exportNow();
+    } finally { setParsing(false); }
+  };
 
   const runParseTest = async () => {
     setParsing(true);
     try {
-      const pdfjs: any = await import("pdfjs-dist");
-      const worker: any = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
-      pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-      const built = buildPdf(cv, enabledSections, tCv, templateStyleId, templateAccent, cvLanguage);
-      const pdf = await pdfjs.getDocument({ data: built.output("arraybuffer") }).promise;
-      let raw = "";
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        raw += " " + content.items.map((it: any) => it.str).join(" ");
-      }
-      const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
-      const hay = norm(raw);
-      const checks: { label: string; ok: boolean }[] = [];
-      const push = (label: string, value?: string) => {
-        if (value && value.trim()) checks.push({ label, ok: hay.includes(norm(value)) });
-      };
-      const sv = cvLanguage === "sv";
-      push(sv ? "Namn" : "Name", cv.contact.name);
-      push(sv ? "E-post" : "Email", cv.contact.email);
-      push(sv ? "Telefon" : "Phone", cv.contact.phone);
-      push(sv ? "Profiltext" : "Profile", cv.profile);
-      for (const e of cv.experience) {
-        push(`${sv ? "Titel" : "Title"}: ${e.title}`, e.title);
-        push(`${sv ? "Företag" : "Company"}: ${e.company}`, e.company);
-        e.bullets.forEach((b, i) => push(`${e.title || "?"} · ${sv ? "punkt" : "bullet"} ${i + 1}`, b));
-      }
-      for (const s of cv.skills) push(`${sv ? "Kompetens" : "Skill"}: ${s}`, s);
-      for (const ed of cv.education) { push(ed.degree, ed.degree); push(ed.school, ed.school); }
-      for (const l of cv.languages) push(`${sv ? "Språk" : "Language"}: ${l.language}`, l.language);
-      setParseChecks(checks);
+      setParseCtx("manual");
+      setParseChecks(await runParseBackCheck(cv, enabledSections, tCv, templateStyleId, templateAccent, cvLanguage));
     } catch (e: any) {
       toast({ title: cvLanguage === "en" ? "Parse test failed" : "Parsningstestet kraschade", description: e.message, variant: "destructive" });
     } finally { setParsing(false); }
@@ -739,6 +730,16 @@ const CVEditor = () => {
                     {misses.map((m, i) => (
                       <p key={i} className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">{m.label}</p>
                     ))}
+                    {parseCtx === "export" && (
+                      <div className="flex gap-2 pt-2">
+                        <Button size="sm" className="h-10 flex-1 text-xs" onClick={() => setParseChecks(null)}>
+                          {cvLanguage === "en" ? "Fix first" : "Fixa först"}
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-10 text-xs" onClick={() => { setParseChecks(null); exportNow(); }}>
+                          {cvLanguage === "en" ? "Download anyway" : "Ladda ner ändå"}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

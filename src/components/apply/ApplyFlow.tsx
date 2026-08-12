@@ -19,6 +19,7 @@ import { deriveRoleFromTitle } from "@/lib/role-from-title";
 import { REGISTRY_ROW_TITLE, buildStrengthLookup, buildEvidenceLookup } from "@/lib/competence-registry";
 import { InsightsPanel } from "@/components/editor/InsightsPanel";
 import { exportToPdf } from "@/lib/export-pdf";
+import { runParseBackCheck } from "@/lib/parse-check";
 import { cvHeadings } from "@/i18n/cvHeadings";
 import { MatchScorecard } from "@/components/editor/MatchScorecard";
 import { computeMatchScore } from "@/lib/match-score";
@@ -281,11 +282,23 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
     return changed;
   };
 
-  const downloadCreated = () => {
+  const downloadCreated = async () => {
     if (!createdCv) return;
     const tCv = (k: string) => cvHeadings[cvLang]?.[k] ?? k;
     const enabled = [...(createdCv.sections || [])].filter((s: any) => s.enabled).sort((a: any, b: any) => a.order - b.order);
     const name = (createdCv.contact?.name || "cv").replace(/[^\wåäöÅÄÖ -]/g, "").trim() || "cv";
+    // Parse-back guard: nothing leaves the flow that a real parser can't read.
+    try {
+      const checks = await runParseBackCheck(createdCv, enabled, tCv, createdCv.__meta?.templateStyle, createdCv.__meta?.templateAccent, cvLang);
+      const misses = checks.filter(c => !c.ok);
+      if (misses.length) {
+        toast({
+          title: isSv ? `${misses.length} fält klarade inte parsningen` : `${misses.length} fields failed parsing`,
+          description: isSv ? "Öppna i editorn och kör Testa parsning för detaljer. PDF:en laddas ner ändå." : "Open in the editor and run Test parsing for details. The PDF downloads anyway.",
+          variant: "destructive",
+        });
+      }
+    } catch { /* the guard never blocks a download when the checker itself fails */ }
     exportToPdf(createdCv, enabled, tCv, `${name}.pdf`, createdCv.__meta?.templateStyle, createdCv.__meta?.templateAccent, cvLang)
       .catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
   };

@@ -157,7 +157,22 @@ export default function Profile() {
       const { data, error } = await supabase.functions.invoke("build-competence-registry", { body: { signals } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setDraft(data.competences || []);
+      let competences: CanonicalCompetence[] = data.competences || [];
+      // ESCO enrichment happens at DRAFT stage, so the wording is reviewable in the
+      // dialog (dashed chips) before anything is saved. An ESCO outage costs nothing.
+      try {
+        const { data: esco } = await supabase.functions.invoke("esco-lookup", {
+          body: { queries: competences.map(c => ({ id: c.id, name_en: c.name_en, name_sv: c.name_sv })) },
+        });
+        const byId = new Map(((esco?.results as any[]) || []).map(r => [r.id, r]));
+        competences = competences.map(c => {
+          const r = byId.get(c.id);
+          if (!r?.escoUri) return c;
+          const known = new Set([c.name_sv, c.name_en, ...c.aliases].map(normName));
+          return { ...c, escoUri: r.escoUri, escoLabels: (r.labels as string[]).filter(l => !known.has(normName(l))) };
+        });
+      } catch { /* draft still fully usable without ESCO */ }
+      setDraft(competences);
     } catch (e: any) {
       toast({ title: isSv ? "Kunde inte bygga registret" : "Couldn't build the registry", description: e.message, variant: "destructive" });
     } finally { setBuilding(false); }
@@ -165,23 +180,8 @@ export default function Profile() {
 
   const saveRegistry = async () => {
     if (!draft || !user) return;
-    let cleaned = draft.filter(c => c.name_sv.trim() && c.name_en.trim());
-    // ESCO enrichment: pull the EU taxonomy's synonym ring (sv + en) into the aliases,
-    // so ad phrasings we've never seen still resolve. Conservative server-side gate;
-    // an ESCO outage never blocks the save.
-    try {
-      const { data } = await supabase.functions.invoke("esco-lookup", {
-        body: { queries: cleaned.map(c => ({ id: c.id, name_en: c.name_en, name_sv: c.name_sv })) },
-      });
-      const byId = new Map(((data?.results as any[]) || []).map(r => [r.id, r]));
-      cleaned = cleaned.map(c => {
-        const r = byId.get(c.id);
-        if (!r?.escoUri) return c;
-        const known = new Set([c.name_sv, c.name_en, ...c.aliases].map(normName));
-        const extra = (r.labels as string[]).filter(l => !known.has(normName(l)));
-        return { ...c, escoUri: r.escoUri, aliases: [...c.aliases, ...extra] };
-      });
-    } catch { /* enrich later — the registry is still fully functional */ }
+    // What you reviewed is what gets saved — ESCO wording included, already vetted.
+    const cleaned = draft.filter(c => c.name_sv.trim() && c.name_en.trim());
     const reg: CompetenceRegistry = { version: (registry?.version || 0) + 1, updatedAt: new Date().toISOString(), competences: cleaned };
     setSaving(true);
     try {
@@ -351,13 +351,23 @@ export default function Profile() {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                {c.aliases.length > 0 && (
+                {(c.aliases.length > 0 || (c.escoLabels || []).length > 0) && (
                   <div className="flex flex-wrap gap-1">
                     {c.aliases.map(a => (
                       <span key={a} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px]">
                         {a}
                         <button type="button" className="text-muted-foreground hover:text-destructive"
                           onClick={() => editDraft(i, { aliases: c.aliases.filter(x => x !== a) })}>
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {(c.escoLabels || []).map(a => (
+                      <span key={`esco-${a}`} title={isSv ? "Synonym från ESCO, EU:s kompetens­taxonomi" : "Synonym from ESCO, the EU skills taxonomy"}
+                        className="inline-flex items-center gap-1 rounded-full border border-dashed border-primary/50 px-2 py-0.5 text-[11px] text-primary">
+                        {a}
+                        <button type="button" className="text-primary/70 hover:text-destructive"
+                          onClick={() => editDraft(i, { escoLabels: (c.escoLabels || []).filter(x => x !== a) })}>
                           <X className="h-3 w-3" />
                         </button>
                       </span>
