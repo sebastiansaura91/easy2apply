@@ -165,7 +165,23 @@ export default function Profile() {
 
   const saveRegistry = async () => {
     if (!draft || !user) return;
-    const cleaned = draft.filter(c => c.name_sv.trim() && c.name_en.trim());
+    let cleaned = draft.filter(c => c.name_sv.trim() && c.name_en.trim());
+    // ESCO enrichment: pull the EU taxonomy's synonym ring (sv + en) into the aliases,
+    // so ad phrasings we've never seen still resolve. Conservative server-side gate;
+    // an ESCO outage never blocks the save.
+    try {
+      const { data } = await supabase.functions.invoke("esco-lookup", {
+        body: { queries: cleaned.map(c => ({ id: c.id, name_en: c.name_en, name_sv: c.name_sv })) },
+      });
+      const byId = new Map(((data?.results as any[]) || []).map(r => [r.id, r]));
+      cleaned = cleaned.map(c => {
+        const r = byId.get(c.id);
+        if (!r?.escoUri) return c;
+        const known = new Set([c.name_sv, c.name_en, ...c.aliases].map(normName));
+        const extra = (r.labels as string[]).filter(l => !known.has(normName(l)));
+        return { ...c, escoUri: r.escoUri, aliases: [...c.aliases, ...extra] };
+      });
+    } catch { /* enrich later — the registry is still fully functional */ }
     const reg: CompetenceRegistry = { version: (registry?.version || 0) + 1, updatedAt: new Date().toISOString(), competences: cleaned };
     setSaving(true);
     try {

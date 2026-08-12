@@ -11,6 +11,8 @@ export interface CanonicalCompetence {
   name_en: string;
   /** Every raw string ever seen that means this competence. */
   aliases: string[];
+  /** ESCO concept URI when the competence maps to the EU taxonomy — brings its synonym ring. */
+  escoUri?: string;
 }
 
 export interface CompetenceRegistry {

@@ -117,7 +117,7 @@ export interface CVMeta {
   competenceRegistry?: {
     version: number;
     updatedAt: string;
-    competences: { id: string; name_sv: string; name_en: string; aliases: string[] }[];
+    competences: { id: string; name_sv: string; name_en: string; aliases: string[]; escoUri?: string }[];
   };
   createdFrom?: string;
   /**

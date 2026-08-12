@@ -14,6 +14,7 @@ import { cvScanSignature } from "@/lib/cv-signature";
 import { RoleFitResult, BulletReframe } from "@/types/role-fit";
 import { getRoleAdvice } from "@/lib/role-advice";
 import { computeMatchScore, biggestGap } from "@/lib/match-score";
+import { titleMatch } from "@/lib/title-match";
 import { CVMeta } from "@/types/cv";
 import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 import {
@@ -1111,6 +1112,25 @@ export function InsightsPanel({
                   )}
                 </p>
               )}
+              {/* Title alignment — recruiters search by title first; own signal, never
+                  folded into the score. Deterministic, no model. */}
+              {(() => {
+                const tm = titleMatch(cv.__meta?.tailoredForJob, cv);
+                if (!tm) return null;
+                return (
+                  <p className="mt-1 text-[11px]">
+                    {tm.level === "exact" && <span className="text-green-700 dark:text-green-500">{isSv ? "Titeln matchar annonsens" : "Title matches the ad"} ({tm.cvTitle})</span>}
+                    {tm.level === "partial" && <span className="text-warning">{isSv ? `Titeln matchar delvis (${tm.cvTitle})` : `Title partly matches (${tm.cvTitle})`}</span>}
+                    {tm.level === "none" && (
+                      <span className="text-muted-foreground">
+                        {isSv
+                          ? `Annonsens titel saknas i CV:t. Rekryterare söker på titel — speglar "${cv.__meta?.tailoredForJob}" din nuvarande roll är profilen rätt plats.`
+                          : `The ad's title is absent from the CV. Recruiters search by title — if "${cv.__meta?.tailoredForJob}" reflects your current role, the profile is the place for it.`}
+                      </span>
+                    )}
+                  </p>
+                );
+              })()}
               {done && (
                 <div className="mx-auto mt-2 max-w-xs space-y-1.5 rounded-lg border border-green-600/30 bg-green-600/10 p-3">
                   <p className="text-xs font-semibold text-green-700 dark:text-green-500">

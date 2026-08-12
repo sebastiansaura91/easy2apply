@@ -73,6 +73,10 @@ const CVEditor = () => {
   // Split view (category standard: form left, live document right). On narrow screens
   // or when the improve panel is docked, one pane at a time via the Redigera/Förhandsgranska toggle.
   const [view, setView] = useState<"edit" | "preview">("edit");
+  // Parse-back test: read the ACTUAL exported PDF with a real parser (pdf.js) and
+  // verify every field survives — "ATS-safe" as a measurement, not a promise.
+  const [parseChecks, setParseChecks] = useState<{ label: string; ok: boolean }[] | null>(null);
+  const [parsing, setParsing] = useState(false);
   const saveTimeout = useRef<number | null>(null);
 
   const sensors = useSensors(
@@ -303,6 +307,45 @@ const CVEditor = () => {
     setCv(prev => ({ ...prev, __meta: { ...prev.__meta, templateAccent: hex } }));
   const doExport = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent, cvLanguage).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
 
+  const runParseTest = async () => {
+    setParsing(true);
+    try {
+      const pdfjs: any = await import("pdfjs-dist");
+      const worker: any = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+      pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+      const built = buildPdf(cv, enabledSections, tCv, templateStyleId, templateAccent, cvLanguage);
+      const pdf = await pdfjs.getDocument({ data: built.output("arraybuffer") }).promise;
+      let raw = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        raw += " " + content.items.map((it: any) => it.str).join(" ");
+      }
+      const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+      const hay = norm(raw);
+      const checks: { label: string; ok: boolean }[] = [];
+      const push = (label: string, value?: string) => {
+        if (value && value.trim()) checks.push({ label, ok: hay.includes(norm(value)) });
+      };
+      const sv = cvLanguage === "sv";
+      push(sv ? "Namn" : "Name", cv.contact.name);
+      push(sv ? "E-post" : "Email", cv.contact.email);
+      push(sv ? "Telefon" : "Phone", cv.contact.phone);
+      push(sv ? "Profiltext" : "Profile", cv.profile);
+      for (const e of cv.experience) {
+        push(`${sv ? "Titel" : "Title"}: ${e.title}`, e.title);
+        push(`${sv ? "Företag" : "Company"}: ${e.company}`, e.company);
+        e.bullets.forEach((b, i) => push(`${e.title || "?"} · ${sv ? "punkt" : "bullet"} ${i + 1}`, b));
+      }
+      for (const s of cv.skills) push(`${sv ? "Kompetens" : "Skill"}: ${s}`, s);
+      for (const ed of cv.education) { push(ed.degree, ed.degree); push(ed.school, ed.school); }
+      for (const l of cv.languages) push(`${sv ? "Språk" : "Language"}: ${l.language}`, l.language);
+      setParseChecks(checks);
+    } catch (e: any) {
+      toast({ title: cvLanguage === "en" ? "Parse test failed" : "Parsningstestet kraschade", description: e.message, variant: "destructive" });
+    } finally { setParsing(false); }
+  };
+
   // Explicit save (autosave still runs) — cancels any pending debounce and saves now.
   const manualSave = async () => {
     if (saveTimeout.current) { clearTimeout(saveTimeout.current); saveTimeout.current = null; }
@@ -451,6 +494,10 @@ const CVEditor = () => {
                 <DropdownMenuItem onClick={() => setStyleOpen(true)}><Palette className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Style" : "Stil"}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSyncOpen(true)}><RefreshCw className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Sync facts" : "Synka fakta"}</DropdownMenuItem>
                 <DropdownMenuItem onClick={applyAtsOrder}><ListOrdered className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Arrange for ATS" : "Ordna för ATS"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={runParseTest} disabled={parsing}>
+                  <ListChecks className="mr-2 h-4 w-4" />
+                  {parsing ? (cvLanguage === "en" ? "Parsing…" : "Parsar…") : (cvLanguage === "en" ? "Test parsing" : "Testa parsning")}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={undoLast} disabled={!cv.__meta?.lastSnapshot}>
                   <RotateCcw className="mr-2 h-4 w-4" />
                   {cv.__meta?.lastSnapshot
@@ -665,6 +712,40 @@ const CVEditor = () => {
       </Dialog>
 
       </div>
+
+      {/* Parse-back result: what a real PDF parser actually recovered from the export. */}
+      <Dialog open={!!parseChecks} onOpenChange={(o) => !o && setParseChecks(null)}>
+        <DialogContent className="max-h-[80vh] max-w-md overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{cvLanguage === "en" ? "Parse test" : "Parsningstest"}</DialogTitle>
+          </DialogHeader>
+          {parseChecks && (() => {
+            const ok = parseChecks.filter(c => c.ok).length;
+            const misses = parseChecks.filter(c => !c.ok);
+            return (
+              <div className="space-y-3">
+                <p className={`text-sm font-medium ${misses.length === 0 ? "text-green-700 dark:text-green-500" : "text-warning"}`}>
+                  {cvLanguage === "en"
+                    ? `${ok} of ${parseChecks.length} fields recovered by a real PDF parser.`
+                    : `${ok} av ${parseChecks.length} fält återfanns av en riktig PDF-parser.`}
+                </p>
+                {misses.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {cvLanguage === "en" ? "Everything survives extraction. This export is machine-readable, measured, not promised." : "Allt överlever extraktion. Exporten är maskinläsbar — uppmätt, inte lovat."}
+                  </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">{cvLanguage === "en" ? "Not recovered:" : "Återfanns inte:"}</p>
+                    {misses.map((m, i) => (
+                      <p key={i} className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">{m.label}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Docked improve column (the Grammarly pattern): the CV changes in view while
           you answer. Sticky, own scroll, closable. */}

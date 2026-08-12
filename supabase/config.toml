@@ -67,3 +67,7 @@ verify_jwt = true
 
 [functions.verify-keywords]
 verify_jwt = true
+
+# ESCO taxonomy lookups run through our proxy; JWT required like everything else.
+[functions.esco-lookup]
+verify_jwt = true
