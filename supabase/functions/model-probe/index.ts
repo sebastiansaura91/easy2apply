@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 /**
- * One-shot diagnostics: ask the gateway which model ids actually resolve, with a
+ * One-shot diagnostics (v2): ask the gateway which model ids actually resolve, with a
  * 1-token prompt per candidate. Exists because the docs and the gateway disagree
  * on id format and guessing costs a redeploy cycle each time.
  */
