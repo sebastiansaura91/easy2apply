@@ -226,7 +226,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
             : undefined,
           // Single source of truth: the editor's scans anchor to THIS demand profile.
           demandProfile: report?.kind === "job" && report.ja
-            ? { competence_themes: report.ja.competence_themes, knockout_requirements: report.ja.knockout_requirements }
+            ? { competence_themes: report.ja.competence_themes, knockout_requirements: report.ja.knockout_requirements, tools_and_systems: (report.ja as any).tools_and_systems || [] }
             : undefined,
         },
       };

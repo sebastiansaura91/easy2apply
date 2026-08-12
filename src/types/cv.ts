@@ -94,6 +94,8 @@ export interface CVMeta {
   demandProfile?: {
     competence_themes?: { theme: string; importance: "must" | "nice"; supporting_terms: string[]; canonical_id?: string | null }[];
     knockout_requirements?: string[];
+    /** Explicitly named products/technologies — exact-match keywords, separate from competence judgment. */
+    tools_and_systems?: string[];
   };
   /** Themes the user has consciously accepted as honest gaps — shown muted, never nagged. */
   acceptedGaps?: string[];

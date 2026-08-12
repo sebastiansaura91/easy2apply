@@ -15,6 +15,7 @@ import { RoleFitResult, BulletReframe } from "@/types/role-fit";
 import { getRoleAdvice } from "@/lib/role-advice";
 import { computeMatchScore, biggestGap } from "@/lib/match-score";
 import { titleMatch } from "@/lib/title-match";
+import { parseYearsRequirement, yearsOfExperience } from "@/lib/experience-years";
 import { CVMeta } from "@/types/cv";
 import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 import {
@@ -432,9 +433,15 @@ export function InsightsPanel({
   // Recruiter lens: competence themes with supporting terms. missingKw = the union of
   // every genuinely-missing term (flat list kept as fallback + for the interview flow).
   const themes = deepResult?.job_language_match?.competence_themes ?? [];
+  // Hard tools/systems from the ad, matched deterministically against the CV text —
+  // exact product names deserve exact matching, separate from competence judgment.
+  const cvBlob = JSON.stringify([cv.profile, cv.skills, cv.experience, cv.certifications]).toLowerCase();
+  const adTools = (cv.__meta?.demandProfile?.tools_and_systems || []).map(t => ({ tool: t, ok: cvBlob.includes(t.toLowerCase()) }));
+  const missingTools = adTools.filter(t => !t.ok).map(t => t.tool);
   const missingKw = Array.from(new Set([
     ...(deepResult?.job_language_match.missing_phrases ?? []),
     ...themes.flatMap(t => t.supporting_terms_missing || []),
+    ...missingTools,
   ].map(s => s.trim()).filter(Boolean)));
   const unthemedKw = missingKw.filter(p => !themes.some(t => (t.supporting_terms_missing || []).includes(p)));
   const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
@@ -527,6 +534,34 @@ export function InsightsPanel({
   const dismissQuestion = (keyword: string) => {
     setKwConfirm(prev => ({ ...prev, [keyword]: "no" }));
     setKwQuestions(prev => (prev || []).filter(q => q.keyword !== keyword));
+  };
+
+  // Skill inference the honest way (the HiredScore trick, with you as the gate):
+  // the AI reads the CV for competences it IMPLIES but never states, and those
+  // become ordinary interview questions — never silent claims.
+  const [inferring, setInferring] = useState(false);
+  const exploreHidden = async () => {
+    setInferring(true);
+    try {
+      const known = Array.from(new Set([
+        ...themes.map(t => t.theme),
+        ...Object.keys(kwConfirm),
+        ...(cv.__meta?.verifiedEvidence || []).map(e => e.keyword),
+      ]));
+      const { data, error } = await supabase.functions.invoke("infer-competences", {
+        body: { resume_content_json: cv, known, locale: cvLanguage },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const names = ((data.inferences || []) as { competence: string }[]).map(i => i.competence).filter(Boolean);
+      if (!names.length) {
+        toast({ title: isSv ? "Inget dolt hittades" : "Nothing hidden found", description: isSv ? "CV:t antyder inga obevisade kompetenser just nu." : "The CV doesn't imply any unproven competences right now." });
+        return;
+      }
+      await fetchQuestions(names);
+    } catch (e: any) {
+      toast({ title: isSv ? "Kunde inte utforska" : "Couldn't explore", description: e.message, variant: "destructive" });
+    } finally { setInferring(false); }
   };
 
   // Options must always exist — if the model (or an old function version) sends none,
@@ -978,6 +1013,18 @@ export function InsightsPanel({
               <div className="flex flex-wrap gap-1">{genericKw.map(p => <Badge key={p} variant="outline" className="text-[9px] h-5">{p}</Badge>)}</div>
             </div>
           )}
+          {adTools.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Verktyg & system i annonsen" : "Tools & systems in the ad"}</p>
+              <div className="flex flex-wrap gap-1">
+                {adTools.map(t => (
+                  <Badge key={t.tool} variant="outline" className={`h-5 text-[9px] ${t.ok ? "border-green-600/50 text-green-700 dark:text-green-500" : "border-warning/60 text-warning"}`}>
+                    {t.tool}{t.ok ? " ✓" : ""}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
           {localBy.keywords.map(renderLocalIssue)}
           {deepBy("keywords").map(d => renderDeepIssue(d.iss, d.i))}
           {!deepResult && (
@@ -1269,7 +1316,23 @@ export function InsightsPanel({
             <div className="space-y-2">
               {knockouts.map(k => (
                 <div key={k} className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5">
-                  <span className="text-sm leading-snug">{k}</span>
+                  <span className="text-sm leading-snug">
+                    {k}
+                    {(() => {
+                      // Quantitative requirements meet the timeline: "5 års erfarenhet av X"
+                      // is answered with your own merged role periods, deterministically.
+                      const req = parseYearsRequirement(k);
+                      if (!req) return null;
+                      const have = yearsOfExperience(cv, req.subject);
+                      return (
+                        <span className={`block text-[11px] ${have >= req.years ? "text-green-700 dark:text-green-500" : "text-muted-foreground"}`}>
+                          {isSv
+                            ? `Din tidslinje: ~${have} år${have >= req.years ? " — kravet täckt" : ` av ${req.years}`}`
+                            : `Your timeline: ~${have} yrs${have >= req.years ? " — requirement met" : ` of ${req.years}`}`}
+                        </span>
+                      );
+                    })()}
+                  </span>
                   <span className="flex shrink-0 gap-1">
                     {(["yes", "no"] as const).map(v => (
                       <button key={v} type="button"
@@ -1433,6 +1496,12 @@ export function InsightsPanel({
                 </Button>
               )}
             </div>
+            {/* Skill inference, honesty preserved: the AI only proposes QUESTIONS about
+                what the CV implies but never states — you stay the gate. */}
+            <button type="button" className="w-full text-center text-[11px] text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50"
+              disabled={inferring} onClick={exploreHidden}>
+              {inferring ? (isSv ? "Letar dold kompetens…" : "Looking for hidden competence…") : (isSv ? "Utforska dold kompetens →" : "Explore hidden competence →")}
+            </button>
           </>);
         }
         return <div className="space-y-2">{trail}{content}</div>;
@@ -1548,6 +1617,16 @@ export function InsightsPanel({
           </div>
 
         </div>
+      )}
+      {/* Observability: which engine actually answered, and how often the guards fired. */}
+      {(deepResult as any)?._meta?.model && (
+        <p className="text-center text-[10px] text-muted-foreground">
+          {isSv ? "Motor" : "Engine"}: {(deepResult as any)._meta.model}
+          {Object.entries(((deepResult as any)._meta.guards || {}) as Record<string, number>)
+            .filter(([, v]) => v > 0)
+            .map(([k, v]) => ` · ${k}: ${v}`)
+            .join("")}
+        </p>
       )}
       </div>{/* end details wrapper (hidden in guided mode) */}
     </div>

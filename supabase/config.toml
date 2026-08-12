@@ -71,3 +71,7 @@ verify_jwt = true
 # ESCO taxonomy lookups run through our proxy; JWT required like everything else.
 [functions.esco-lookup]
 verify_jwt = true
+
+# Skill inference proposes interview questions from what the CV implies; JWT required.
+[functions.infer-competences]
+verify_jwt = true

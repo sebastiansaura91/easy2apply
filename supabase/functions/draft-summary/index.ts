@@ -13,9 +13,11 @@ const corsHeaders = {
 // Model chain: strongest first; on an unknown-model rejection (400/404) step down,
 // so a gateway id rename can never break the app.
 const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
+let lastModelUsed = "";
 async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
   let res: Response | null = null;
   for (const m of MODEL_CHAIN) {
+    lastModelUsed = m;
     res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
     if (res.status !== 400 && res.status !== 404) return res;
   }

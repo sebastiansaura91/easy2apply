@@ -10,9 +10,11 @@ const corsHeaders = {
 // Model chain: strongest first; on an unknown-model rejection (400/404) step down,
 // so a gateway id rename can never break the app.
 const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
+let lastModelUsed = "";
 async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
   let res: Response | null = null;
   for (const m of MODEL_CHAIN) {
+    lastModelUsed = m;
     res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
     if (res.status !== 400 && res.status !== 404) return res;
   }
@@ -199,6 +201,11 @@ Return via the keyword_placements tool.`;
       });
     }
 
+    // Observability: every guard rejection is a model-failure signal worth counting.
+    const guardHits: Record<string, number> = {};
+    const _pb = (result.placements || []).length;
+    const _nb = (result.new_bullets || []).length;
+
     // Deterministic guards: the original must actually match the CV bullet, and the
     // revision must stay a minimal edit (no ballooning, no new digits).
     const norm = (s: string) => String(s || "").trim().toLowerCase();
@@ -254,6 +261,9 @@ Return via the keyword_placements tool.`;
       result.new_bullets = result.new_bullets.filter((nb: any) => !introducesSwedish(evidenceText, nb.bullet));
     }
 
+    guardHits["placements_rejected"] = _pb - (result.placements || []).length;
+    guardHits["new_bullets_rejected"] = _nb - (result.new_bullets || []).length;
+    (result as any)._meta = { model: lastModelUsed, guards: guardHits };
     return new Response(JSON.stringify(stripAiDashes(result)), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

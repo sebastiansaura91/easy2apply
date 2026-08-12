@@ -61,6 +61,8 @@ export interface BulletFeedback {
 }
 
 export interface AtsCheckResult {
+  /** Observability: which model actually answered, and how often server guards fired. */
+  _meta?: { model?: string; guards?: Record<string, number> };
   overall_score: number;
   grade: "A" | "B" | "C" | "D" | "F";
   summary: string;

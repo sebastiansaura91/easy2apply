@@ -10,9 +10,11 @@ const corsHeaders = {
 // Model chain: strongest first; on an unknown-model rejection (400/404) step down,
 // so a gateway id rename can never break the app.
 const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
+let lastModelUsed = "";
 async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
   let res: Response | null = null;
   for (const m of MODEL_CHAIN) {
+    lastModelUsed = m;
     res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
     if (res.status !== 400 && res.status !== 404) return res;
   }
@@ -70,7 +72,10 @@ supporting terms (3–6 short terms, the employer's exact words).
 Extract binary hard requirements that application forms screen on: work authorization,
 location/relocation, required languages, mandatory certifications/licenses, non-negotiable
 years of experience or degree. Only list requirements the posting states as absolute.
-Empty array if none.${Array.isArray(registry?.competences) && registry.competences.length ? `
+Empty array if none.
+
+## TOOLS & SYSTEMS (exact-match keywords)
+List products, technologies, systems and certifications the posting NAMES explicitly (e.g. Salesforce, SAP, Power BI, SQL, PMP). Max 10, exact spelling from the posting. Generic words ("CRM system", "affärssystem") only when no product is named. Empty array if none.${Array.isArray(registry?.competences) && registry.competences.length ? `
 
 ## CANONICAL COMPETENCES (the candidate's registry)
 For each competence theme, set canonical_id to the id of the registry competence it means,
@@ -113,6 +118,11 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
                     required: ["theme", "importance", "supporting_terms"],
                     additionalProperties: false,
                   },
+                },
+                tools_and_systems: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Explicitly named products/technologies/certifications (max 10, exact spelling)",
                 },
                 knockout_requirements: {
                   type: "array",
@@ -169,6 +179,7 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
       }
     }
 
+    (result as any)._meta = { model: lastModelUsed };
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -6,13 +6,25 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Recency policy (what the big matchers weight and consumer tools skip): old proof
+// is weaker proof, and the note must say so instead of hiding it.
+const RECENCY_RULE = `
+
+RECENCY RULE for competence ratings:
+- Evidence found ONLY in roles that ended more than 5 years ago supports at most rating 3. Say so in the evidence note ("beviset är från 2013–2016" / "the proof is from 2013–2016").
+- Evidence from the current or most recent role weighs heaviest.
+- Never lower a rating for recency when the ad asks for the competence generically ("erfarenhet av ledarskap") rather than currently-practised skill.`;
+
+
 
 // Model chain: strongest first; on an unknown-model rejection (400/404) step down,
 // so a gateway id rename can never break the app.
 const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
+let lastModelUsed = "";
 async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
   let res: Response | null = null;
   for (const m of MODEL_CHAIN) {
+    lastModelUsed = m;
     res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
     if (res.status !== 400 && res.status !== 404) return res;
   }
@@ -52,6 +64,7 @@ serve(async (req) => {
     const renderedText = buildRenderedText(resume_content_json, locale === "en" ? "en" : "sv");
     const bulletList = extractBullets(resume_content_json);
     const lang = locale === "en" ? "en" : "sv";
+    const guardHits: Record<string, number> = {};
     const systemPrompt = lang === "sv" ? SYSTEM_PROMPT_SV : SYSTEM_PROMPT_EN;
 
     const today = new Date();
@@ -103,7 +116,7 @@ serve(async (req) => {
         // Deterministic: the same CV + posting must yield the same score and findings.
         temperature: 0,
         messages: [
-          { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
+          { role: "system", content: systemPrompt + RECENCY_RULE + HUMAN_WRITING_RULES },
           { role: "user", content: userPrompt },
         ],
         tools: [{
@@ -300,7 +313,9 @@ serve(async (req) => {
         if (n.split(" ").length > 4) return false;
         return true;
       };
+      const _mpBefore = result.job_language_match.missing_phrases.length;
       result.job_language_match.missing_phrases = result.job_language_match.missing_phrases.filter(keepPhrase);
+      guardHits["keywords_filtered"] = _mpBefore - result.job_language_match.missing_phrases.length;
       if (Array.isArray(result.job_language_match.competence_themes)) {
         for (const th of result.job_language_match.competence_themes) {
           if (Array.isArray(th?.supporting_terms_missing)) th.supporting_terms_missing = th.supporting_terms_missing.filter(keepPhrase);
@@ -318,6 +333,7 @@ serve(async (req) => {
       }
     }
 
+    (result as any)._meta = { model: lastModelUsed, guards: guardHits };
     return new Response(JSON.stringify(stripAiDashes(result)), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
