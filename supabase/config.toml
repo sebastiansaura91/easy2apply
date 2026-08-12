@@ -75,3 +75,7 @@ verify_jwt = true
 # Skill inference proposes interview questions from what the CV implies; JWT required.
 [functions.infer-competences]
 verify_jwt = true
+
+# One-shot model-id diagnostics; JWT required, removable once the chain is pinned.
+[functions.model-probe]
+verify_jwt = true
