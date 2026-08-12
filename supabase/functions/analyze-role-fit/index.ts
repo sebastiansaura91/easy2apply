@@ -15,7 +15,7 @@ const corsHeaders = {
 
 // Model chain: strongest first; on an unknown-model rejection (400/404) step down,
 // so a gateway id rename can never break the app.
-const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
+const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
 let lastModelUsed = "";
 async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
   let res: Response | null = null;
@@ -148,7 +148,7 @@ Return everything via the role_fit_result tool.`;
       body: JSON.stringify({
         model,
         // Deterministic: same CV + role + posting must yield the same fit score and gaps.
-        temperature: 0,
+        ...(model.startsWith("google/") ? { temperature: 0 } : {}),
         messages: [
           { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
           { role: "user", content: userPrompt },
