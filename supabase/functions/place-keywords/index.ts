@@ -98,7 +98,12 @@ STRICT RULES:
 - NEVER invent achievements, numbers, tools or scope. If a keyword has no honest home in any bullet${hasEvidence ? " and no candidate evidence covers it" : ""}, OMIT it (do not force it).
 - Never place two keywords in the same bullet.${hasEvidence ? `
 - CANDIDATE EVIDENCE: the candidate has answered verification questions confirming real experience. Use their answers to pick the right bullet and wording.
-- If a confirmed keyword has NO honest home in any existing bullet, you may instead propose ONE new bullet in new_bullets for the most relevant experience — built ONLY from facts in the candidate's answer (their system names, role, outcome). Use "${locale === "en" ? "[FILL IN]" : "[FYLL I]"}" for any number the answer does not state. Max 180 characters, outcome-first.` : ""}
+- NEW BULLET CONTRACT (when a confirmed keyword has NO honest home in any existing bullet):
+  * DISTILL, never quote. The evidence is interview language ("Jag har lett strategiprojekt...") and must be completely rewritten into CV language. Copying evidence phrasing, or chaining its clauses ("...redesigning customer journeys and managing acquisition and reorganization transformations"), is FORBIDDEN.
+  * ONE claim per bullet: pick the STRONGEST single achievement in the evidence and drop the rest.
+  * Shape: action verb + task + result (CAR). Use "${locale === "en" ? "[FILL IN]" : "[FYLL I]"}" for any number the evidence does not state. Facts come ONLY from the evidence.
+  * Target the experience whose title/company matches the evidence role field; match that experience's existing bullet style and tense.
+  * No first person. CV bullets are subjectless. Max 180 characters.` : ""}
 - LANGUAGE PURITY: every revised bullet must be written entirely in ${lang}. When a keyword comes from a job ad in the other language, place its natural ${lang} equivalent instead (Swedish "serieförvärvare" → English "serial acquirer"; "ledningsgrupp" → "management team"; "dotterbolag" → "subsidiaries"). Inserting the ad's word verbatim into a bullet of the other language ("...integrating acquired dotterbolag") is ALWAYS wrong. Recruiters and scanners match translations — never mix two languages inside one bullet.
 - EMPLOYER-CONTEXT TERMS: some keywords describe the COMPANY, not the person ("serieförvärvare"/"serial acquirer", "PE-backed", "family-owned", industry labels). Place these only as environment context ("…within a serial acquirer" / "…i en serieförvärvarkoncern") — never as a role or trait of the candidate ("as a serial acquirer" would be false). If no bullet can carry that context naturally, omit the keyword.
 - PRESERVE FACTS: a swap must never replace concrete words (ownership, scope, responsibilities, numbers) with vaguer phrasing. "Owned commercial and offering responsibility" → "Demonstrated strong business ownership" destroys information and is FORBIDDEN.
@@ -113,7 +118,13 @@ Return via the keyword_placements tool.`;
     userPrompt += `## BULLETS (with indices)\n\`\`\`json\n${JSON.stringify(bullets, null, 2)}\n\`\`\`\n\n`;
     if (hasEvidence) {
       userPrompt += `## CANDIDATE EVIDENCE (verified answers — the only source of new facts)\n`;
-      for (const ev of evidence.slice(0, 10)) userPrompt += `- ${ev.keyword}: ${String(ev.answer || "").slice(0, 400)}\n`;
+      for (const ev of evidence.slice(0, 10)) {
+        const parts: string[] = [];
+        if (Array.isArray(ev.statements) && ev.statements.length) parts.push(`kinds of experience confirmed: ${ev.statements.join(" | ")}`);
+        if (ev.detail) parts.push(`SPECIFICS (the only concrete content): ${String(ev.detail).slice(0, 300)}`);
+        if (ev.role) parts.push(`role it belongs to: ${ev.role}`);
+        userPrompt += `- ${ev.keyword}: ${parts.length ? parts.join(" ;; ") : String(ev.answer || "").slice(0, 400)}\n`;
+      }
       userPrompt += `\n`;
     }
     userPrompt += `Propose minimal placements now.`;
@@ -231,6 +242,10 @@ Return via the keyword_placements tool.`;
     const evidenceDigits = new Set((evidenceText.match(/\d+/g) || []));
     result.new_bullets = (result.new_bullets || []).filter((nb: any) => {
       if (!hasEvidence) return false;
+      // Interview language and clause-mashing are model failures, not suggestions:
+      // no first person, no semicolon chains, max two coordinated clauses.
+      if (/\bjag\b/i.test(nb.bullet) || /\bI\b/.test(nb.bullet) || /;/.test(nb.bullet)) return false;
+      if ((nb.bullet.match(/\b(och|and)\b/gi) || []).length >= 3) return false;
       if (typeof nb?.exp_index !== "number" || !(resume_content_json.experience || [])[nb.exp_index]) return false;
       if (!nb.bullet || nb.bullet.length > 220) return false;
       const nums = String(nb.bullet).match(/\d+/g) || [];

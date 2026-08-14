@@ -109,6 +109,19 @@ try {
   check("pk: no &-labels or trait phrases in bullets", !placed.some(p => /&/.test(p.revised.replace(p.original, "")) ) && !placed.some(p => /affärsägarskap|team leadership & development/i.test(p.revised)), "");
   check("pk: no em dashes anywhere", !deepStrings(pk).some(s => EM_DASH.test(s)), "");
 
+  // ── place-keywords: new-bullet contract (distilled CV language, never interview mash) ──
+  const pk2 = await invoke("place-keywords", { resume_content_json: CV, missing_phrases: ["Management- & strategikonsulting"], locale: "en", evidence: [{
+    keyword: "Management- & strategikonsulting",
+    answer: "Jag har lett strategiprojekt själv",
+    statements: ["Jag har lett strategiprojekt själv", "Jag har designat om kundresor"],
+    detail: "kundresor och förvärvsintegrationer för ledningsgrupper i tre bolag",
+    role: "Business Analyst · Corp AB",
+  }] });
+  const nbs = pk2.new_bullets || [];
+  check("nb: no first person", !nbs.some(n => /jag/i.test(n.bullet) || /I/.test(n.bullet)), JSON.stringify(nbs.map(n => n.bullet)));
+  check("nb: no semicolon mash", !nbs.some(n => /;/.test(n.bullet)), "");
+  check("nb: max two coordinated clauses", !nbs.some(n => (n.bullet.match(/(och|and)/gi) || []).length >= 3), JSON.stringify(nbs.map(n => n.bullet)));
+
   // ── verify-keywords ──
   const vk = await invoke("verify-keywords", { resume_content_json: CV, missing_phrases: ["prissättning", "transformation"], locale: "sv" });
   const qs = vk.questions || [];

@@ -447,7 +447,10 @@ export function InsightsPanel({
   const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
   const weakFeedback = (deepResult?.bullet_feedback ?? []).filter(b => b.score < 7);
 
-  const runPlacements = async (phrases: string[], evidence?: { keyword: string; answer: string }[]) => {
+  // Evidence travels STRUCTURED (what kinds are true / the specifics / which role),
+  // so the server can distill a proper CV bullet instead of quoting a mashed string.
+  interface EvidenceItem { keyword: string; answer: string; statements?: string[]; detail?: string; role?: string }
+  const runPlacements = async (phrases: string[], evidence?: EvidenceItem[]) => {
     setPlacing(true);
     setPlacements(null);
     setNewBullets(null);
@@ -634,7 +637,10 @@ export function InsightsPanel({
     const answer = composedAnswer(q);
     if (answer.length <= 2) return;
     persistEvidence([{ keyword: q.keyword, answer, role: kwRole[q.keyword] || undefined }]);
-    answeredRef.current.push({ keyword: q.keyword, answer: answerWithRole(q) });
+    answeredRef.current.push({
+      keyword: q.keyword, answer: answerWithRole(q),
+      statements: kwChoice[q.keyword] || [], detail: (kwAnswers[q.keyword] || "").trim() || undefined, role: kwRole[q.keyword] || undefined,
+    });
     setKwConfirm(prev => ({ ...prev, [q.keyword]: "yes" }));
     const rest = (kwQuestions || []).filter(x => x.keyword !== q.keyword);
     setKwQuestions(rest.length ? rest : null);
@@ -658,7 +664,10 @@ export function InsightsPanel({
     const stashed = answeredRef.current;
     answeredRef.current = [];
     persistEvidence(answered.map(q => ({ keyword: q.keyword, answer: composedAnswer(q), role: kwRole[q.keyword] || undefined })));
-    const evidence = [...stashed, ...answered.map(q => ({ keyword: q.keyword, answer: answerWithRole(q) }))];
+    const evidence = [...stashed, ...answered.map(q => ({
+      keyword: q.keyword, answer: answerWithRole(q),
+      statements: kwChoice[q.keyword] || [], detail: (kwAnswers[q.keyword] || "").trim() || undefined, role: kwRole[q.keyword] || undefined,
+    }))];
     const tapped = missingKw.filter(p => kwConfirm[p] === "yes" && !evidence.some(e => e.keyword === p));
     setKwQuestions(null);
     runPlacements([...tapped, ...evidence.map(e => e.keyword)], evidence);
