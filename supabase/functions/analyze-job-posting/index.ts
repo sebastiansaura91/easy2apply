@@ -64,6 +64,9 @@ Always base seniority on the title, NOT on the job description content.
 ## COMPETENCE THEMES (how recruiters screen)
 Recruiters evaluate candidates on 4–7 CORE COMPETENCE BUCKETS, not keyword lists.
 Derive them from the posting (e.g. "Controlling", "Transformation", "Commercial leadership").
+ALWAYS return at least 4 themes, even for a short posting: split distinct capabilities
+(e.g. pricing vs commercial ownership vs analysis/tools vs the employer context) into
+separate buckets instead of merging them into one broad theme.
 Mark each "must" or "nice" by how the posting weights it (title + repeated emphasis +
 explicit requirements beat single mentions). For each theme list the posting's own
 supporting terms (3–6 short terms, the employer's exact words).
