@@ -15,6 +15,18 @@ RECENCY RULE for competence ratings:
 - Evidence from the current or most recent role weighs heaviest.
 - Never lower a rating for recency when the ad asks for the competence generically ("erfarenhet av ledarskap") rather than currently-practised skill.`;
 
+// Nivålyftet: verified answers reach the rater, with a visibility cap - the score
+// may stop lying downward about the candidate, but a 5 still means "the recruiter
+// sees it in the CV".
+const EVIDENCE_RULE = `
+
+VERIFIED EVIDENCE RULES (rating with the ledger):
+- The ledger contains answers the candidate explicitly confirmed. Treat them as true facts.
+- A theme supported ONLY by ledger evidence (not visible in the CV text) reaches AT MOST rating 4. Set lifted_by_evidence=true for it, and the evidence_note MUST say the proof is verified but not yet visible in the CV ("styrkt via dina svar, syns inte i CV:t än" / "verified through your answers, not visible in the CV yet").
+- Rating 5 requires the CV ITSELF to show the competence. Recruiters only see the CV.
+- Never lower a rating because ledger evidence exists; the ledger only lifts or confirms.`;
+
+
 
 
 // Model chain: strongest first; on an unknown-model rejection (400/404) step down,
@@ -57,7 +69,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { resume_content_json, job_posting_text, locale, demand_profile, previous_themes } = await req.json();
+    const { resume_content_json, job_posting_text, locale, demand_profile, previous_themes, verified_evidence } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -103,6 +115,16 @@ serve(async (req) => {
     userPrompt += `## RENDERED PLAIN TEXT (what ATS sees)\n\`\`\`\n${renderedText}\n\`\`\`\n\n`;
     userPrompt += `## BULLETS WITH IDS\n\`\`\`json\n${JSON.stringify(bulletList, null, 2)}\n\`\`\`\n\n`;
     if (job_posting_text) userPrompt += `## JOB POSTING\n\`\`\`\n${job_posting_text}\n\`\`\`\n\n`;
+    if (Array.isArray(verified_evidence) && verified_evidence.length) {
+      userPrompt += `## VERIFIED EVIDENCE LEDGER (candidate-confirmed answers, treat as true)
+`;
+      for (const ev of verified_evidence.slice(0, 20)) {
+        userPrompt += `- ${String(ev.keyword || "")}${ev.role ? ` [${String(ev.role)}]` : ""}: ${String(ev.answer || "").slice(0, 300)}
+`;
+      }
+      userPrompt += `
+`;
+    }
     userPrompt += `Perform the full ATS + Recruiter Scan analysis now. Return the result via the ats_check_result tool. ALL text output MUST be in ${lang === "sv" ? "Swedish" : "English"}.`;
 
     const response = await gatewayFetch((model) => ({
@@ -116,7 +138,7 @@ serve(async (req) => {
         // Deterministic: the same CV + posting must yield the same score and findings.
         temperature: 0,
         messages: [
-          { role: "system", content: systemPrompt + RECENCY_RULE + HUMAN_WRITING_RULES },
+          { role: "system", content: systemPrompt + RECENCY_RULE + EVIDENCE_RULE + HUMAN_WRITING_RULES },
           { role: "user", content: userPrompt },
         ],
         tools: [{
@@ -712,7 +734,8 @@ const RESULT_SCHEMA = {
             properties: {
               theme: { type: "string", description: "The competence bucket, e.g. 'Controlling' or 'Transformation'" },
               importance: { type: "string", enum: ["must", "nice"] },
-              rating: { type: "number", description: "Anchored 1-5 recruiter-scorecard rating of the CV's evidence for this theme" },
+              lifted_by_evidence: { type: "boolean", description: "True when the rating rests on ledger evidence not visible in the CV" },
+                      rating: { type: "number", description: "Anchored 1-5 recruiter-scorecard rating of the CV's evidence for this theme" },
               evidence: { type: "string", enum: ["strong", "partial", "missing"] },
               evidence_note: { type: "string", description: "One short sentence: where the CV evidences this (or that it doesn't)" },
               supporting_terms_present: { type: "array", items: { type: "string" } },

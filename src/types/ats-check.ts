@@ -32,6 +32,8 @@ export interface CompetenceTheme {
   importance: "must" | "nice";
   /** Anchored 1–5 recruiter-scorecard rating of the CV's evidence for this theme. */
   rating?: number;
+  /** True when the rating rests on verified answers not yet visible in the CV text. */
+  lifted_by_evidence?: boolean;
   evidence: "strong" | "partial" | "missing";
   evidence_note: string;
   supporting_terms_present: string[];

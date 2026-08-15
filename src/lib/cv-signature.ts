@@ -6,5 +6,8 @@ import { CVContent } from "@/types/cv";
  * analysis MUST use this same function, or caches will never hit across surfaces.
  */
 export function cvScanSignature(cv: CVContent, jobText?: string): string {
-  return JSON.stringify({ ...cv, __meta: undefined }) + "|" + (jobText || "").trim();
+  // Verified answers feed the rating (Nivålyftet), so they bust the cache like any
+  // other input — otherwise a new answer would show stale ratings forever.
+  const evidence = cv.__meta?.verifiedEvidence || [];
+  return JSON.stringify({ ...cv, __meta: undefined }) + "|" + JSON.stringify(evidence) + "|" + (jobText || "").trim();
 }

@@ -117,6 +117,15 @@ Har du dessutom erfarenhet från en operativ linjeroll är det meriterande.`;
   check("ats: no >4-word keywords", !mp.some(p => p.split(/\s+/).length > 4), JSON.stringify(mp));
   check("ats: guards reported", !!a1._meta?.guards, JSON.stringify(a1._meta));
 
+  // ── ats-check with evidence ledger: lifts allowed, capped at 4 without CV visibility ──
+  const aev = await invoke("ats-check", { ...body, verified_evidence: [{
+    keyword: "transformation",
+    answer: "Jag ledde integrationen av två förvärvade bolag och satte den nya kommersiella organisationen, 12 månaders program",
+    role: "Head of Commercial · Acme AB",
+  }] });
+  check("ats-ev: ledger accepted", aev.overall_score >= 0 && aev.overall_score <= 100, `${aev.overall_score}`);
+  check("ats-ev: lifted themes capped at 4", (aev.job_language_match?.competence_themes || []).every(t => !t.lifted_by_evidence || Math.round(t.rating ?? 0) <= 4), JSON.stringify((aev.job_language_match?.competence_themes || []).filter(t => t.lifted_by_evidence)));
+
   // ── place-keywords: the classic traps ──
   const pk = await invoke("place-keywords", { resume_content_json: CV, missing_phrases: ["serieförvärvare", "dotterbolag", "ledningsgrupp", "starkt affärsägarskap", "Team Leadership & Development"], locale: "en" });
   const placed = pk.placements || [];

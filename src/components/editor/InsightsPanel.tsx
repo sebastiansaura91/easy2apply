@@ -144,6 +144,8 @@ export function InsightsPanel({
   // ── Fix queue (guided mode): one card at a time; the full dashboard hides behind "Visa detaljer".
   const [showDetails, setShowDetails] = useState(false);
   const [handledThemes, setHandledThemes] = useState<Set<string>>(new Set());
+  // Themes proven via answers but invisible in the CV: communication gaps, own card type.
+  const [handledComm, setHandledComm] = useState<Set<string>>(new Set());
   const [dismissedPlacements, setDismissedPlacements] = useState<Set<number>>(new Set());
   const [dismissedNew, setDismissedNew] = useState<Set<number>>(new Set());
   // Whole-bullet reframes toward the target role — queue cards after the gap cards.
@@ -257,6 +259,8 @@ export function InsightsPanel({
           previous_themes: (prevFull?.job_language_match?.competence_themes || [])
             .filter(t => Number.isFinite(t.rating as number))
             .map(t => ({ theme: t.theme, rating: t.rating })),
+          // Nivålyftet: verified answers reach the rater — capped at 4 without CV visibility.
+          verified_evidence: (cv.__meta?.verifiedEvidence || []).length ? cv.__meta?.verifiedEvidence : undefined,
         },
       });
       if (error) throw error;
@@ -522,8 +526,14 @@ export function InsightsPanel({
     }
     setLoadingQ(true);
     try {
+      // Level-up mode: themes with a known rating get questions for the NEXT level's
+      // missing attribute (autonomy/scope/outcome), not "do you have this?".
+      const ratingOfT = (t: typeof themes[number]) => Math.round((t.rating as number) ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
+      const themesCtx = themes
+        .filter(t => toAsk.includes(t.theme))
+        .map(t => ({ theme: t.theme, rating: ratingOfT(t), evidence_note: t.evidence_note }));
       const { data, error } = await supabase.functions.invoke("verify-keywords", {
-        body: { resume_content_json: cv, missing_phrases: toAsk, locale: cvLanguage },
+        body: { resume_content_json: cv, missing_phrases: toAsk, locale: cvLanguage, themes_context: themesCtx.length ? themesCtx : undefined },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -1431,6 +1441,21 @@ export function InsightsPanel({
               {isSv ? <>Annonsen kräver: {g.theme}</> : <>The ad requires: {g.theme}</>}
             </p>
             <p className="text-sm leading-relaxed text-muted-foreground">{g.evidence_note || (isSv ? "Ditt CV visar det inte än." : "Your CV doesn't show it yet.")}</p>
+            {/* What the NEXT level takes (SFIA logic) — the question targets exactly this. */}
+            {(() => {
+              const nxt: Record<number, [string, string]> = {
+                1: ["grundbevis: var och när du gjort arbetet", "basic proof: where and when you did the work"],
+                2: ["eget ansvar: att du drev arbetet, inte bara deltog", "ownership: you drove the work, not just took part"],
+                3: ["ägarskap plus mätbart utfall, siffror på effekten", "ownership plus a measurable outcome, numbers on the effect"],
+                4: ["att CV:t självt visar det, femman kräver synlighet", "the CV itself showing it, a five requires visibility"],
+              };
+              const t = nxt[Math.min(r, 4)];
+              return t ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {isSv ? "För nivå" : "For level"} {Math.min(r + 1, 5)}: {isSv ? t[0] : t[1]}
+                </p>
+              ) : null;
+            })()}
             <div className="space-y-2 pt-1">
               {canFix && (
                 <Button className="h-11 w-full text-sm" onClick={() => { markHandled(g.theme); fetchQuestions([g.theme, ...terms]); }}>
@@ -1472,6 +1497,29 @@ export function InsightsPanel({
                 setAppliedReframes(prev => new Set(prev).add(rfIdx));
               }}>{isSv ? "Använd" : "Accept"}</Button>
               <Button variant="outline" className="h-11 text-sm" onClick={() => setDismissedReframes(prev => new Set(prev).add(rfIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
+            </div>
+          </>);
+        } else if ((() => themes.some(t => (t as any).lifted_by_evidence && ratingOf(t) >= 4 && !handledComm.has(t.theme)))()) {
+          // Proven via answers but invisible in the CV — a communication gap, not a
+          // competence gap. The recruiter only sees the CV; get it in there.
+          const g = themes.find(t => (t as any).lifted_by_evidence && ratingOf(t) >= 4 && !handledComm.has(t.theme))!;
+          content = card(<>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-green-700 dark:text-green-500">{isSv ? "Bevisat" : "Proven"}</span>
+            <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{g.theme}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {isSv ? "Styrkt via dina svar, men CV:t visar det inte än. Rekryteraren ser bara CV:t." : "Verified through your answers, but the CV doesn't show it yet. The recruiter only sees the CV."}
+            </p>
+            <div className="flex gap-2">
+              <Button className="h-11 flex-1 text-sm" onClick={() => {
+                setHandledComm(prev => new Set(prev).add(g.theme));
+                const nn = (s: string) => s.toLowerCase().trim();
+                const evs = (cv.__meta?.verifiedEvidence || []).filter(e => nn(g.theme).includes(nn(e.keyword)) || nn(e.keyword).includes(nn(g.theme)));
+                runPlacements(
+                  g.supporting_terms_missing?.length ? g.supporting_terms_missing : [g.theme],
+                  evs.map(e => ({ keyword: e.keyword, answer: e.role ? `${e.answer} (i rollen: ${e.role})` : e.answer, role: e.role })),
+                );
+              }}>{isSv ? "Få in det i CV:t" : "Get it into the CV"}</Button>
+              <Button variant="outline" className="h-11 text-sm" onClick={() => setHandledComm(prev => new Set(prev).add(g.theme))}>{isSv ? "Senare" : "Later"}</Button>
             </div>
           </>);
         } else {

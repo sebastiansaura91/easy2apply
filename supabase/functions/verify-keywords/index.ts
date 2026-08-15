@@ -53,7 +53,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { resume_content_json, missing_phrases, locale } = await req.json();
+    const { resume_content_json, missing_phrases, locale, themes_context } = await req.json();
     if (!resume_content_json || !Array.isArray(missing_phrases) || missing_phrases.length === 0) {
       return new Response(JSON.stringify({ error: "resume_content_json and missing_phrases are required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -73,9 +73,16 @@ For EACH keyword return three things:
 2. options — the 3 most plausible KINDS of experience with this competence, first person, most likely first. Guide recognition, don't test recall: name the concrete forms this work usually takes. Example — keyword "pricing" → "I have set prices and packaging myself" / "I have run pricing analyses as input to decisions" / "I have worked on pricing as part of a commercial team". Each option: max 14 words, safe to claim if true, NO numbers, NO company or role names — the candidate adds their own specifics. The candidate can pick several.
 3. hint — one short prompt (max 12 words) for the specifics worth adding: where (company/role), what you did, outcome.
 - Never suggest the candidate should claim something — "no" must stay an easy answer. Do NOT include a "no experience" option; the interface has a separate button for that.
+- LEVEL-UP MODE: when THEME CONTEXT gives a current rating for a keyword, do NOT ask whether the candidate has the competence. Ask for the missing ingredient of the NEXT level, one attribute at a time (SFIA logic): autonomy (owned decisions vs supported), scope (budget, teams, companies), measurable outcome, repetition (how many contexts), recency. Grade the options by that attribute ("Jag ägde besluten" / "Jag drev arbetet" / "Jag stödde teamet"), and let the hint chase the number.
 - Output all text in ${lang}. Return via the verification_questions tool.`;
 
-    const userPrompt = `## KEYWORDS TO VERIFY\n${missing_phrases.slice(0, 10).join("; ")}\n\n## CANDIDATE CV CONTEXT\n${cvContext || "(none)"}`;
+    let userPrompt = `## KEYWORDS TO VERIFY\n${missing_phrases.slice(0, 10).join("; ")}\n\n`;
+    if (Array.isArray(themes_context) && themes_context.length) {
+      userPrompt += `## THEME CONTEXT (current rating 1-5 + why)\n`;
+      for (const tc of themes_context.slice(0, 10)) userPrompt += `- ${String(tc.theme || "")}: rating ${tc.rating}. ${String(tc.evidence_note || "").slice(0, 200)}\n`;
+      userPrompt += `\n`;
+    }
+    userPrompt += `## CANDIDATE CV CONTEXT\n${cvContext || "(none)"}`;
 
     const response = await gatewayFetch((model) => ({
       method: "POST",
