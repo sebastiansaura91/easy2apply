@@ -54,6 +54,15 @@
     --warning-foreground: 45 15% 98%;
 
     --surface-alt: 240 10% 97%;
+
+    /* Motion tokens (transitions.dev scale): ONE easing, tiny pre-rest deltas,
+       exits faster than entrances. Frequent actions stay ≤250ms; 500ms is reserved
+       for the single rare celebration ("ready to send"). */
+    --motion-quick: 150ms;
+    --motion-fast: 250ms;
+    --motion-medium: 350ms;
+    --motion-emphasis: 500ms;
+    --ease-ink: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .dark {
@@ -126,6 +135,47 @@
   }
 
   .tnum { font-variant-numeric: tabular-nums; }
+}
+
+@layer components {
+  /* Materials (Geist-style): exactly two surfaces, defined once, never assembled ad hoc. */
+  .surface-card { @apply rounded-2xl border border-border bg-card p-5 shadow-sm; }
+  .surface-sheet { @apply rounded-lg border border-border bg-muted/30 px-3 py-2; }
+
+  /* AI ink: suggested wording is typographically foreign — italic serif in the signature
+     ink — until the user accepts it and it becomes ordinary body text in the CV. Honesty
+     as a visible property of the interface. */
+  .ai-ink {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-style: italic;
+    color: hsl(var(--primary) / 0.9);
+  }
+}
+
+/* Queue-card content: rises 8px from 98% scale through a 2px blur — felt, not watched.
+   The card surface itself never remounts (component persistence); only content animates. */
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); filter: blur(2px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.card-enter { animation: card-enter var(--motion-fast) var(--ease-ink) both; }
+
+/* Accepted-wording swap: quick, the blur does the morph. */
+@keyframes text-morph {
+  from { opacity: 0; filter: blur(2px); }
+  to { opacity: 1; filter: none; }
+}
+.text-morph { animation: text-morph var(--motion-quick) var(--ease-ink) both; }
+
+/* The one celebration: a pen-stroke check drawn at "ready to send". Nowhere else. */
+@keyframes check-draw {
+  from { stroke-dashoffset: 26; }
+  to { stroke-dashoffset: 0; }
+}
+.check-draw { stroke-dasharray: 26; animation: check-draw var(--motion-emphasis) var(--ease-ink) 120ms both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-enter, .text-morph, .check-draw { animation: none; }
 }
 
 /* A4 Preview Styles */

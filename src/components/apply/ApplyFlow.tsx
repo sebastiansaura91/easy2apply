@@ -303,7 +303,9 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
       .catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
   };
 
-  const STEPS = isSv ? ["Annons", "Rapport", "Förbättra", "Klart"] : ["Ad", "Report", "Improve", "Done"];
+  // Numbered like a document's front matter (the Linear device): the sequence reads
+  // as typeset structure, not a SaaS wizard bar.
+  const STEPS = isSv ? ["1.0 Annonsen", "2.0 Rapporten", "3.0 Formuleringarna", "4.0 Skicka"] : ["1.0 The ad", "2.0 The report", "3.0 The wording", "4.0 Send"];
   const stepIdx = step === "input" ? 0 : step === "report" ? 1 : step === "improve" ? 2 : 3;
 
   const body = (

@@ -63,23 +63,25 @@ const Dashboard = () => {
   // Status per application, GOV.UK task-list style. Thresholds follow the industry
   // convention (Jobscan: 75 minimum, 80 sweet spot): 80+ ready, 60–79 improve.
   // After sending, the lifecycle stage takes over from the readiness score.
-  const LIFECYCLE: Record<string, { sv: string; en: string; cls: string }> = {
-    sent: { sv: "Skickad", en: "Sent", cls: "bg-accent text-accent-foreground" },
-    interview: { sv: "Intervju", en: "Interview", cls: "bg-primary text-primary-foreground" },
-    offer: { sv: "Erbjudande", en: "Offer", cls: "bg-green-600/15 text-green-700 dark:text-green-500" },
-    rejected: { sv: "Avslag", en: "Rejected", cls: "bg-muted text-muted-foreground" },
+  // Status is typographic (the read.cv/Fey lesson): hairline border, ink text, and one
+  // small state dot — never a colored slab per row. Density stays calm.
+  const LIFECYCLE: Record<string, { sv: string; en: string; cls: string; dot: string }> = {
+    sent: { sv: "Skickad", en: "Sent", cls: "text-foreground", dot: "bg-primary/60" },
+    interview: { sv: "Intervju", en: "Interview", cls: "text-foreground", dot: "bg-primary" },
+    offer: { sv: "Erbjudande", en: "Offer", cls: "text-green-700 dark:text-green-500", dot: "bg-green-600" },
+    rejected: { sv: "Avslag", en: "Rejected", cls: "text-muted-foreground", dot: "bg-muted-foreground/50" },
   };
   const statusOf = (meta: CVMeta) => {
     const st = meta.applicationStatus;
     if (st && LIFECYCLE[st.stage]) {
       const l = LIFECYCLE[st.stage];
-      return { label: `${isSv ? l.sv : l.en} ${format(new Date(st.at), "d/M")}`, cls: l.cls, lifecycle: true };
+      return { label: `${isSv ? l.sv : l.en} ${format(new Date(st.at), "d/M")}`, cls: l.cls, dot: l.dot, lifecycle: true };
     }
     const s = meta.lastAtsScore?.score;
-    if (s === undefined) return { label: isSv ? "Utkast" : "Draft", cls: "bg-muted text-muted-foreground", lifecycle: false };
-    if (s >= 80) return { label: isSv ? "Redo att skicka" : "Ready to send", cls: "bg-green-600/10 text-green-700 dark:text-green-500", lifecycle: false };
-    if (s >= 60) return { label: isSv ? "Att förbättra" : "To improve", cls: "bg-warning/15 text-warning", lifecycle: false };
-    return { label: isSv ? "Svag match" : "Weak match", cls: "bg-destructive/10 text-destructive", lifecycle: false };
+    if (s === undefined) return { label: isSv ? "Utkast" : "Draft", cls: "text-muted-foreground", dot: "bg-muted-foreground/40", lifecycle: false };
+    if (s >= 80) return { label: isSv ? "Redo att skicka" : "Ready to send", cls: "text-green-700 dark:text-green-500", dot: "bg-green-600", lifecycle: false };
+    if (s >= 60) return { label: isSv ? "Att förbättra" : "To improve", cls: "text-warning", dot: "bg-warning", lifecycle: false };
+    return { label: isSv ? "Svag match" : "Weak match", cls: "text-destructive", dot: "bg-destructive", lifecycle: false };
   };
   const setStage = async (r: ResumeRow, stage: "sent" | "interview" | "offer" | "rejected" | null) => {
     const { data } = await supabase.from("resumes").select("content_json").eq("id", r.id).single();
@@ -267,8 +269,9 @@ const Dashboard = () => {
               return (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button type="button" className={`hidden items-center rounded-full px-2.5 py-1 text-[11px] font-medium tabular-nums sm:inline-flex ${st.cls}`}
+                    <button type="button" className={`hidden items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] font-medium tabular-nums hover:bg-muted sm:inline-flex ${st.cls}`}
                       title={isSv ? "Sätt status" : "Set status"}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} aria-hidden="true" />
                       {!st.lifecycle && sc !== undefined && <>{sc} · </>}{st.label}
                     </button>
                   </DropdownMenuTrigger>

@@ -620,11 +620,11 @@ export function InsightsPanel({
         <p className="text-sm leading-relaxed">
           <span className="rounded bg-destructive/10 px-1 py-0.5 line-through decoration-destructive/50">{d.removed || (isSv ? "(inget)" : "(nothing)")}</span>
           <span className="mx-1.5 text-muted-foreground">→</span>
-          <span className="rounded bg-green-600/15 px-1 py-0.5 font-medium">{d.added}</span>
+          <span className="ai-ink rounded bg-green-600/15 px-1 py-0.5 font-medium">{d.added}</span>
         </p>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           {d.prefix && <>{d.prefix} </>}
-          <span className="rounded bg-green-600/15 px-0.5 font-medium text-foreground">{d.added}</span>
+          <span className="ai-ink rounded bg-green-600/15 px-0.5 font-medium">{d.added}</span>
           {d.suffix && <> {d.suffix}</>}
         </p>
       </div>
@@ -1209,6 +1209,13 @@ export function InsightsPanel({
               <p className="text-xs font-semibold text-muted-foreground">
                 {isSv ? "Matchpoäng · viktad kompetensmatchning" : "Match score · weighted competency match"}
               </p>
+              {/* Endowed progress: the meter never starts at zero — lead with what the
+                  CV already proves before what remains. */}
+              {!done && themes.length - allGaps.length > 0 && (
+                <p className="mt-0.5 text-[11px] text-green-700 dark:text-green-500">
+                  {themes.length - allGaps.length} {isSv ? `av ${themes.length} teman har redan stark evidens` : `of ${themes.length} themes already carry strong evidence`}
+                </p>
+              )}
               {!done && (
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   {remaining} {isSv ? `av ${allGaps.length} gap kvar` : `of ${allGaps.length} gaps left`}
@@ -1283,8 +1290,13 @@ export function InsightsPanel({
               })()}
               {done && (
                 <div className="mx-auto mt-2 max-w-xs space-y-1.5 rounded-lg border border-green-600/30 bg-green-600/10 p-3">
+                  {/* The one celebration in the whole app: a pen-stroke check, drawn once,
+                      for the user's own milestone. Nothing else ever celebrates. */}
+                  <svg viewBox="0 0 24 24" className="mx-auto h-6 w-6 text-green-700 dark:text-green-500" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path className="check-draw" d="M4 12.5l5.5 5.5L20 6.5" />
+                  </svg>
                   <p className="text-xs font-semibold text-green-700 dark:text-green-500">
-                    ✓ {isSv ? "Redo att skicka" : "Ready to send"} · {matchScore}
+                    {isSv ? "Redo att skicka" : "Ready to send"} · {matchScore}
                   </p>
                   <p className="text-[10px] text-muted-foreground">
                     {isSv ? "Alla gap är åtgärdade eller ärligt accepterade." : "Every gap is fixed or honestly accepted."}
@@ -1391,19 +1403,42 @@ export function InsightsPanel({
         const busyQ = loadingQ || placing;
         const markHandled = (theme: string) => setHandledThemes(prev => new Set(prev).add(theme));
 
-        const card = (body: React.ReactNode) => (
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-3">{body}</div>
+        // One persistent surface (never remounts); only the CONTENT animates in, keyed
+        // per card. Enter 250ms with a 2px blur, no exit animation — the frequent path
+        // stays fast, per the frequency rule.
+        const card = (key: string, body: React.ReactNode) => (
+          <div className="surface-card space-y-3">
+            <div key={key} className="card-enter space-y-3">{body}</div>
+          </div>
         );
 
         // The trail: one dot per gap this round, filled as they're handled. The trail is
         // the whole progress meter — no counter to read.
         const trailTotal = Math.min(gaps.length + handledThemes.size, 10);
         const trailDone = Math.min(handledThemes.size, trailTotal);
-        const trail = trailTotal > 1 ? (
-          <div className="flex items-center justify-center gap-1.5 py-1">
-            {Array.from({ length: trailTotal }, (_, i) => (
-              <span key={i} className={`h-2 w-2 rounded-full transition-colors ${i < trailDone ? "bg-primary" : i === trailDone ? "ring-2 ring-primary ring-offset-1 ring-offset-background bg-transparent" : "bg-muted"}`} />
-            ))}
+        // Finite, shrinking goal (goal gradient): a concrete count plus a small time
+        // estimate beats any percentage bar. ~45s per card is an honest pace here.
+        const cardsLeft =
+          (kwQuestions || []).length +
+          (placements || []).filter((_, i) => !appliedPlacements.has(i) && !dismissedPlacements.has(i)).length +
+          (newBullets || []).filter((_, i) => !appliedNew.has(i) && !dismissedNew.has(i)).length +
+          gaps.length + rfLeft +
+          themes.filter(t => (t as any).lifted_by_evidence && ratingOf(t) >= 4 && !handledComm.has(t.theme)).length;
+        const minsLeft = Math.max(1, Math.round(cardsLeft * 0.75));
+        const trail = (trailTotal > 1 || cardsLeft > 0) ? (
+          <div className="space-y-1 py-1">
+            {trailTotal > 1 && (
+              <div className="flex items-center justify-center gap-1.5">
+                {Array.from({ length: trailTotal }, (_, i) => (
+                  <span key={i} className={`h-2 w-2 rounded-full transition-colors ${i < trailDone ? "bg-primary" : i === trailDone ? "ring-2 ring-primary ring-offset-1 ring-offset-background bg-transparent" : "bg-muted"}`} />
+                ))}
+              </div>
+            )}
+            {cardsLeft > 0 && (
+              <p className="text-center text-[10px] tabular-nums text-muted-foreground">
+                {cardsLeft} {isSv ? "kort kvar" : cardsLeft === 1 ? "card left" : "cards left"} · ~{minsLeft} min
+              </p>
+            )}
           </div>
         ) : null;
 
@@ -1413,7 +1448,7 @@ export function InsightsPanel({
           // so a "no" is said out loud instead of discovered after four hours of tailoring.
           const answers = cv.__meta?.knockoutAnswers || {};
           const allAnswered = knockouts.every(k => answers[k]);
-          content = card(<>
+          content = card("knockouts", <>
             <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{isSv ? "Uppfyller du de hårda kraven?" : "Do you meet the hard requirements?"}</p>
             <p className="text-xs text-muted-foreground">{isSv ? "De enda automatiska avslagen. CV-formuleringar hjälper inte här, bara ärliga svar." : "The only automatic rejections. CV wording can't help here, only honest answers."}</p>
             <div className="space-y-2">
@@ -1457,14 +1492,18 @@ export function InsightsPanel({
             )}
           </>);
         } else if (busyQ) {
-          content = card(<p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{loadingQ ? (isSv ? "Skapar fråga…" : "Creating question…") : (isSv ? "Letar ärliga placeringar…" : "Finding honest placements…")}</p>);
+          content = card("busy", <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{loadingQ ? (isSv ? "Skapar fråga…" : "Creating question…") : (isSv ? "Letar ärliga placeringar…" : "Finding honest placements…")}</p>);
         } else if (pendingQ) {
-          content = card(<>
+          content = card(`q:${pendingQ.keyword}`, <>
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Fråga" : "Question"}</span>
               <span className="text-[10px] text-muted-foreground">{(kwQuestions || []).length} {isSv ? "kvar" : "left"}</span>
             </div>
             <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{pendingQ.question}</p>
+            {/* Every question justifies itself: the answer maps to a named demand in the ad. */}
+            <p className="text-[11px] text-muted-foreground">
+              {isSv ? <>Svaret täcker annonsens krav på <span className="font-medium text-foreground">{pendingQ.keyword}</span>.</> : <>Your answer covers the ad's demand for <span className="font-medium text-foreground">{pendingQ.keyword}</span>.</>}
+            </p>
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">{isSv ? "Kryssa det som stämmer, flera går bra" : "Tick what's true, several ok"}</p>
               {optionsFor(pendingQ).map(opt => (
@@ -1487,7 +1526,7 @@ export function InsightsPanel({
           </>);
         } else if (pIdx >= 0) {
           const p = placements![pIdx];
-          content = card(<>
+          content = card(`p:${pIdx}`, <>
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ordbyte" : "Word swap"}</span>
               <Badge variant="secondary" className="h-5 text-[9px]">{p.keyword}</Badge>
@@ -1501,12 +1540,12 @@ export function InsightsPanel({
           </>);
         } else if (nbIdx >= 0) {
           const nb = newBullets![nbIdx];
-          content = card(<>
+          content = card(`nb:${nbIdx}`, <>
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ny punkt, byggd på ditt svar" : "New bullet, built from your answer"}</span>
               <Badge variant="secondary" className="h-5 text-[9px]">{nb.keyword}</Badge>
             </div>
-            <p className="text-sm leading-relaxed">{nb.bullet}</p>
+            <p className="ai-ink text-sm leading-relaxed">{nb.bullet}</p>
             <div className="flex gap-2">
               <Button className="h-11 flex-1 text-sm" onClick={() => applyNewBullet(nb, nbIdx)}>{isSv ? "Lägg till" : "Add"}</Button>
               <Button variant="outline" className="h-11 text-sm" onClick={() => setDismissedNew(prev => new Set(prev).add(nbIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
@@ -1516,7 +1555,7 @@ export function InsightsPanel({
           const g = gaps[0];
           const r = ratingOf(g);
           const terms = g.supporting_terms_missing || [];
-          content = card(<>
+          content = card(`gap:${g.theme}`, <>
             <div className="flex items-center gap-1.5">
               {g.importance === "must" && <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">{isSv ? "Krav i annonsen" : "Required in the ad"}</span>}
               <span className="ml-auto flex items-center gap-0.5">{[1, 2, 3, 4, 5].map(n => <span key={n} className={`h-1.5 w-1.5 rounded-full ${n <= r ? (r >= 4 ? "bg-green-600" : r >= 2 ? "bg-warning" : "bg-destructive") : "bg-muted"}`} />)}</span>
@@ -1565,13 +1604,13 @@ export function InsightsPanel({
           </>);
         } else if (rfIdx >= 0) {
           const rf = reframes![rfIdx];
-          content = card(<>
+          content = card(`rf:${rfIdx}`, <>
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Omformulering" : "Reframe"}</span>
               <span className="text-[10px] text-muted-foreground">{rfLeft} {isSv ? "kvar" : "left"}</span>
             </div>
             <p className="text-[11px] leading-relaxed text-muted-foreground line-through">{rf.original}</p>
-            <p className="text-sm leading-relaxed">{rf.suggested}</p>
+            <p className="ai-ink text-sm leading-relaxed">{rf.suggested}</p>
             <p className="text-[11px] text-muted-foreground">{rf.reason}</p>
             <div className="flex gap-2">
               <Button className="h-11 flex-1 text-sm" onClick={() => {
@@ -1587,7 +1626,7 @@ export function InsightsPanel({
           // Proven via answers but invisible in the CV — a communication gap, not a
           // competence gap. The recruiter only sees the CV; get it in there.
           const g = themes.find(t => (t as any).lifted_by_evidence && ratingOf(t) >= 4 && !handledComm.has(t.theme))!;
-          content = card(<>
+          content = card(`comm:${g.theme}`, <>
             <span className="text-[10px] font-semibold uppercase tracking-wider text-green-700 dark:text-green-500">{isSv ? "Bevisat" : "Proven"}</span>
             <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{g.theme}</p>
             <p className="text-sm leading-relaxed text-muted-foreground">
@@ -1610,7 +1649,7 @@ export function InsightsPanel({
           const anyHandled = handledThemes.size > 0 || appliedReframes.size > 0;
           const curScore = computeMatchScore(themes) ?? (deepResult ? Math.round(deepResult.overall_score) : null);
           const showDelta = !anyHandled && curScore !== null && lastDelta !== null && lastDelta !== 0;
-          content = card(<>
+          content = card("done", <>
             {showDelta ? (
               <p className="font-serif text-4xl font-medium tabular-nums">
                 <span className="text-muted-foreground/50">{curScore! - lastDelta!}</span>
