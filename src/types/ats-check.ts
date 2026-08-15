@@ -38,6 +38,10 @@ export interface CompetenceTheme {
   evidence_note: string;
   supporting_terms_present: string[];
   supporting_terms_missing: string[];
+  /** Verbatim quote of the CV bullet that best evidences this theme (server-validated), or "". */
+  proof_bullet?: string;
+  /** The one ingredient that bullet lacks to convince: outcome, scope, none — or "" when no bullet. */
+  proof_gap?: "outcome" | "scope" | "none" | "";
 }
 
 export interface JobLanguageMatch {

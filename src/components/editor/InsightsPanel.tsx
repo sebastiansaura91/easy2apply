@@ -16,6 +16,8 @@ import { getRoleAdvice } from "@/lib/role-advice";
 import { computeMatchScore, biggestGap } from "@/lib/match-score";
 import { titleMatch } from "@/lib/title-match";
 import { parseYearsRequirement, yearsOfExperience } from "@/lib/experience-years";
+import { collectProxyTerms, isPedigreeTerm } from "@/lib/pedigree";
+import { sixSecondTest } from "@/lib/six-second";
 import { CVMeta } from "@/types/cv";
 import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 import {
@@ -436,7 +438,14 @@ export function InsightsPanel({
   const scanFails = deepResult ? [...deepResult.scanability_check, ...deepResult.parse_check].filter(c => c.status !== "pass") : [];
   // Recruiter lens: competence themes with supporting terms. missingKw = the union of
   // every genuinely-missing term (flat list kept as fallback + for the interview flow).
-  const themes = deepResult?.job_language_match?.competence_themes ?? [];
+  // Pedigree proxies (the ad's brand examples) are class labels, never keywords: they are
+  // filtered out of every keyword surface here, so frozen pre-classification analyses
+  // can't leak a brand into questions or placements.
+  const proxyTerms = collectProxyTerms(cv.__meta?.demandProfile);
+  const themes = (deepResult?.job_language_match?.competence_themes ?? []).map(t => ({
+    ...t,
+    supporting_terms_missing: (t.supporting_terms_missing || []).filter(p => !isPedigreeTerm(p, proxyTerms)),
+  }));
   // Hard tools/systems from the ad, matched deterministically against the CV text —
   // exact product names deserve exact matching, separate from competence judgment.
   const cvBlob = JSON.stringify([cv.profile, cv.skills, cv.experience, cv.certifications]).toLowerCase();
@@ -446,7 +455,7 @@ export function InsightsPanel({
     ...(deepResult?.job_language_match.missing_phrases ?? []),
     ...themes.flatMap(t => t.supporting_terms_missing || []),
     ...missingTools,
-  ].map(s => s.trim()).filter(Boolean)));
+  ].map(s => s.trim()).filter(Boolean))).filter(p => !isPedigreeTerm(p, proxyTerms));
   const unthemedKw = missingKw.filter(p => !themes.some(t => (t.supporting_terms_missing || []).includes(p)));
   const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
   const weakFeedback = (deepResult?.bullet_feedback ?? []).filter(b => b.score < 7);
@@ -467,9 +476,13 @@ export function InsightsPanel({
       const expanded = Array.from(new Set(phrases.flatMap(p => {
         const t = themeByName.get(p.toLowerCase().trim());
         return t?.supporting_terms_missing?.length ? [...t.supporting_terms_missing, p] : [p];
-      })));
+      }))).filter(p => !isPedigreeTerm(p, proxyTerms));
+      if (!expanded.length) {
+        toast({ title: isSv ? "Inget att placera" : "Nothing to place", description: isSv ? "Varumärken ur annonsen skrivs aldrig in i CV:t — bevisa kapaciteten i stället." : "Ad brand names never go into the CV — prove the capability instead." });
+        return;
+      }
       const { data, error } = await supabase.functions.invoke("place-keywords", {
-        body: { resume_content_json: cv, missing_phrases: expanded, locale: cvLanguage, evidence },
+        body: { resume_content_json: cv, missing_phrases: expanded, locale: cvLanguage, evidence, never_insert: Array.from(proxyTerms) },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -491,9 +504,10 @@ export function InsightsPanel({
     const weakThemes = themes
       .filter(t => t.evidence !== "strong" && !kwConfirm[t.theme] && !accepted.has(t.theme))
       .map(t => t.theme);
-    const unknowns = scope?.length
+    const unknowns = (scope?.length
       ? scope.filter(p => !kwConfirm[p])
-      : Array.from(new Set([...weakThemes, ...missingKw.filter(p => !kwConfirm[p])]));
+      : Array.from(new Set([...weakThemes, ...missingKw.filter(p => !kwConfirm[p])]))
+    ).filter(p => !isPedigreeTerm(p, proxyTerms));
     if (!unknowns.length) return;
 
     // Cross-CV reuse: a competence verified in ANY CV is never asked about again —
@@ -884,6 +898,31 @@ export function InsightsPanel({
                             {!accepted && (
                               <>
                                 <p className="text-[10px] leading-relaxed text-muted-foreground">{th.evidence_note}</p>
+                                {/* The recruiter's real question: which ONE sentence proves this theme? */}
+                                {th.proof_bullet ? (
+                                  <p className="rounded border-l-2 border-primary/40 bg-muted/40 px-2 py-1 text-[11px] leading-relaxed">
+                                    <span className="font-serif italic">"{th.proof_bullet}"</span>
+                                    {th.proof_gap === "outcome" && <span className="ml-1 text-[9px] font-semibold text-warning">{isSv ? "· saknar utfall" : "· lacks outcome"}</span>}
+                                    {th.proof_gap === "scope" && <span className="ml-1 text-[9px] font-semibold text-warning">{isSv ? "· saknar omfång" : "· lacks scope"}</span>}
+                                    {th.proof_gap === "none" && <span className="ml-1 text-[9px] font-semibold text-green-700 dark:text-green-500">{isSv ? "· bär temat" : "· carries the theme"}</span>}
+                                  </p>
+                                ) : (
+                                  <p className="text-[10px] text-muted-foreground">{isSv ? "Ingen mening i CV:t bär det här temat än." : "No sentence in the CV carries this theme yet."}</p>
+                                )}
+                                {/* Motsvarande-bridge: what the ad's pedigree examples actually mean. */}
+                                {(() => {
+                                  const dp = (cv.__meta?.demandProfile?.competence_themes || []).find(d => d.theme.toLowerCase().trim() === th.theme.toLowerCase().trim());
+                                  if (!dp?.proxy_terms?.length) return null;
+                                  return (
+                                    <div className="rounded-lg bg-muted/40 px-2 py-1.5 text-[10px] leading-relaxed">
+                                      <span className="text-muted-foreground">{isSv ? "Annonsen säger" : "The ad says"}: </span>
+                                      <span className="font-medium">{dp.proxy_terms.join(", ")} {isSv ? "eller motsvarande" : "or equivalent"}</span>
+                                      <span className="text-muted-foreground"> → {isSv ? "det betyder" : "meaning"}: </span>
+                                      <span className="font-medium">{dp.proxy_translation || (dp.supporting_terms || []).slice(0, 4).join(", ")}</span>
+                                      <span className="block text-muted-foreground">{isSv ? "Varumärket ska aldrig stå i CV:t — beviset ska." : "The brand never goes in the CV — the proof does."}</span>
+                                    </div>
+                                  );
+                                })()}
                                 {(th.supporting_terms_present || []).length > 0 && (
                                   <p className="text-[10px] text-green-700 dark:text-green-500">✓ {th.supporting_terms_present.join(" · ")}</p>
                                 )}
@@ -1195,6 +1234,51 @@ export function InsightsPanel({
                       </span>
                     )}
                   </p>
+                );
+              })()}
+              {/* Six-second pass: does the top third of page 1 show the must-themes?
+                  Deterministic, no model, no score impact — and the fix (reordering)
+                  is the most honest edit there is. */}
+              {(() => {
+                const six = sixSecondTest(cv, themes.length ? themes : (cv.__meta?.demandProfile?.competence_themes || []));
+                if (!six) return null;
+                return (
+                  <div className="mt-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {isSv ? "Sexsekunderstestet — det rekryteraren ser först" : "Six-second test — what the recruiter sees first"}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {six.themes.map(tc => (
+                        <span key={tc.theme} className={`rounded-full border px-2 py-0.5 text-[9px] font-medium ${tc.visible ? "border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-500" : "border-warning/40 bg-warning/10 text-warning"}`}>
+                          {tc.visible ? "✓" : "•"} {tc.theme}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      {isSv
+                        ? `${six.quantifiedTop} av ${six.topCount} punkter i toppen har siffror.`
+                        : `${six.quantifiedTop} of ${six.topCount} top bullets carry numbers.`}
+                    </p>
+                    {six.suggestion && onUpdateExperienceBullets && (
+                      <Button variant="outline" size="sm" className="mt-1.5 h-8 w-full text-[10px]" onClick={() => {
+                        const s = six.suggestion!;
+                        const exp = cv.experience[s.expIndex];
+                        if (!exp || exp.bullets[s.fromIndex] !== s.bullet) {
+                          toast({ title: isSv ? "Punkten har ändrats" : "That bullet has changed", variant: "destructive" });
+                          return;
+                        }
+                        onSnapshot?.(isSv ? "Omordning" : "Reorder");
+                        appliedSinceScanRef.current = true;
+                        const next = [...exp.bullets];
+                        next.splice(s.fromIndex, 1);
+                        next.unshift(s.bullet);
+                        onUpdateExperienceBullets(s.expIndex, next);
+                        toast({ title: isSv ? "Punkten flyttad överst" : "Bullet moved to the top" });
+                      }}>
+                        {isSv ? `Flytta upp beviset för "${six.suggestion.theme}"` : `Move the proof for "${six.suggestion.theme}" up`}
+                      </Button>
+                    )}
+                  </div>
                 );
               })()}
               {done && (

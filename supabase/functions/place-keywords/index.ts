@@ -53,7 +53,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { resume_content_json, missing_phrases, locale, evidence } = await req.json();
+    const { resume_content_json, missing_phrases, locale, evidence, never_insert } = await req.json();
     if (!resume_content_json || !Array.isArray(missing_phrases) || missing_phrases.length === 0) {
       return new Response(JSON.stringify({ error: "resume_content_json and missing_phrases are required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -107,6 +107,7 @@ STRICT RULES:
 - LANGUAGE PURITY: every revised bullet must be written entirely in ${lang}. When a keyword comes from a job ad in the other language, place its natural ${lang} equivalent instead (Swedish "serieförvärvare" → English "serial acquirer"; "ledningsgrupp" → "management team"; "dotterbolag" → "subsidiaries"). Inserting the ad's word verbatim into a bullet of the other language ("...integrating acquired dotterbolag") is ALWAYS wrong. Recruiters and scanners match translations — never mix two languages inside one bullet.
 - EMPLOYER-CONTEXT TERMS: some keywords describe the COMPANY, not the person ("serieförvärvare"/"serial acquirer", "PE-backed", "family-owned", industry labels). Place these only as environment context ("…within a serial acquirer" / "…i en serieförvärvarkoncern") — never as a role or trait of the candidate ("as a serial acquirer" would be false). If no bullet can carry that context naturally, omit the keyword.
 - PRESERVE FACTS: a swap must never replace concrete words (ownership, scope, responsibilities, numbers) with vaguer phrasing. "Owned commercial and offering responsibility" → "Demonstrated strong business ownership" destroys information and is FORBIDDEN.
+- PEDIGREE PROXIES: never insert the name of a company, consultancy or institution the candidate's CV does not already contain ("McKinsey", "BCG", "Big 4"), and never constructions like "McKinsey-style"/"BCG-liknande" — writing "Developed McKinsey-style business cases" is borrowed prestige a recruiter reads as gaming, and it is FORBIDDEN. Brand names in a job ad are proxies for a capability: place the capability evidence instead ("built the business case approved by the executive team"). Exception: a firm the CV or the candidate's evidence names as a REAL relationship (employer, client, partner program) may be stated factually.
 - NEVER paste a category label or trait phrase into a sentence ("...services, including Team Leadership & Development" is nonsense). Labels prove themselves through new evidence bullets, or not at all.
 - Output all text in ${lang}.
 Return via the keyword_placements tool.`;
@@ -275,6 +276,39 @@ Return via the keyword_placements tool.`;
       result.placements = result.placements.filter((p: any) => !introducesSwedish(p.original, p.revised));
       result.new_bullets = result.new_bullets.filter((nb: any) => !introducesSwedish(evidenceText, nb.bullet));
     }
+
+    // Pedigree guard: borrowed prestige never enters a CV. Three layers: the ad's own
+    // proxy terms (never_insert), "X-style" constructions on any proper noun, and
+    // brand-new proper nouns absent from the CV, the evidence and the keyword list.
+    const banned = (Array.isArray(never_insert) ? never_insert : [])
+      .map((t: unknown) => String(t || "").toLowerCase().trim()).filter((t: string) => t.length >= 2);
+    const STYLE_RE = /[A-ZÅÄÖ][\w&ÅÄÖåäö.]*[-‐‑](style|inspired|caliber|level|liknande|klass|anda|aktig\w*|mässig\w*)\b/;
+    const wordsOf = (s: string) => s.toLowerCase().split(/[^a-zåäö]+/).filter(Boolean);
+    const knownWords = new Set([
+      ...wordsOf(JSON.stringify(resume_content_json)),
+      ...wordsOf(evidenceText),
+      ...wordsOf(allPhrases.join(" ")),
+    ]);
+    const pedigreeViolation = (sentence: string, origWords: Set<string>) => {
+      const clean = String(sentence || "").replace(/\[[^\]]*\]/g, " "); // [FYLL I]/[FILL IN] placeholders
+      const low = clean.toLowerCase();
+      if (banned.some((b: string) => low.includes(b))) return true;
+      if (STYLE_RE.test(clean)) return true;
+      const toks = clean.split(/\s+/);
+      for (let i = 1; i < toks.length; i++) {
+        if (/[.:!?]$/.test(toks[i - 1])) continue; // sentence-initial capitals are fine
+        const t = toks[i].replace(/^[^A-Za-zÅÄÖåäö]+|[^A-Za-zÅÄÖåäö]+$/g, "");
+        if (!/^[A-ZÅÄÖ]/.test(t)) continue;
+        const subs = wordsOf(t);
+        if (!subs.length || subs.every(s => origWords.has(s))) continue;
+        if (subs.some(s => !knownWords.has(s))) return true;
+      }
+      return false;
+    };
+    const _pp = result.placements.length, _pn = result.new_bullets.length;
+    result.placements = result.placements.filter((p: any) => !pedigreeViolation(p.revised, new Set(wordsOf(p.original))));
+    result.new_bullets = result.new_bullets.filter((nb: any) => !pedigreeViolation(nb.bullet, new Set<string>()));
+    guardHits["pedigree_rejected"] = (_pp - result.placements.length) + (_pn - result.new_bullets.length);
 
     guardHits["placements_rejected"] = _pb - (result.placements || []).length;
     guardHits["new_bullets_rejected"] = _nb - (result.new_bullets || []).length;

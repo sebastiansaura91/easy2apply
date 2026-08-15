@@ -70,8 +70,15 @@ supporting terms (3–6 short terms, the employer's exact words).
 THEMES ARE COMPETENCES, NEVER EMPLOYMENT PEDIGREES. If the posting asks for background at a
 type of firm ("erfarenhet från management- eller strategikonsulting, exempelvis McKinsey"),
 the theme is the underlying CAPABILITY ("Strukturerat strategi- och analysarbete") with the
-pedigree as a supporting term. Candidates prove capabilities; they cannot retroactively
+pedigree as a proxy term. Candidates prove capabilities; they cannot retroactively
 change employers. Never name a theme "...bakgrund"/"...background".
+PEDIGREE EXAMPLES GO IN proxy_terms, NEVER IN supporting_terms. Firm names ("McKinsey",
+"Bain", "BCG"), firm classes ("MBB", "Big 4") and example schools/degrees given with
+"exempelvis"/"e.g."/"eller motsvarande" are proxies a CV must never echo: a candidate who
+never worked there cannot write the brand without looking dishonest. supporting_terms hold
+only capability words a CV could truthfully use. For a theme with proxy_terms, also set
+proxy_translation: max 12 words in the posting's language stating the capability the
+pedigree stands for (e.g. "strukturerade analyser, beslutsunderlag till ledning, högt tempo").
 
 ## KNOCKOUT REQUIREMENTS (the only real auto-rejectors)
 ONLY requirements the posting marks as ABSOLUTE: "krav:", "du måste", "ska ha", "förutsätter",
@@ -122,6 +129,8 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
                       theme: { type: "string" },
                       importance: { type: "string", enum: ["must", "nice"] },
                       supporting_terms: { type: "array", items: { type: "string" } },
+                      proxy_terms: { type: "array", items: { type: "string" }, description: "Pedigree examples from the posting (firm names, MBB, Big 4, example degrees under 'or equivalent'). Class labels, never CV keywords." },
+                      proxy_translation: { type: ["string", "null"], description: "What the pedigree examples stand for, max 12 words, in the posting's language. Null when proxy_terms is empty." },
                       canonical_id: { type: ["string", "null"], description: "Id from the candidate's registry this theme maps to, or null" },
                     },
                     required: ["theme", "importance", "supporting_terms"],
@@ -184,6 +193,20 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
             t.canonical_id = c.id;
             break;
           }
+        }
+      }
+    }
+
+    // Pedigree proxies are class labels, never CV keywords: if the model left a brand
+    // in supporting_terms anyway, move it to proxy_terms deterministically.
+    const BRAND_RE = /^(mc\s?kinsey|bain|bcg|boston consulting group|mbb|big\s?(?:4|four)|deloitte|kpmg|pwc|ey|ernst\s*&\s*young|accenture|kearney|oliver wyman|roland berger|capgemini)(\s*(&|and)\s*(co|company|partners)\w*)?$/i;
+    if (Array.isArray(result.competence_themes)) {
+      for (const t of result.competence_themes) {
+        const terms: string[] = Array.isArray(t.supporting_terms) ? t.supporting_terms : [];
+        const brands = terms.filter((s: string) => BRAND_RE.test(String(s || "").trim()));
+        if (brands.length) {
+          t.supporting_terms = terms.filter((s: string) => !BRAND_RE.test(String(s || "").trim()));
+          t.proxy_terms = Array.from(new Set([...(Array.isArray(t.proxy_terms) ? t.proxy_terms : []), ...brands]));
         }
       }
     }

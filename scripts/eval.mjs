@@ -105,6 +105,9 @@ Har du dessutom erfarenhet från en operativ linjeroll är det meriterande.`;
   check("ajp2: wish-framed examen is not a knockout", !ko2.some(k => /examen|degree/i.test(k)), JSON.stringify(ko2));
   check("ajp2: wish-framed konsulting is not a knockout", !ko2.some(k => /konsult|consult/i.test(k)), JSON.stringify(ko2));
   check("ajp2: no pedigree themes (bakgrund/background)", !(ja2.competence_themes || []).some(t => /bakgrund|background/i.test(t.theme)), JSON.stringify((ja2.competence_themes || []).map(t => t.theme)));
+  const BRAND = /\b(mckinsey|bain|bcg|mbb|big ?4)\b/i;
+  check("ajp2: brands never in supporting_terms", !(ja2.competence_themes || []).some(t => (t.supporting_terms || []).some(s => BRAND.test(s))), JSON.stringify((ja2.competence_themes || []).map(t => t.supporting_terms)));
+  check("ajp2: brands captured as proxy_terms", (ja2.competence_themes || []).some(t => (t.proxy_terms || []).some(p => BRAND.test(p))), JSON.stringify((ja2.competence_themes || []).map(t => t.proxy_terms)));
 
   // ── ats-check (twice: score stability) ──
   const body = { resume_content_json: CV, job_posting_text: AD, locale: "en", demand_profile: { competence_themes: ja.competence_themes, knockout_requirements: ja.knockout_requirements } };
@@ -116,6 +119,9 @@ Har du dessutom erfarenhet från en operativ linjeroll är det meriterande.`;
   check("ats: no trait-lead keywords", !mp.some(p => TRAIT_LEAD.test(p)), JSON.stringify(mp));
   check("ats: no >4-word keywords", !mp.some(p => p.split(/\s+/).length > 4), JSON.stringify(mp));
   check("ats: guards reported", !!a1._meta?.guards, JSON.stringify(a1._meta));
+  const normPB = s => s.toLowerCase().replace(/[-–—]/g, " ").replace(/\s+/g, " ").trim();
+  const cvBullets = CV.experience.flatMap(e => e.bullets).map(normPB);
+  check("ats: proof bullets quote the CV verbatim", (a1.job_language_match?.competence_themes || []).every(t => !t.proof_bullet || cvBullets.some(b => b.includes(normPB(t.proof_bullet)) || normPB(t.proof_bullet).includes(b))), JSON.stringify((a1.job_language_match?.competence_themes || []).map(t => t.proof_bullet)));
 
   // ── ats-check with evidence ledger: lifts allowed, capped at 4 without CV visibility ──
   const aev = await invoke("ats-check", { ...body, verified_evidence: [{
@@ -147,6 +153,16 @@ Har du dessutom erfarenhet från en operativ linjeroll är det meriterande.`;
   check("nb: no first person", !nbs.some(n => /jag/i.test(n.bullet) || /I/.test(n.bullet)), JSON.stringify(nbs.map(n => n.bullet)));
   check("nb: no semicolon mash", !nbs.some(n => /;/.test(n.bullet)), "");
   check("nb: max two coordinated clauses", !nbs.some(n => (n.bullet.match(/(och|and)/gi) || []).length >= 3), JSON.stringify(nbs.map(n => n.bullet)));
+
+  // ── place-keywords: pedigree guard (the McKinsey-style lesson) — brands from the ad,
+  //    even when the candidate's own answer mentions them, never enter the CV ──
+  const pk3 = await invoke("place-keywords", { resume_content_json: CV, missing_phrases: ["strategikonsulting", "business case"], locale: "en", never_insert: ["McKinsey", "Bain", "BCG", "MBB"], evidence: [{
+    keyword: "strategikonsulting",
+    answer: "Jag har inte jobbat på McKinsey men byggde business case och beslutsunderlag som ledningsgruppen fattade beslut på i tre bolag",
+    role: "Business Analyst · Corp AB",
+  }] });
+  const allPk3 = [...(pk3.placements || []).map(p => p.revised), ...(pk3.new_bullets || []).map(n => n.bullet)];
+  check("pk3: no brand names or X-style constructions", !allPk3.some(s => BRAND.test(s) || /[A-ZÅÄÖ][\w&ÅÄÖåäö.]*-(style|inspired|liknande|klass|anda)/.test(s)), JSON.stringify(allPk3));
 
   // ── verify-keywords ──
   const vk = await invoke("verify-keywords", { resume_content_json: CV, missing_phrases: ["prissättning", "transformation"], locale: "sv" });

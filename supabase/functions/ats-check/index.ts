@@ -63,7 +63,7 @@ HUMAN WRITING RULES for every piece of suggested text:
 const stripAiDashes = (v: unknown): unknown =>
   typeof v === "string" ? v.replace(/\s*—\s*/g, ", ")
     : Array.isArray(v) ? v.map(stripAiDashes)
-    : v && typeof v === "object" ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, k === "original" ? x : stripAiDashes(x)])) : v;
+    : v && typeof v === "object" ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, k === "original" || k === "proof_bullet" ? x : stripAiDashes(x)])) : v;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -102,7 +102,7 @@ serve(async (req) => {
       userPrompt += `## DEMAND PROFILE (ANCHOR — use EXACTLY these themes)\n`;
       userPrompt += `The employer's competence themes were already extracted. In job_language_match.competence_themes you MUST use these exact theme names and importance values — only judge the CV's evidence and supporting terms for each:\n`;
       for (const t of demand_profile.competence_themes) {
-        userPrompt += `- ${t.theme} (${t.importance})${t.supporting_terms?.length ? ` — supporting terms: ${t.supporting_terms.join(", ")}` : ""}\n`;
+        userPrompt += `- ${t.theme} (${t.importance})${t.supporting_terms?.length ? ` — supporting terms: ${t.supporting_terms.join(", ")}` : ""}${t.proxy_terms?.length ? ` — pedigree proxies (class labels, NEVER keywords, never missing terms): ${t.proxy_terms.join(", ")}` : ""}\n`;
       }
       userPrompt += `\n`;
     }
@@ -325,10 +325,19 @@ serve(async (req) => {
         "self starter", "team player", "lagspelare", "högt tempo", "eget driv",
       ]);
       const verbLed = /^(driva|leda|skapa|utveckla|bygga|säkerställa|arbeta|vara|drive|lead|create|develop|build|ensure|work)\b/;
+      // Pedigree proxies (the ad's brand examples) must never surface as keywords —
+      // from the demand profile when classified, plus a brand-regex fallback for
+      // profiles frozen before proxy classification existed.
+      const BRAND_RE = /^(mc\s?kinsey|bain|bcg|boston consulting group|mbb|big\s?(?:4|four)|deloitte|kpmg|pwc|ey|ernst\s*&\s*young|accenture|kearney|oliver wyman|roland berger|capgemini)(\s*(&|and)\s*(co|company|partners)\w*)?$/i;
+      const proxySet = new Set<string>();
+      for (const t of demand_profile?.competence_themes || []) {
+        for (const p of (t as any).proxy_terms || []) proxySet.add(normalize(String(p)));
+      }
       const keepPhrase = (p: string) => {
         if (isPresent(p)) return false;
         const n = normalize(p);
         if (!n || SOFT_TRAITS.has(n)) return false;
+        if (proxySet.has(n) || BRAND_RE.test(String(p).trim())) return false;
         // Trait phrases led by a qualifier adjective are self-description, not keywords.
         if (/^(strong|proven|excellent|solid|good|demonstrated|stark|starkt|god|gott|gedigen|dokumenterad|utm\u00e4rkt)\s/.test(n)) return false;
         if (verbLed.test(n)) return false;
@@ -341,6 +350,12 @@ serve(async (req) => {
       if (Array.isArray(result.job_language_match.competence_themes)) {
         for (const th of result.job_language_match.competence_themes) {
           if (Array.isArray(th?.supporting_terms_missing)) th.supporting_terms_missing = th.supporting_terms_missing.filter(keepPhrase);
+          // proof_bullet must quote a real CV sentence — anything else is a hallucination
+          // and is dropped rather than shown as "your" text.
+          if (typeof th?.proof_bullet === "string" && th.proof_bullet.trim()) {
+            const pb = normalize(th.proof_bullet);
+            if (pb.length < 10 || !cvText.includes(pb)) { th.proof_bullet = ""; th.proof_gap = ""; }
+          } else if (th) { th.proof_bullet = ""; th.proof_gap = ""; }
           // Clamp/derive the scorecard rating; keep evidence consistent with it.
           let r = Number(th?.rating);
           if (!Number.isFinite(r)) r = th?.evidence === "strong" ? 4 : th?.evidence === "missing" ? 1 : 3;
@@ -619,6 +634,14 @@ CV EVIDENCES each bucket. Keywords are only signals that support a bucket.
 - supporting_terms_present: the posting's terms for this theme that the CV already uses
   (in any language/form). supporting_terms_missing: the posting's terms that would
   reinforce this theme and are genuinely absent (subject to the matching rules below).
+- PEDIGREE PROXIES: brand/firm names and firm classes the posting uses as EXAMPLES
+  ("McKinsey", "MBB", "Big 4", example schools) are never supporting terms and never
+  missing keywords - a CV must not echo an employer it does not contain. Judge the
+  UNDERLYING capability instead; "or equivalent" instructs you to accept equivalent proof.
+- proof_bullet: quote VERBATIM the ONE existing CV bullet that best evidences this theme
+  (empty string if none does). proof_gap: the single ingredient that bullet lacks to
+  convince a recruiter: "outcome" (no measurable result), "scope" (no size/breadth), or
+  "none" (it already convinces). Empty string when proof_bullet is empty.
 - A theme with strong evidence but missing exact terms needs WORDING, not new content.
   A "must" theme with missing evidence is an honest gap — say so.
 - missing_phrases must be consistent with the themes: every missing phrase should belong
@@ -740,6 +763,8 @@ const RESULT_SCHEMA = {
               evidence_note: { type: "string", description: "One short sentence: where the CV evidences this (or that it doesn't)" },
               supporting_terms_present: { type: "array", items: { type: "string" } },
               supporting_terms_missing: { type: "array", items: { type: "string" } },
+              proof_bullet: { type: "string", description: "Verbatim quote of the one CV bullet that best evidences this theme, or empty string" },
+              proof_gap: { type: "string", enum: ["outcome", "scope", "none", ""], description: "What the proof bullet lacks: outcome, scope, none, or empty when no bullet" },
             },
             required: ["theme", "importance", "rating", "evidence", "evidence_note", "supporting_terms_present", "supporting_terms_missing"],
             additionalProperties: false,

@@ -92,7 +92,14 @@ export interface CVMeta {
    * always show the same themes).
    */
   demandProfile?: {
-    competence_themes?: { theme: string; importance: "must" | "nice"; supporting_terms: string[]; canonical_id?: string | null }[];
+    competence_themes?: {
+      theme: string; importance: "must" | "nice"; supporting_terms: string[];
+      /** Pedigree examples from the ad (firm names, MBB, Big 4) — class labels, never CV keywords. */
+      proxy_terms?: string[];
+      /** What the pedigree stands for, in the ad's language — powers the "motsvarande" bridge. */
+      proxy_translation?: string | null;
+      canonical_id?: string | null;
+    }[];
     knockout_requirements?: string[];
     /** Explicitly named products/technologies — exact-match keywords, separate from competence judgment. */
     tools_and_systems?: string[];
