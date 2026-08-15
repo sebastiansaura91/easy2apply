@@ -67,12 +67,21 @@ Derive them from the posting (e.g. "Controlling", "Transformation", "Commercial 
 Mark each "must" or "nice" by how the posting weights it (title + repeated emphasis +
 explicit requirements beat single mentions). For each theme list the posting's own
 supporting terms (3–6 short terms, the employer's exact words).
+THEMES ARE COMPETENCES, NEVER EMPLOYMENT PEDIGREES. If the posting asks for background at a
+type of firm ("erfarenhet från management- eller strategikonsulting, exempelvis McKinsey"),
+the theme is the underlying CAPABILITY ("Strukturerat strategi- och analysarbete") with the
+pedigree as a supporting term. Candidates prove capabilities; they cannot retroactively
+change employers. Never name a theme "...bakgrund"/"...background".
 
 ## KNOCKOUT REQUIREMENTS (the only real auto-rejectors)
-Extract binary hard requirements that application forms screen on: work authorization,
-location/relocation, required languages, mandatory certifications/licenses, non-negotiable
-years of experience or degree. Only list requirements the posting states as absolute.
-Empty array if none.
+ONLY requirements the posting marks as ABSOLUTE: "krav:", "du måste", "ska ha", "förutsätter",
+"required", "must have". Typical true knockouts: work authorization, location/relocation,
+required languages, mandatory certifications/licenses.
+WISH-FRAMING IS NEVER A KNOCKOUT: items under "vi tror att du har", "för att lyckas tror vi",
+"we believe you have", "din profil" are profile wishes - they belong in competence themes.
+"Eller motsvarande" / "or equivalent" also disqualifies an item from being a knockout.
+A degree or a consulting background under wish-framing is NOT a knockout.
+Empty array if none - most Swedish postings have none.
 
 ## TOOLS & SYSTEMS (exact-match keywords)
 List products, technologies, systems and certifications the posting NAMES explicitly (e.g. Salesforce, SAP, Power BI, SQL, PMP). Max 10, exact spelling from the posting. Generic words ("CRM system", "affärssystem") only when no product is named. Empty array if none.${Array.isArray(registry?.competences) && registry.competences.length ? `

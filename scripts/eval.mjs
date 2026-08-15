@@ -89,6 +89,23 @@ try {
   check("ajp: tools include Salesforce", (ja.tools_and_systems || []).some(t => /salesforce/i.test(t)), JSON.stringify(ja.tools_and_systems));
   check("ajp: model tracked", !!ja._meta?.model, ja._meta?.model || "missing");
 
+  // ── analyze-job-posting: wish-framed requirements must never become knockouts,
+  //    and pedigree asks must become capability themes (the Inrego lesson) ──
+  const AD2 = `Head of Business Transformation – Inrego
+Som Head of Business Transformation rapporterar du till VD och arbetar nära ledningsgruppen.
+Rollen kombinerar affärsutveckling, verksamhetsutveckling, projektledning och AI-driven transformation.
+För att lyckas i rollen tror vi att du har:
+* Akademisk examen, exempelvis inom industriell ekonomi, teknik, ekonomi eller motsvarande.
+* Några års erfarenhet från management- eller strategikonsulting (exempelvis McKinsey, Bain, BCG eller motsvarande).
+* Erfarenhet av att leda förändrings- eller transformationsprojekt.
+* Intresse för och kunskap inom AI, digitalisering och automation.
+Har du dessutom erfarenhet från en operativ linjeroll är det meriterande.`;
+  const ja2 = await invoke("analyze-job-posting", { job_posting_text: AD2 });
+  const ko2 = ja2.knockout_requirements || [];
+  check("ajp2: wish-framed examen is not a knockout", !ko2.some(k => /examen|degree/i.test(k)), JSON.stringify(ko2));
+  check("ajp2: wish-framed konsulting is not a knockout", !ko2.some(k => /konsult|consult/i.test(k)), JSON.stringify(ko2));
+  check("ajp2: no pedigree themes (bakgrund/background)", !(ja2.competence_themes || []).some(t => /bakgrund|background/i.test(t.theme)), JSON.stringify((ja2.competence_themes || []).map(t => t.theme)));
+
   // ── ats-check (twice: score stability) ──
   const body = { resume_content_json: CV, job_posting_text: AD, locale: "en", demand_profile: { competence_themes: ja.competence_themes, knockout_requirements: ja.knockout_requirements } };
   const a1 = await invoke("ats-check", body);
