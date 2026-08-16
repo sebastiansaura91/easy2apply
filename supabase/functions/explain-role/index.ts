@@ -38,6 +38,8 @@ REGLER:
 - Generera 4-6 bullet points
 - Använd "outcome-first"-struktur där möjligt: Resultat → Metod → Omfattning
 - Hitta ALDRIG PÅ specifika siffror, KPI:er eller resultat – använd [FYLL I] som platshållare
+- Hitta ALDRIG PÅ verktyg, system, teknologier, certifieringar, teamstorlekar, budgetar eller företagsnamn – bara det användaren själv angett i områden/kontext får bli konkret
+- Aldrig första person ("jag") – CV-punkter är subjektlösa
 - Var konservativ i ordval – använd "bidrog till", "stöttade", "deltog i" när rollens nivå är oklar
 - Om beslutsfattare: använd starkare verb som "ledde", "drev", "beslutade om"
 - Om utförare: använd "genomförde", "levererade", "ansvarade för"
@@ -50,6 +52,8 @@ RULES:
 - Generate 4-6 bullet points
 - Use "outcome-first" structure where possible: Result → Method → Scope
 - NEVER invent specific numbers, KPIs, or results – use [FILL IN] as placeholder
+- NEVER invent tools, systems, technologies, certifications, team sizes, budgets or company names – only what the user stated in areas/context may become concrete
+- Never first person ("I") – CV bullets are subjectless
 - Be conservative in wording – use "supported", "contributed to", "participated in" when role level is unclear
 - If decision-maker: use stronger verbs like "led", "drove", "decided on"
 - If executor: use "executed", "delivered", "was responsible for"
@@ -141,14 +145,45 @@ Generate 4-6 relevant CV bullets based on the above. Return as JSON array.`;
     let bullets: string[] = [];
 
     if (toolCall?.function?.arguments) {
-      const parsed = JSON.parse(toolCall.function.arguments);
-      bullets = parsed.bullets || [];
+      try {
+        const parsed = JSON.parse(toolCall.function.arguments);
+        bullets = Array.isArray(parsed.bullets) ? parsed.bullets : [];
+      } catch { bullets = []; }
     } else {
-      // Fallback: try parsing content as JSON
-      const content = result.choices?.[0]?.message?.content || "[]";
-      const cleaned = content.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
-      bullets = JSON.parse(cleaned);
+      // Fallback: try parsing content as JSON — guarded, a malformed reply is an
+      // empty result, never a 500 with internals.
+      try {
+        const content = result.choices?.[0]?.message?.content || "[]";
+        const cleaned = content.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        bullets = Array.isArray(parsed) ? parsed : [];
+      } catch { bullets = []; }
     }
+
+    // Deterministic fabrication guards: these bullets are built from a role title and
+    // checkboxes, with NO CV as ground truth — so nothing concrete the user didn't
+    // state may survive. Digits and proper nouns must come from the user's own input;
+    // placeholders ([FYLL I]/[FILL IN]) are exempt. First person is a model failure.
+    const userText = [jobTitle, company, ...(selectedAreas || []), ...Object.values(context || {})].map(v => String(v || "")).join(" ");
+    const noPh = (s: string) => s.replace(/\[[^\]]*\]/g, " ");
+    const userDigits = new Set(userText.match(/\d+(?:[.,]\d+)?/g) || []);
+    const userWords = new Set(noPh(userText).toLowerCase().split(/[^a-zåäöéü]+/).filter(Boolean));
+    const ok = (b: unknown): b is string => {
+      if (typeof b !== "string" || !b.trim() || b.length > 240) return false;
+      if (/\bjag\b/i.test(b) || /\bI\b/.test(b)) return false;
+      const clean = noPh(b);
+      if ((clean.match(/\d+(?:[.,]\d+)?/g) || []).some(d => !userDigits.has(d))) return false;
+      const toks = clean.split(/\s+/);
+      for (let i = 1; i < toks.length; i++) {
+        if (/[.:!?]$/.test(toks[i - 1])) continue;
+        const t = toks[i].replace(/^[^A-Za-zÅÄÖåäö]+|[^A-Za-zÅÄÖåäö]+$/g, "");
+        if (!/^[A-ZÅÄÖ]/.test(t)) continue;
+        const subs = t.toLowerCase().split(/[^a-zåäö]+/).filter(Boolean);
+        if (subs.length && subs.some(s => !userWords.has(s))) return false;
+      }
+      return true;
+    };
+    bullets = bullets.filter(ok).slice(0, 6);
 
     return new Response(JSON.stringify({ bullets }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

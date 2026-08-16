@@ -27,7 +27,7 @@ const REFINEMENT_PROMPTS_SV: Record<string, string> = {
   impact: `Gör denna CV-bullet mer impact-driven. Lyft scope, stakeholders, eller affärsnytta tydligare. Hitta INTE på mätetal – använd [FYLL I: t.ex. +X%] om de saknas. Svara BARA med den nya texten.`,
   verb: `Byt starterverbet i denna CV-bullet till ett starkare, mer distinkt verb. Välj bland: byggde, drev, införde, automatiserade, standardiserade, analyserade, förhandlade, lanserade, migrerade, förbättrade, säkrade, optimerade, etablerade, samordnade, formade, skalade. Svara BARA med den nya texten.`,
   metrics: `Lägg till realistiska platshållare för mätetal i denna CV-bullet. Använd formatet [FYLL I: t.ex. +X% / -Y% / SEK Z / timmar / NPS] på de ställen där mätetal vore naturliga. Svara BARA med den nya texten.`,
-  ats: `Gör denna CV-bullet mer ATS-keyword friendly. Infoga relevanta bransch-/rollspecifika nyckelord naturligt i texten. Hitta INTE på – behåll sanningen. Svara BARA med den nya texten.`,
+  ats: `Gör denna CV-bullet mer ATS-keyword friendly genom att OMFORMULERA med naturlig branschterminologi för det som redan står. Aldrig nya verktyg, teknologier, företagsnamn eller siffror – kapaciteten måste redan finnas i meningen. Svara BARA med den nya texten.`,
 };
 
 const REFINEMENT_PROMPTS_EN: Record<string, string> = {
@@ -36,7 +36,7 @@ const REFINEMENT_PROMPTS_EN: Record<string, string> = {
   impact: `Make this CV bullet more impact-driven. Highlight scope, stakeholders, or business value more clearly. Do NOT fabricate metrics – use [FILL IN: e.g. +X%] if missing. Reply with ONLY the new text.`,
   verb: `Replace the starting verb in this CV bullet with a stronger, more distinct verb. Choose from: built, drove, implemented, automated, standardized, analyzed, negotiated, launched, migrated, improved, secured, optimized, established, coordinated, shaped, scaled. Reply with ONLY the new text.`,
   metrics: `Add realistic metric placeholders to this CV bullet. Use format [FILL IN: e.g. +X% / -Y% / $Z / hours / NPS] where metrics would be natural. Reply with ONLY the new text.`,
-  ats: `Make this CV bullet more ATS-keyword friendly. Insert relevant industry/role-specific keywords naturally. Do NOT fabricate – keep it truthful. Reply with ONLY the new text.`,
+  ats: `Make this CV bullet more ATS-keyword friendly by REPHRASING what is already there in natural industry terminology. Never new tools, technologies, company names or numbers – the capability must already exist in the sentence. Reply with ONLY the new text.`,
 };
 
 // Distilled human-writing rules (from the "signs of AI writing" guide): suggested
@@ -132,6 +132,34 @@ serve(async (req) => {
     const improved = result.choices?.[0]?.message?.content?.trim()?.replace(/^["']|["']$/g, "");
 
     if (!improved) throw new Error("No response from AI");
+
+    // Deterministic fabrication guards (the place-keywords standard applied to a
+    // whole-bullet rewrite): no new digits, no new proper nouns, no ballooning.
+    // A rewrite that fails is REJECTED, never patched — honesty over output.
+    const noPh = (s: string) => s.replace(/\[[^\]]*\]/g, " ");
+    const digitsOf = (s: string) => new Set(noPh(s).match(/\d+(?:[.,]\d+)?/g) || []);
+    const wordsOf = (s: string) => new Set(noPh(s).toLowerCase().split(/[^a-zåäöéü]+/).filter(Boolean));
+    const knownWords = wordsOf(`${bullet} ${context?.jobTitle || ""} ${context?.company || ""}`);
+    const origDigits = digitsOf(bullet);
+    const hasNewDigits = [...digitsOf(improved)].some((d) => !origDigits.has(d));
+    const hasNewProperNoun = (() => {
+      const toks = noPh(improved).split(/\s+/);
+      for (let i = 1; i < toks.length; i++) {
+        if (/[.:!?]$/.test(toks[i - 1])) continue; // sentence-initial capitals are fine
+        const t = toks[i].replace(/^[^A-Za-zÅÄÖåäö]+|[^A-Za-zÅÄÖåäö]+$/g, "");
+        if (!/^[A-ZÅÄÖ]/.test(t)) continue;
+        const subs = t.toLowerCase().split(/[^a-zåäö]+/).filter(Boolean);
+        if (subs.length && subs.some((s) => !knownWords.has(s))) return true;
+      }
+      return false;
+    })();
+    if (hasNewDigits || hasNewProperNoun || improved.length > Math.max(240, bullet.length * 1.6)) {
+      return new Response(JSON.stringify({
+        error: lang === "en"
+          ? "The suggestion was stopped by the fact guard (new numbers or names). Try again."
+          : "Förslaget stoppades av faktaskyddet (nya siffror eller namn). Försök igen.",
+      }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     return new Response(JSON.stringify({ improved: stripAiDashes(improved) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

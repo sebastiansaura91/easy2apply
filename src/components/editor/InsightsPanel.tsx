@@ -233,7 +233,15 @@ export function InsightsPanel({
   // the case where the score is guaranteed not to have gotten worse.
   const appliedSinceScanRef = useRef(false);
 
+  // Live mirror for async persist decisions: a scan describes the document it was
+  // GIVEN. If the user edits while it runs, the result is still stored under the
+  // scanned signature (correct pairing), but the headline score is NOT written as
+  // the live document's current score.
+  const liveRef = useRef({ cv, jobText });
+  useEffect(() => { liveRef.current = { cv, jobText }; });
+
   const runDeep = async (opts?: { silent?: boolean }) => {
+    const requestSig = cvSignature; // the signature of the document this scan describes
     // Stability by construction: the model isn't perfectly deterministic even at
     // temperature 0, so if nothing changed since the stored analysis, reuse it.
     if (cv.__meta?.lastAtsResult?.hash === cvSignature && deepResult) {
@@ -301,9 +309,13 @@ export function InsightsPanel({
       }
       appliedSinceScanRef.current = false;
       setDeepResult(newResult);
-      onPersistScore?.(Math.round(newResult.overall_score), newResult.grade, newResult.subscores);
-      onPersistResult?.(cvSignature, newResult);
-      setAnalyzedSnapshot(cvSignature);
+      // Only stamp the headline score when the scanned document is still the live one.
+      const liveSig = cvScanSignature(liveRef.current.cv, liveRef.current.jobText);
+      if (liveSig === requestSig) {
+        onPersistScore?.(Math.round(newResult.overall_score), newResult.grade, newResult.subscores);
+      }
+      onPersistResult?.(requestSig, newResult);
+      setAnalyzedSnapshot(requestSig);
       setAnalyzedAt(new Date());
       if (prevScore !== null) {
         const delta = Math.round(newResult.overall_score - prevScore);
@@ -354,12 +366,20 @@ export function InsightsPanel({
     const skillsKw = ["skill", "kompeten", "färdighet", "keyword", "nyckelord", "tech stack", "teknik"];
     const expKw = ["bullet", "punkt", "experience", "erfarenhet", "role", "roll", "achievement", "resultat", "outcome", "metric", "mätbar", "quantif", "siffr"];
     const profileKw = ["profile", "profil", "summary", "sammanfattning", "headline", "rubrik", "objective"];
+    // The issue text often names the role it concerns — match against titles/companies
+    // instead of always hitting experience[0].
+    const expIdxFor = (): number => {
+      const hit = cv.experience.findIndex(e =>
+        (e.title && haystack.includes(e.title.toLowerCase())) ||
+        (e.company && haystack.includes(e.company.toLowerCase())));
+      return hit >= 0 ? hit : 0;
+    };
     if (skillsKw.some(k => haystack.includes(k))) return { target: "skills" };
     if (profileKw.some(k => haystack.includes(k))) return { target: "profile" };
-    if (expKw.some(k => haystack.includes(k)) && cv.experience.length > 0) return { target: "experience", targetIdx: 0 };
+    if (expKw.some(k => haystack.includes(k)) && cv.experience.length > 0) return { target: "experience", targetIdx: expIdxFor() };
     // Default: profile if exists, else first experience, else skills
     if (cv.profile || cv.experience.length === 0) return { target: "profile" };
-    return { target: "experience", targetIdx: 0 };
+    return { target: "experience", targetIdx: expIdxFor() };
   };
 
   const runAutoFix = async (issue: FirstScanIssue, issueIdx: number) => {
@@ -413,10 +433,15 @@ export function InsightsPanel({
     } else if (target === "skills") {
       // Grouped lines ("Category: a, b, c") stay as ONE entry — the research-backed
       // grouped-skills pattern; plain lines are split on commas as before.
+      // MERGE with the existing list — an AI suggestion must never erase the
+      // user's own skills (this used to replace the whole list).
       const newSkills = text.split("\n").map(clean).filter(Boolean).flatMap(line =>
         line.includes(":") ? [line] : line.split(",").map(s => s.trim()).filter(Boolean)
       );
-      if (newSkills.length > 0) onUpdateSkills?.(newSkills);
+      if (newSkills.length > 0) {
+        const seen = new Set(cv.skills.map(s => s.toLowerCase().trim()));
+        onUpdateSkills?.([...cv.skills, ...newSkills.filter(s => !seen.has(s.toLowerCase().trim()))]);
+      }
       onNavigateToSection?.("skills");
     }
     toast({ title: isSv ? "✅ Fix applicerad" : "✅ Fix applied" });

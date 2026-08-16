@@ -143,8 +143,12 @@ export function FixIssueWizard({
       onApplyToExperience(targetExpIdx, merged);
       onNavigateToSection?.("experience");
     } else if (targetSection === "skills") {
+      // MERGE with the existing list — a suggestion must never erase the user's
+      // own skills (this used to replace the whole list).
       const newSkills = text.split(/[,\n]/).map(s => s.trim()).filter(s => s.length > 0);
-      onApplyToSkills(newSkills);
+      const existing = cv.skills || [];
+      const seen = new Set(existing.map(s => s.toLowerCase().trim()));
+      onApplyToSkills([...existing, ...newSkills.filter(s => !seen.has(s.toLowerCase().trim()))]);
       onNavigateToSection?.("skills");
     }
 

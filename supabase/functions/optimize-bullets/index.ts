@@ -116,7 +116,8 @@ serve(async (req) => {
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
 
     if (!toolCall?.function?.arguments) {
-      console.error("No tool call in response:", JSON.stringify(aiData));
+      // Log SHAPE only — the raw response can echo CV text, which must never reach logs.
+      console.error("No tool call in response. finish_reason:", aiData.choices?.[0]?.finish_reason, "keys:", Object.keys(aiData.choices?.[0]?.message || {}).join(","));
       return new Response(JSON.stringify({ error: "AI did not return structured result" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

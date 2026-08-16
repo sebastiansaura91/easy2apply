@@ -67,23 +67,34 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
+// ── Fencing: the client supplies coaching config and chat history, and NONE of it may
+// steer the model's instructions. Client text is data. Strings are clamped and stripped
+// of control characters; chat roles are restricted to user/assistant (a client-supplied
+// "system" entry is dropped, never forwarded); caps bound the context size. ──
+const cleanStr = (v: unknown, max: number) =>
+  String(v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+const cleanList = (v: unknown, maxItems: number, maxLen: number): string[] =>
+  (Array.isArray(v) ? v : []).map((x) => cleanStr(x, maxLen)).filter(Boolean).slice(0, maxItems);
+const cleanMessages = (v: unknown, maxItems: number): { role: "user" | "assistant"; content: string }[] =>
+  (Array.isArray(v) ? v : [])
+    .filter((m: any) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+    .slice(-maxItems)
+    .map((m: any) => ({ role: m.role, content: m.content.slice(0, 2000) }));
+const cleanFacts = (v: unknown) => JSON.stringify(v && typeof v === "object" ? v : {}).slice(0, 1500);
+
 // ── Chat: extract facts & ask next question ──
 async function handleChat(body: any) {
-  const {
-    original_bullet,
-    role_title,
-    profile_id,
-    profile_label,
-    questions,
-    verified_facts,
-    messages,
-    system_language,
-  } = body;
+  const lang = body.system_language === "en" ? "en" : "sv";
+  const original_bullet = cleanStr(body.original_bullet, 400);
+  const role_title = cleanStr(body.role_title, 120);
+  const profile_label = cleanStr(body.profile_label, 120);
+  const questions = cleanList(body.questions, 6, 200);
+  const messages = cleanMessages(body.messages, 12);
+  const verified_facts = cleanFacts(body.verified_facts);
+  if (!original_bullet) return jsonResponse({ error: "original_bullet is required" }, 400);
 
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-
-  const lang = system_language === "en" ? "en" : "sv";
 
   const systemPrompt = lang === "sv"
     ? `Du är en senior CV-coach. Du hjälper användaren förbättra EN specifik bullet-point.
@@ -100,8 +111,8 @@ DIN UPPGIFT:
 TILLGÄNGLIGA FRÅGOR (ställ en i taget, max 4 totalt):
 ${questions.map((q: string, i: number) => `${i + 1}. ${q}`).join("\n")}
 
-REDAN BESVARADE FRÅGOR: ${messages.filter((m: any) => m.role === "assistant").length}
-REDAN KÄNDA FAKTA: ${JSON.stringify(verified_facts)}
+REDAN BESVARADE FRÅGOR: ${messages.filter((m) => m.role === "assistant").length}
+REDAN KÄNDA FAKTA: ${verified_facts}
 
 REGLER:
 - Ställ MAX 4 frågor totalt. Prioritera att fylla decision_purpose + method_tool + stakeholders + outcome.
@@ -123,8 +134,8 @@ YOUR TASK:
 AVAILABLE QUESTIONS (ask one at a time, max 4 total):
 ${questions.map((q: string, i: number) => `${i + 1}. ${q}`).join("\n")}
 
-QUESTIONS ALREADY ASKED: ${messages.filter((m: any) => m.role === "assistant").length}
-KNOWN FACTS: ${JSON.stringify(verified_facts)}
+QUESTIONS ALREADY ASKED: ${messages.filter((m) => m.role === "assistant").length}
+KNOWN FACTS: ${verified_facts}
 
 RULES:
 - Ask MAX 4 questions total. Prioritize filling decision_purpose + method_tool + stakeholders + outcome.
@@ -207,21 +218,17 @@ RULES:
 
 // ── Generate A/B/C suggestions ──
 async function handleSuggestions(body: any) {
-  const {
-    original_bullet,
-    role_title,
-    profile_id,
-    profile_label,
-    verified_facts,
-    rewrite_templates,
-    allowed_verbs,
-    system_language,
-  } = body;
+  const lang = body.system_language === "en" ? "en" : "sv";
+  const original_bullet = cleanStr(body.original_bullet, 400);
+  const role_title = cleanStr(body.role_title, 120);
+  const profile_label = cleanStr(body.profile_label, 120);
+  const rewrite_templates = cleanList(body.rewrite_templates, 6, 200);
+  const allowed_verbs = cleanList(body.allowed_verbs, 30, 40);
+  const verified_facts = cleanFacts(body.verified_facts);
+  if (!original_bullet) return jsonResponse({ error: "original_bullet is required" }, 400);
 
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-
-  const lang = system_language === "en" ? "en" : "sv";
   const placeholder = lang === "sv"
     ? "[FYLL I: ROI / besparing / marginal / godkännande / tid-till-beslut]"
     : "[FILL IN: ROI / savings / margin / approval / time-to-decision]";
@@ -232,7 +239,7 @@ async function handleSuggestions(body: any) {
 ORIGINAL BULLET: "${original_bullet}"
 ROLL: ${role_title || "Ej angiven"}
 PROFIL: ${profile_label}
-BEKRÄFTADE FAKTA: ${JSON.stringify(verified_facts)}
+BEKRÄFTADE FAKTA: ${verified_facts}
 
 MALLAR (inspiration, anpassa fritt):
 ${rewrite_templates.join("\n")}
@@ -251,7 +258,7 @@ REGLER:
 ORIGINAL BULLET: "${original_bullet}"
 ROLE: ${role_title || "Not specified"}
 PROFILE: ${profile_label}
-VERIFIED FACTS: ${JSON.stringify(verified_facts)}
+VERIFIED FACTS: ${verified_facts}
 
 TEMPLATES (inspiration, adapt freely):
 ${rewrite_templates.join("\n")}
