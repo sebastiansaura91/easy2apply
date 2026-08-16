@@ -19,6 +19,7 @@ import { parseYearsRequirement, yearsOfExperience } from "@/lib/experience-years
 import { collectProxyTerms, isPedigreeTerm } from "@/lib/pedigree";
 import { sixSecondTest } from "@/lib/six-second";
 import { adviseSkills } from "@/lib/skills-advisor";
+import { estimatePages, profileCoverage, shortenTargets } from "@/lib/readiness";
 import { CVMeta } from "@/types/cv";
 import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 import {
@@ -460,6 +461,101 @@ export function InsightsPanel({
   const unthemedKw = missingKw.filter(p => !themes.some(t => (t.supporting_terms_missing || []).includes(p)));
   const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
   const weakFeedback = (deepResult?.bullet_feedback ?? []).filter(b => b.score < 7);
+
+  // ── Färdigmodellen: EVERYTHING that can improve the CV becomes a queue card, and
+  // "done" means the queue is empty. The match score measures theme evidence; these
+  // deterministic checks gate "ready to send" — score and guidance must never
+  // disagree on screen again. ──
+  const six = sixSecondTest(cv, themes.length ? themes : (cv.__meta?.demandProfile?.competence_themes || []));
+  const skillsAdvice = onUpdateSkills ? adviseSkills(cv, cv.__meta?.demandProfile, cv.__meta?.verifiedEvidence) : null;
+  const skillsActionCount = skillsAdvice ? skillsAdvice.add.length + skillsAdvice.reword.length + skillsAdvice.trim.length : 0;
+  const acceptedChecks = new Set(cv.__meta?.acceptedChecks || []);
+  const acceptCheck = (id: string) => onUpdateMeta?.({ acceptedChecks: [...(cv.__meta?.acceptedChecks || []), id] });
+  const pageEst = estimatePages(cv);
+  const profMiss = profileCoverage(cv.profile, themes.filter(t => t.importance === "must").slice(0, 3)).filter(c => !c.mentioned);
+  const blankScope = cv.experience.slice(0, 2).filter(e => (e.bullets || []).some(b => b.trim()) && !(e.roleScope || "").trim());
+  interface ReadyCheck { id: string; kind: "issues" | "six" | "profile" | "scope" | "length" | "skills"; title: string; body: string; theme?: string; expIndex?: number }
+  const readiness: ReadyCheck[] = (!deepResult || !themes.length) ? [] : ([
+    ...(errorCount > 0 ? [{ id: "issues", kind: "issues" as const,
+      title: isSv ? `${errorCount} kritiska problem i dokumentet` : `${errorCount} critical document issues`,
+      body: isSv ? "Kritiska fel gallrar innan innehållet ens läses." : "Critical issues screen you out before the content is even read." }] : []),
+    ...(six ? six.themes.filter(t => !t.visible).map(t => ({ id: `six:${t.theme}`, kind: "six" as const, theme: t.theme,
+      title: isSv ? `Syns inte i toppen: ${t.theme}` : `Not visible up top: ${t.theme}`,
+      body: isSv ? "Rekryterarens första sekunder läser bara övre tredjedelen av sida 1: profilen och de tre första punkterna i senaste rollen." : "The recruiter's first seconds read only the top third of page 1: the profile and the latest role's first three bullets." })) : []),
+    ...profMiss.map(c => ({ id: `profile:${c.theme}`, kind: "profile" as const, theme: c.theme,
+      title: isSv ? `Profilen nämner inte: ${c.theme}` : `The profile doesn't mention: ${c.theme}`,
+      body: isSv ? "Profiltexten är rekryterarens första läsning och CV:ts bästa nyckelordsyta. Ett krav-tema som saknas där förlorar både skimmen och sökningen." : "The profile paragraph is the recruiter's first read and the CV's best keyword surface. A must theme absent there loses both the skim and the search." })),
+    ...blankScope.map(e => ({ id: `scope:${e.id}`, kind: "scope" as const, expIndex: cv.experience.indexOf(e),
+      title: isSv ? `Rollomfång saknas: ${e.title}` : `Role scope missing: ${e.title}`,
+      body: isSv ? "Mandat, P&L, team, geografi. En tom omfångsrad gör rollen mindre än den var." : "Mandate, P&L, team, geography. An empty scope line makes the role look smaller than it was." })),
+    ...(pageEst.pages > 2 ? [{ id: "length", kind: "length" as const,
+      title: isSv ? `CV:t är ~${pageEst.pages} sidor, sikta på 2` : `The CV runs ~${pageEst.pages} pages, aim for 2`,
+      body: isSv ? "Uppskattat från innehållsmängden. Sida 3 läses nästan aldrig, och allt viktigt trängs nedåt av allt som inte är det." : "Estimated from content volume. Page 3 is almost never read, and everything important gets pushed down by everything that isn't." }] : []),
+    ...(skillsActionCount > 0 ? [{ id: "skills", kind: "skills" as const,
+      title: isSv ? `Skills-sektionen: ${skillsActionCount} förslag` : `Skills section: ${skillsActionCount} suggestions`,
+      body: isSv ? "8–12 skills med annonsens exakta ord vinner både rekryterarens skim och sökningen." : "8–12 skills in the ad's exact words win both the recruiter's skim and the search." }] : []),
+  ] as ReadyCheck[]).filter(c => !acceptedChecks.has(c.id));
+  // The one honest reorder: move an existing proof bullet to the top of its role.
+  const moveProofUp = () => {
+    const s = six?.suggestion;
+    if (!s || !onUpdateExperienceBullets) return;
+    const exp = cv.experience[s.expIndex];
+    if (!exp || exp.bullets[s.fromIndex] !== s.bullet) {
+      toast({ title: isSv ? "Punkten har ändrats" : "That bullet has changed", variant: "destructive" });
+      return;
+    }
+    onSnapshot?.(isSv ? "Omordning" : "Reorder");
+    appliedSinceScanRef.current = true;
+    const next = [...exp.bullets];
+    next.splice(s.fromIndex, 1);
+    next.unshift(s.bullet);
+    onUpdateExperienceBullets(s.expIndex, next);
+    toast({ title: isSv ? "Punkten flyttad överst" : "Bullet moved to the top" });
+  };
+  // Skills advisor rows — shared by the queue card and the details sheet.
+  const skillsRows = () => skillsAdvice && (
+    <div className="space-y-1.5">
+      {skillsAdvice.add.map(a => (
+        <div key={a.term} className="flex items-center justify-between gap-2 text-xs">
+          <span>+ <span className="font-medium">{a.term}</span>{a.theme && <span className="text-muted-foreground"> · {a.theme}</span>}</span>
+          <Button variant="outline" size="sm" className="h-7 shrink-0 text-[10px]" onClick={() => {
+            onSnapshot?.(`Skill: ${a.term}`);
+            appliedSinceScanRef.current = true;
+            onUpdateSkills?.([...cv.skills, a.term]);
+          }}>{isSv ? "Lägg till" : "Add"}</Button>
+        </div>
+      ))}
+      {skillsAdvice.reword.map(r => (
+        <div key={r.from} className="flex items-center justify-between gap-2 text-xs">
+          <span><span className="text-muted-foreground line-through">{r.from}</span> → <span className="font-medium">{r.to}</span></span>
+          <Button variant="outline" size="sm" className="h-7 shrink-0 text-[10px]" onClick={() => {
+            onSnapshot?.(isSv ? "Skill-ordval" : "Skill wording");
+            appliedSinceScanRef.current = true;
+            onUpdateSkills?.(cv.skills.map(s => (s === r.from ? r.to : s)));
+          }}>{isSv ? "Byt till annonsens ord" : "Use the ad's word"}</Button>
+        </div>
+      ))}
+      {skillsAdvice.trim.map(t => (
+        <div key={t} className="flex items-center justify-between gap-2 text-xs">
+          <span className="text-muted-foreground">− {t} <span className="text-[10px]">({isSv ? "över taket, ej i annonsen" : "over the cap, not in the ad"})</span></span>
+          <Button variant="outline" size="sm" className="h-7 shrink-0 text-[10px]" onClick={() => {
+            onSnapshot?.(isSv ? "Skill borttagen" : "Skill removed");
+            appliedSinceScanRef.current = true;
+            onUpdateSkills?.(cv.skills.filter(s => s !== t));
+          }}>{isSv ? "Ta bort" : "Remove"}</Button>
+        </div>
+      ))}
+      {skillsAdvice.unproven.length > 0 && canFix && (
+        <div className="flex items-center justify-between gap-2 pt-0.5 text-xs">
+          <span className="text-muted-foreground">{isSv ? "Obevisat än:" : "Unproven yet:"} {skillsAdvice.unproven.map(u => u.term).join(", ")}</span>
+          <Button variant="ghost" size="sm" className="h-7 shrink-0 text-[10px]" disabled={loadingQ || placing}
+            onClick={() => fetchQuestions(skillsAdvice.unproven.map(u => u.term))}>
+            {isSv ? "Fråga mig" : "Ask me"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 
   // Evidence travels STRUCTURED (what kinds are true / the specifics / which role),
   // so the server can distill a proper CV bullet instead of quoting a mashed string.
@@ -967,65 +1063,17 @@ export function InsightsPanel({
                   words — Teamtailor has no auto-scoring, so the list optimizes for
                   recruiter skim and manual search. Adds are honesty-gated: only terms
                   the CV or verified answers already prove; the rest become questions. */}
-              {onUpdateSkills && (() => {
-                const advice = adviseSkills(cv, cv.__meta?.demandProfile, cv.__meta?.verifiedEvidence);
-                if (!advice) return null;
-                const hasContent = advice.add.length || advice.reword.length || advice.trim.length || advice.unproven.length;
-                if (!hasContent) return null;
-                const applySkills = (next: string[], label: string) => {
-                  onSnapshot?.(label);
-                  appliedSinceScanRef.current = true;
-                  onUpdateSkills(next.filter(Boolean));
-                };
-                return (
-                  <div className="surface-sheet space-y-1.5">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                      {isSv ? "Skills-sektionen" : "Skills section"} · {advice.current}/{advice.cap}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {isSv ? "8–12 är optimalt. Annonsens exakta ord vinner både rekryterarens skim och sökningen." : "8–12 is the sweet spot. The ad's exact words win both the recruiter's skim and the search."}
-                    </p>
-                    {advice.add.map(a => (
-                      <div key={a.term} className="flex items-center justify-between gap-2 text-xs">
-                        <span>+ <span className="font-medium">{a.term}</span>{a.theme && <span className="text-muted-foreground"> · {a.theme}</span>}</span>
-                        <Button variant="outline" size="sm" className="h-7 shrink-0 text-[10px]"
-                          onClick={() => applySkills([...cv.skills, a.term], isSv ? `Skill: ${a.term}` : `Skill: ${a.term}`)}>
-                          {isSv ? "Lägg till" : "Add"}
-                        </Button>
-                      </div>
-                    ))}
-                    {advice.reword.map(r => (
-                      <div key={r.from} className="flex items-center justify-between gap-2 text-xs">
-                        <span><span className="text-muted-foreground line-through">{r.from}</span> → <span className="font-medium">{r.to}</span></span>
-                        <Button variant="outline" size="sm" className="h-7 shrink-0 text-[10px]"
-                          onClick={() => applySkills(cv.skills.map(s => (s === r.from ? r.to : s)), isSv ? "Skill-ordval" : "Skill wording")}>
-                          {isSv ? "Byt till annonsens ord" : "Use the ad's word"}
-                        </Button>
-                      </div>
-                    ))}
-                    {advice.trim.map(t => (
-                      <div key={t} className="flex items-center justify-between gap-2 text-xs">
-                        <span className="text-muted-foreground">− {t} <span className="text-[10px]">({isSv ? "över taket, ej i annonsen" : "over the cap, not in the ad"})</span></span>
-                        <Button variant="outline" size="sm" className="h-7 shrink-0 text-[10px]"
-                          onClick={() => applySkills(cv.skills.filter(s => s !== t), isSv ? "Skill borttagen" : "Skill removed")}>
-                          {isSv ? "Ta bort" : "Remove"}
-                        </Button>
-                      </div>
-                    ))}
-                    {advice.unproven.length > 0 && canFix && (
-                      <div className="flex items-center justify-between gap-2 pt-0.5 text-xs">
-                        <span className="text-muted-foreground">
-                          {isSv ? "Obevisat än:" : "Unproven yet:"} {advice.unproven.map(u => u.term).join(", ")}
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-7 shrink-0 text-[10px]" disabled={loadingQ || placing}
-                          onClick={() => fetchQuestions(advice.unproven.map(u => u.term))}>
-                          {isSv ? "Fråga mig" : "Ask me"}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+              {skillsAdvice && (skillsActionCount > 0 || skillsAdvice.unproven.length > 0) && (
+                <div className="surface-sheet space-y-1.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    {isSv ? "Skills-sektionen" : "Skills section"} · {skillsAdvice.current}/{skillsAdvice.cap}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {isSv ? "8–12 är optimalt. Annonsens exakta ord vinner både rekryterarens skim och sökningen." : "8–12 is the sweet spot. The ad's exact words win both the recruiter's skim and the search."}
+                  </p>
+                  {skillsRows()}
+                </div>
+              )}
               {Object.values(kwConfirm).filter(v => v === "no").length > 0 && (
                 <p className="text-[10px] text-muted-foreground">
                   {isSv
@@ -1266,7 +1314,9 @@ export function InsightsPanel({
           const ratingOf = (t: typeof themes[number]) => Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
           const allGaps = themes.filter(t => ratingOf(t) < 4);
           const remaining = allGaps.filter(t => !accepted.has(t.theme)).length;
-          const done = remaining === 0;
+          // "Ready to send" means the WHOLE queue is empty — theme gaps AND the
+          // readiness checks. Score and guidance must never contradict on screen.
+          const done = remaining === 0 && readiness.length === 0;
           return (
             <>
               <div className={`font-serif text-4xl font-medium ${scoreColor(matchScore)}`}>{matchScore}</div>
@@ -1307,51 +1357,13 @@ export function InsightsPanel({
                   </p>
                 );
               })()}
-              {/* Six-second pass: does the top third of page 1 show the must-themes?
-                  Deterministic, no model, no score impact — and the fix (reordering)
-                  is the most honest edit there is. */}
-              {(() => {
-                const six = sixSecondTest(cv, themes.length ? themes : (cv.__meta?.demandProfile?.competence_themes || []));
-                if (!six) return null;
-                return (
-                  <div className="mt-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                      {isSv ? "Sexsekunderstestet — det rekryteraren ser först" : "Six-second test — what the recruiter sees first"}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {six.themes.map(tc => (
-                        <span key={tc.theme} className={`rounded-full border px-2 py-0.5 text-[9px] font-medium ${tc.visible ? "border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-500" : "border-warning/40 bg-warning/10 text-warning"}`}>
-                          {tc.visible ? "✓" : "•"} {tc.theme}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="mt-1 text-[10px] text-muted-foreground">
-                      {isSv
-                        ? `${six.quantifiedTop} av ${six.topCount} punkter i toppen har siffror.`
-                        : `${six.quantifiedTop} of ${six.topCount} top bullets carry numbers.`}
-                    </p>
-                    {six.suggestion && onUpdateExperienceBullets && (
-                      <Button variant="outline" size="sm" className="mt-1.5 h-8 w-full text-[10px]" onClick={() => {
-                        const s = six.suggestion!;
-                        const exp = cv.experience[s.expIndex];
-                        if (!exp || exp.bullets[s.fromIndex] !== s.bullet) {
-                          toast({ title: isSv ? "Punkten har ändrats" : "That bullet has changed", variant: "destructive" });
-                          return;
-                        }
-                        onSnapshot?.(isSv ? "Omordning" : "Reorder");
-                        appliedSinceScanRef.current = true;
-                        const next = [...exp.bullets];
-                        next.splice(s.fromIndex, 1);
-                        next.unshift(s.bullet);
-                        onUpdateExperienceBullets(s.expIndex, next);
-                        toast({ title: isSv ? "Punkten flyttad överst" : "Bullet moved to the top" });
-                      }}>
-                        {isSv ? `Flytta upp beviset för "${six.suggestion.theme}"` : `Move the proof for "${six.suggestion.theme}" up`}
-                      </Button>
-                    )}
-                  </div>
-                );
-              })()}
+              {/* Six-second status: one quiet line. The ACTIONS live as queue cards —
+                  the overview reports, the queue guides. */}
+              {six && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {isSv ? "Toppen visar" : "Top third shows"} {six.themes.filter(t => t.visible).length}/{six.themes.length} {isSv ? "krav-teman" : "must themes"} · {six.quantifiedTop}/{six.topCount} {isSv ? "punkter med siffror" : "bullets with numbers"}
+                </p>
+              )}
               {done && (
                 <div className="mx-auto mt-2 max-w-xs space-y-1.5 rounded-lg border border-green-600/30 bg-green-600/10 p-3">
                   {/* The one celebration in the whole app: a pen-stroke check, drawn once,
@@ -1486,7 +1498,7 @@ export function InsightsPanel({
           (kwQuestions || []).length +
           (placements || []).filter((_, i) => !appliedPlacements.has(i) && !dismissedPlacements.has(i)).length +
           (newBullets || []).filter((_, i) => !appliedNew.has(i) && !dismissedNew.has(i)).length +
-          gaps.length + rfLeft +
+          gaps.length + rfLeft + readiness.length +
           themes.filter(t => (t as any).lifted_by_evidence && ratingOf(t) >= 4 && !handledComm.has(t.theme)).length;
         const minsLeft = Math.max(1, Math.round(cardsLeft * 0.75));
         const trail = (trailTotal > 1 || cardsLeft > 0) ? (
@@ -1709,6 +1721,60 @@ export function InsightsPanel({
               <Button variant="outline" className="h-11 text-sm" onClick={() => setHandledComm(prev => new Set(prev).add(g.theme))}>{isSv ? "Senare" : "Later"}</Button>
             </div>
           </>);
+        } else if (readiness.length > 0) {
+          // Färdigmodellen as cards: document-level checks the score can't see —
+          // top-third visibility, profile coverage, empty fields, page budget, skills.
+          const rc = readiness[0];
+          const KIND_LABEL: Record<typeof rc.kind, [string, string]> = {
+            issues: ["Dokumentet", "Document"],
+            six: ["Sexsekunderstestet", "Six-second test"],
+            profile: ["Profiltexten", "Profile paragraph"],
+            scope: ["Rollomfång", "Role scope"],
+            length: ["Längden", "Length"],
+            skills: ["Skills-sektionen", "Skills section"],
+          };
+          const sixFix = rc.kind === "six" && six?.suggestion && six.suggestion.theme === rc.theme;
+          content = card(`ready:${rc.id}`, <>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? KIND_LABEL[rc.kind][0] : KIND_LABEL[rc.kind][1]}</span>
+            <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{rc.title}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{rc.body}</p>
+            {rc.kind === "skills" && skillsRows()}
+            {rc.kind === "length" && (
+              <ul className="list-disc pl-4 text-[11px] text-muted-foreground">
+                {shortenTargets(cv).map(t => <li key={t.label}>{t.label}</li>)}
+              </ul>
+            )}
+            {rc.kind === "profile" && rc.theme && (() => {
+              const dp = themes.find(t => t.theme === rc.theme);
+              const words = [...(dp?.supporting_terms_present || []), ...(dp?.supporting_terms_missing || [])].slice(0, 4);
+              return words.length ? (
+                <p className="text-[11px] text-muted-foreground">{isSv ? "Ord att väva in:" : "Words to weave in:"} <span className="font-medium text-foreground">{words.join(" · ")}</span></p>
+              ) : null;
+            })()}
+            <div className="flex gap-2">
+              {rc.kind === "issues" && (
+                <Button className="h-11 flex-1 text-sm" onClick={() => setShowDetails(true)}>{isSv ? "Visa problemen" : "Show the issues"}</Button>
+              )}
+              {sixFix && (
+                <Button className="h-11 flex-1 text-sm" onClick={moveProofUp}>{isSv ? "Flytta upp bevispunkten" : "Move the proof bullet up"}</Button>
+              )}
+              {rc.kind === "six" && !sixFix && (
+                <Button className="h-11 flex-1 text-sm" onClick={() => onNavigateToSection?.("experience")}>{isSv ? "Öppna erfarenheten" : "Open experience"}</Button>
+              )}
+              {rc.kind === "profile" && (
+                <Button className="h-11 flex-1 text-sm" onClick={() => onNavigateToSection?.("profile")}>{isSv ? "Öppna profilen" : "Open the profile"}</Button>
+              )}
+              {(rc.kind === "scope" || rc.kind === "length") && (
+                <Button className="h-11 flex-1 text-sm" onClick={() => onNavigateToSection?.("experience")}>{isSv ? "Öppna erfarenheten" : "Open experience"}</Button>
+              )}
+              {rc.kind === "skills" && (
+                <Button className="h-11 flex-1 text-sm" onClick={() => acceptCheck(rc.id)}>{isSv ? "Klart för nu" : "Done for now"}</Button>
+              )}
+              {rc.kind !== "skills" && onUpdateMeta && (
+                <Button variant="outline" className="h-11 text-sm" onClick={() => acceptCheck(rc.id)}>{isSv ? "Lämna som det är" : "Leave as is"}</Button>
+              )}
+            </div>
+          </>);
         } else {
           const anyHandled = handledThemes.size > 0 || appliedReframes.size > 0;
           const curScore = computeMatchScore(themes) ?? (deepResult ? Math.round(deepResult.overall_score) : null);
@@ -1726,20 +1792,15 @@ export function InsightsPanel({
             <p className="text-sm text-muted-foreground">
               {anyHandled
                 ? (isSv ? "Kör om analysen så ser du nya poängen." : "Re-run the analysis to see the new score.")
-                : (isSv ? "Alla gap är åtgärdade eller ärligt accepterade." : "Every gap is fixed or honestly accepted.")}
+                : (isSv ? "Nedladdningen ligger i rutan ovanför." : "The download lives in the box above.")}
             </p>
-            <div className="flex gap-2">
-              {anyHandled && (
-                <Button className="h-11 flex-1 text-sm" disabled={loading} onClick={() => { setHandledThemes(new Set()); runDeep(); }}>
-                  {loading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}{isSv ? "Uppdatera poängen" : "Update the score"}
-                </Button>
-              )}
-              {onDownload && (
-                <Button variant={anyHandled ? "outline" : "default"} className="h-11 flex-1 text-sm" onClick={onDownload}>
-                  {isSv ? "Ladda ner PDF" : "Download PDF"}
-                </Button>
-              )}
-            </div>
+            {/* Download lives ONLY in the "ready to send" box up top — one end state,
+                not two competing ones. */}
+            {anyHandled && (
+              <Button className="h-11 w-full text-sm" disabled={loading} onClick={() => { setHandledThemes(new Set()); runDeep(); }}>
+                {loading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}{isSv ? "Uppdatera poängen" : "Update the score"}
+              </Button>
+            )}
             {/* Skill inference, honesty preserved: the AI only proposes QUESTIONS about
                 what the CV implies but never states — you stay the gate. */}
             <button type="button" className="w-full text-center text-[11px] text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50"

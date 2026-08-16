@@ -106,6 +106,11 @@ export interface CVMeta {
   };
   /** Themes the user has consciously accepted as honest gaps — shown muted, never nagged. */
   acceptedGaps?: string[];
+  /**
+   * Readiness checks (Färdigmodellen) the user has consciously waived — prefixed ids
+   * like "six:Transformation", "profile:X", "scope:exp-1", "length", "skills".
+   */
+  acceptedChecks?: string[];
   /** The knockout-requirements card has been acknowledged — don't lead the queue with it again. */
   knockoutsAcked?: boolean;
   /** Honest answers to the ad's hard requirements — "no" means likely screen-out, said out loud. */
