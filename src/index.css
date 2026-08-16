@@ -55,6 +55,20 @@
 
     --surface-alt: 240 10% 97%;
 
+    /* Ink ramp (Geist structure: DISCRETE text tones, never opacity dimming).
+       Two working tones + two supporting; every pair checked against Background 1. */
+    --ink-secondary: 240 6% 34%;
+    --ink-tertiary: 240 5% 50%;
+    --ink-disabled: 240 5% 64%;
+    /* AI ink: the tone for not-yet-accepted suggested wording — a discrete step
+       between the archival blue and body ink, replacing the old alpha mix. */
+    --ink-ai: 233 35% 38%;
+    /* Background 2 (Geist): wells and insets differentiate by TONE, never shadow. */
+    --surface-2: 45 12% 95.5%;
+    /* Border ramp: default / hover / active-container (Geist 400-600 band). */
+    --border-hover: 240 8% 80%;
+    --border-active: 240 8% 72%;
+
     /* Motion tokens (transitions.dev scale): ONE easing, tiny pre-rest deltas,
        exits faster than entrances. Frequent actions stay ≤250ms; 500ms is reserved
        for the single rare celebration ("ready to send"). */
@@ -111,6 +125,15 @@
     --warning-foreground: 240 10% 8%;
 
     --surface-alt: 240 9% 11%;
+
+    /* Night ink ramp: never pure white; elevation by lighter tone, not shadow. */
+    --ink-secondary: 45 8% 70%;
+    --ink-tertiary: 45 5% 55%;
+    --ink-disabled: 45 5% 42%;
+    --ink-ai: 233 50% 78%;
+    --surface-2: 240 9% 12%;
+    --border-hover: 240 8% 26%;
+    --border-active: 240 8% 34%;
   }
 }
 
@@ -134,13 +157,17 @@
     letter-spacing: 0.005em;
   }
 
-  .tnum { font-variant-numeric: tabular-nums; }
+  .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+  /* Serif contract: Instrument Serif (single weight, display-only) appears ONLY in
+     display headings, the match-score numeral, and quoted material (proof bullets,
+     AI ink). Banned from buttons, inputs, form labels, nav, table headers, badges. */
 }
 
 @layer components {
   /* Materials (Geist-style): exactly two surfaces, defined once, never assembled ad hoc. */
   .surface-card { @apply rounded-2xl border border-border bg-card p-5 shadow-sm; }
-  .surface-sheet { @apply rounded-lg border border-border bg-muted/30 px-3 py-2; }
+  .surface-sheet { @apply rounded-lg border border-border bg-surface-2 px-3 py-2; }
 
   /* AI ink: suggested wording is typographically foreign — italic serif in the signature
      ink — until the user accepts it and it becomes ordinary body text in the CV. Honesty
@@ -148,7 +175,18 @@
   .ai-ink {
     font-family: 'Instrument Serif', Georgia, serif;
     font-style: italic;
-    color: hsl(var(--primary) / 0.9);
+    color: hsl(var(--ink-ai));
+  }
+
+  /* Reading regime (iA: 16px floor set by reading distance; Butterick: ~66ch measure,
+     120-145% leading). For text-heavy prose surfaces — never for dense UI chrome. */
+  .prose-reading {
+    font-size: 1rem;
+    line-height: 1.45;
+    max-width: 65ch;
+  }
+  @media (min-width: 1280px) {
+    .prose-reading { font-size: 1.0625rem; }
   }
 }
 

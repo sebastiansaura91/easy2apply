@@ -55,7 +55,7 @@ export function SectionNav({ sections, activeSection, onSelect, cv, cvLanguage =
 
   return (
     <nav className="py-4 px-3 space-y-0.5">
-      <p className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider px-2 mb-2">Sections</p>
+      <p className="text-[10px] font-semibold uppercase text-muted-foreground tracking-[0.08em] px-2 mb-2">Sections</p>
       {sections.map(s => {
         const meta = sectionMeta[s.type] || { icon: MoreHorizontal, label: s.type };
         const Icon = meta.icon;

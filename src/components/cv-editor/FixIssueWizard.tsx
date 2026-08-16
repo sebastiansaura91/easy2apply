@@ -211,7 +211,7 @@ export function FixIssueWizard({
           {/* Experience role selector */}
           {targetSection === "experience" && cv.experience.length > 0 && (
             <div className="space-y-1.5 pl-2">
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.08em]">
                 {isSv ? "Välj roll" : "Select role"}
               </p>
               {cv.experience.map((exp, i) => (
@@ -300,7 +300,7 @@ export function FixIssueWizard({
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-primary">
                   {isSv ? "Förslag" : "Suggestion"}
                 </span>
                 <Button variant="ghost" size="sm" className="h-5 text-[10px] gap-1" onClick={() => setIsEditing(!isEditing)}>

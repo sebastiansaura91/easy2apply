@@ -361,7 +361,7 @@ const Dashboard = () => {
             {/* The task that needs you most, GOV.UK task-list style. */}
             {nextStep && (
               <section className="rounded-xl border border-warning/50 p-5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Nästa steg" : "Next step"}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Nästa steg" : "Next step"}</p>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-medium">
@@ -390,7 +390,7 @@ const Dashboard = () => {
             ) : (
               STAGE_META.filter(s => pipeline[s.key].length > 0).map(s => (
                 <section key={s.key}>
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground tabular-nums">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
                     {s.label} · {pipeline[s.key].length}
                   </p>
                   <div className="space-y-2">{pipeline[s.key].map((r) => renderCard(r, "application"))}</div>
@@ -400,7 +400,7 @@ const Dashboard = () => {
             {pipeline.done.length > 0 && (
               <section>
                 <button type="button" onClick={() => setDoneOpen(o => !o)}
-                  className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground underline-offset-4 hover:underline tabular-nums">
+                  className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground underline-offset-4 hover:underline tabular-nums">
                   {isSv ? "Avslutade" : "Closed"} · {pipeline.done.length} {doneOpen ? "▴" : "▾"}
                 </button>
                 {doneOpen && <div className="space-y-2">{pipeline.done.map((r) => renderCard(r, "application"))}</div>}

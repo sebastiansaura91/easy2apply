@@ -18,6 +18,7 @@ import { titleMatch } from "@/lib/title-match";
 import { parseYearsRequirement, yearsOfExperience } from "@/lib/experience-years";
 import { collectProxyTerms, isPedigreeTerm } from "@/lib/pedigree";
 import { sixSecondTest } from "@/lib/six-second";
+import { adviseSkills } from "@/lib/skills-advisor";
 import { CVMeta } from "@/types/cv";
 import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 import {
@@ -790,7 +791,7 @@ export function InsightsPanel({
       {canFix && (
         autoFixPreview?.issueIdx === i ? (
           <div className="space-y-2 mt-1 rounded-md border border-primary/30 bg-background p-2">
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-primary flex items-center gap-1">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-primary flex items-center gap-1">
               {isSv ? "Förslag" : "Suggestion"} →{" "}
               {autoFixPreview.target === "profile" ? (isSv ? "Profil" : "Profile")
                 : autoFixPreview.target === "skills" ? (isSv ? "Kompetenser" : "Skills")
@@ -858,7 +859,7 @@ export function InsightsPanel({
                       : <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[9px] font-semibold text-destructive">{isSv ? "Saknar evidens" : "No evidence"}</span>;
                 return (
                   <>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       {themes.length > 0 ? (isSv ? "Kompetensområden rollen screenar på" : "Competence areas the role screens for") : (isSv ? "Saknade nyckelord" : "Missing keywords")}
                     </p>
                     <p className="text-[10px] text-muted-foreground">
@@ -962,6 +963,69 @@ export function InsightsPanel({
                   </>
                 );
               })()}
+              {/* Skills advisor: deterministic, zero AI. 8-12 skills in the ad's exact
+                  words — Teamtailor has no auto-scoring, so the list optimizes for
+                  recruiter skim and manual search. Adds are honesty-gated: only terms
+                  the CV or verified answers already prove; the rest become questions. */}
+              {onUpdateSkills && (() => {
+                const advice = adviseSkills(cv, cv.__meta?.demandProfile, cv.__meta?.verifiedEvidence);
+                if (!advice) return null;
+                const hasContent = advice.add.length || advice.reword.length || advice.trim.length || advice.unproven.length;
+                if (!hasContent) return null;
+                const applySkills = (next: string[], label: string) => {
+                  onSnapshot?.(label);
+                  appliedSinceScanRef.current = true;
+                  onUpdateSkills(next.filter(Boolean));
+                };
+                return (
+                  <div className="surface-sheet space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      {isSv ? "Skills-sektionen" : "Skills section"} · {advice.current}/{advice.cap}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {isSv ? "8–12 är optimalt. Annonsens exakta ord vinner både rekryterarens skim och sökningen." : "8–12 is the sweet spot. The ad's exact words win both the recruiter's skim and the search."}
+                    </p>
+                    {advice.add.map(a => (
+                      <div key={a.term} className="flex items-center justify-between gap-2 text-xs">
+                        <span>+ <span className="font-medium">{a.term}</span>{a.theme && <span className="text-muted-foreground"> · {a.theme}</span>}</span>
+                        <Button variant="outline" size="sm" className="h-7 shrink-0 text-[10px]"
+                          onClick={() => applySkills([...cv.skills, a.term], isSv ? `Skill: ${a.term}` : `Skill: ${a.term}`)}>
+                          {isSv ? "Lägg till" : "Add"}
+                        </Button>
+                      </div>
+                    ))}
+                    {advice.reword.map(r => (
+                      <div key={r.from} className="flex items-center justify-between gap-2 text-xs">
+                        <span><span className="text-muted-foreground line-through">{r.from}</span> → <span className="font-medium">{r.to}</span></span>
+                        <Button variant="outline" size="sm" className="h-7 shrink-0 text-[10px]"
+                          onClick={() => applySkills(cv.skills.map(s => (s === r.from ? r.to : s)), isSv ? "Skill-ordval" : "Skill wording")}>
+                          {isSv ? "Byt till annonsens ord" : "Use the ad's word"}
+                        </Button>
+                      </div>
+                    ))}
+                    {advice.trim.map(t => (
+                      <div key={t} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="text-muted-foreground">− {t} <span className="text-[10px]">({isSv ? "över taket, ej i annonsen" : "over the cap, not in the ad"})</span></span>
+                        <Button variant="outline" size="sm" className="h-7 shrink-0 text-[10px]"
+                          onClick={() => applySkills(cv.skills.filter(s => s !== t), isSv ? "Skill borttagen" : "Skill removed")}>
+                          {isSv ? "Ta bort" : "Remove"}
+                        </Button>
+                      </div>
+                    ))}
+                    {advice.unproven.length > 0 && canFix && (
+                      <div className="flex items-center justify-between gap-2 pt-0.5 text-xs">
+                        <span className="text-muted-foreground">
+                          {isSv ? "Obevisat än:" : "Unproven yet:"} {advice.unproven.map(u => u.term).join(", ")}
+                        </span>
+                        <Button variant="ghost" size="sm" className="h-7 shrink-0 text-[10px]" disabled={loadingQ || placing}
+                          onClick={() => fetchQuestions(advice.unproven.map(u => u.term))}>
+                          {isSv ? "Fråga mig" : "Ask me"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {Object.values(kwConfirm).filter(v => v === "no").length > 0 && (
                 <p className="text-[10px] text-muted-foreground">
                   {isSv
@@ -992,7 +1056,7 @@ export function InsightsPanel({
               })()}
               {kwQuestions && kwQuestions.length > 0 && (
                 <div className="space-y-2 pt-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                     {isSv ? "Har du detta? Svara kort — dina svar blir underlaget." : "Do you have this? Answer briefly — your answers become the evidence."}
                   </p>
                   {kwQuestions.map(q => (
@@ -1067,13 +1131,13 @@ export function InsightsPanel({
           )}
           {genericKw.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Generiska fraser att byta ut" : "Generic phrases to replace"}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Generiska fraser att byta ut" : "Generic phrases to replace"}</p>
               <div className="flex flex-wrap gap-1">{genericKw.map(p => <Badge key={p} variant="outline" className="text-[9px] h-5">{p}</Badge>)}</div>
             </div>
           )}
           {adTools.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Verktyg & system i annonsen" : "Tools & systems in the ad"}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Verktyg & system i annonsen" : "Tools & systems in the ad"}</p>
               <div className="flex flex-wrap gap-1">
                 {adTools.map(t => (
                   <Badge key={t.tool} variant="outline" className={`h-5 text-[9px] ${t.ok ? "border-green-600/50 text-green-700 dark:text-green-500" : "border-warning/60 text-warning"}`}>
@@ -1251,7 +1315,7 @@ export function InsightsPanel({
                 if (!six) return null;
                 return (
                   <div className="mt-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                       {isSv ? "Sexsekunderstestet — det rekryteraren ser först" : "Six-second test — what the recruiter sees first"}
                     </p>
                     <div className="mt-1 flex flex-wrap gap-1">
@@ -1338,7 +1402,7 @@ export function InsightsPanel({
         {/* What changed since the previous scan */}
         {sinceLast && (
           <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-left">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               {isSv ? "Sedan förra analysen" : "Since last scan"}
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -1496,7 +1560,7 @@ export function InsightsPanel({
         } else if (pendingQ) {
           content = card(`q:${pendingQ.keyword}`, <>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Fråga" : "Question"}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Fråga" : "Question"}</span>
               <span className="text-[10px] text-muted-foreground">{(kwQuestions || []).length} {isSv ? "kvar" : "left"}</span>
             </div>
             <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{pendingQ.question}</p>
@@ -1528,7 +1592,7 @@ export function InsightsPanel({
           const p = placements![pIdx];
           content = card(`p:${pIdx}`, <>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ordbyte" : "Word swap"}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Ordbyte" : "Word swap"}</span>
               <Badge variant="secondary" className="h-5 text-[9px]">{p.keyword}</Badge>
             </div>
             <p className="text-lg font-semibold leading-snug">{isSv ? "Byt några ord i en punkt:" : "Swap a few words in one bullet:"}</p>
@@ -1542,7 +1606,7 @@ export function InsightsPanel({
           const nb = newBullets![nbIdx];
           content = card(`nb:${nbIdx}`, <>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Ny punkt, byggd på ditt svar" : "New bullet, built from your answer"}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Ny punkt, byggd på ditt svar" : "New bullet, built from your answer"}</span>
               <Badge variant="secondary" className="h-5 text-[9px]">{nb.keyword}</Badge>
             </div>
             <p className="ai-ink text-sm leading-relaxed">{nb.bullet}</p>
@@ -1606,7 +1670,7 @@ export function InsightsPanel({
           const rf = reframes![rfIdx];
           content = card(`rf:${rfIdx}`, <>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Omformulering" : "Reframe"}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Omformulering" : "Reframe"}</span>
               <span className="text-[10px] text-muted-foreground">{rfLeft} {isSv ? "kvar" : "left"}</span>
             </div>
             <p className="text-[11px] leading-relaxed text-muted-foreground line-through">{rf.original}</p>
@@ -1627,7 +1691,7 @@ export function InsightsPanel({
           // competence gap. The recruiter only sees the CV; get it in there.
           const g = themes.find(t => (t as any).lifted_by_evidence && ratingOf(t) >= 4 && !handledComm.has(t.theme))!;
           content = card(`comm:${g.theme}`, <>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-green-700 dark:text-green-500">{isSv ? "Bevisat" : "Proven"}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-green-700 dark:text-green-500">{isSv ? "Bevisat" : "Proven"}</span>
             <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{g.theme}</p>
             <p className="text-sm leading-relaxed text-muted-foreground">
               {isSv ? "Styrkt via dina svar, men CV:t visar det inte än. Rekryteraren ser bara CV:t." : "Verified through your answers, but the CV doesn't show it yet. The recruiter only sees the CV."}
@@ -1697,7 +1761,7 @@ export function InsightsPanel({
       <div className={themes.length > 0 && !showDetails ? "hidden" : "space-y-4"}>
       {/* ── What to fix: ATS buckets ── */}
       <div className="space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           {isSv ? "Vad du bör åtgärda" : "What to fix"}
         </p>
         {buckets.map(b => (

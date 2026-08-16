@@ -18,7 +18,18 @@ export default {
         serif: ["Instrument Serif", "Georgia", "serif"],
       },
       colors: {
-        border: "hsl(var(--border))",
+        border: {
+          DEFAULT: "hsl(var(--border))",
+          hover: "hsl(var(--border-hover))",
+          active: "hsl(var(--border-active))",
+        },
+        ink: {
+          secondary: "hsl(var(--ink-secondary))",
+          tertiary: "hsl(var(--ink-tertiary))",
+          disabled: "hsl(var(--ink-disabled))",
+          ai: "hsl(var(--ink-ai))",
+        },
+        "surface-2": "hsl(var(--surface-2))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",

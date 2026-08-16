@@ -440,7 +440,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
                     <>
                       <p className="text-sm">{advice.focus[isSv ? "sv" : "en"]}</p>
                       <div className="space-y-1.5">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{isSv ? "Lyft fram" : "Lead with"}</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Lyft fram" : "Lead with"}</p>
                         <div className="flex flex-wrap gap-1.5">{advice.emphasize[isSv ? "sv" : "en"].slice(0, 6).map((e) => <Badge key={e} variant="secondary" className="text-[10px]">{e}</Badge>)}</div>
                       </div>
                     </>

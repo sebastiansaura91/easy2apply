@@ -152,7 +152,7 @@ export function SummaryKitDialog({ open, onOpenChange, cv, cvLanguage, onApply }
 
           {draft !== null && (
             <div className="space-y-1.5 rounded-lg border border-primary/30 bg-primary/5 p-3">
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-primary">{isSv ? "Utkast" : "Draft"}</label>
+              <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-primary">{isSv ? "Utkast" : "Draft"}</label>
               <Textarea rows={5} value={draft} onChange={(e) => setDraft(e.target.value)} className="text-sm bg-background" />
               <p className="text-[10px] text-muted-foreground">{isSv ? "Redigera fritt innan du använder det." : "Edit freely before using it."}</p>
             </div>
