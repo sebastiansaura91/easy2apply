@@ -491,8 +491,12 @@ export function InsightsPanel({
     ...(pageEst.pages > 2 ? [{ id: "length", kind: "length" as const,
       title: isSv ? `CV:t är ~${pageEst.pages} sidor, sikta på 2` : `The CV runs ~${pageEst.pages} pages, aim for 2`,
       body: isSv ? "Uppskattat från innehållsmängden. Sida 3 läses nästan aldrig, och allt viktigt trängs nedåt av allt som inte är det." : "Estimated from content volume. Page 3 is almost never read, and everything important gets pushed down by everything that isn't." }] : []),
-    ...(skillsActionCount > 0 ? [{ id: "skills", kind: "skills" as const,
-      title: isSv ? `Skills-sektionen: ${skillsActionCount} förslag` : `Skills section: ${skillsActionCount} suggestions`,
+    ...(skillsAdvice && (skillsActionCount > 0 || skillsAdvice.status !== "ok") ? [{ id: "skills", kind: "skills" as const,
+      title: skillsAdvice.status === "few"
+        ? (isSv ? `För få skills: ${skillsAdvice.current} av minst ${skillsAdvice.floor}` : `Too few skills: ${skillsAdvice.current} of at least ${skillsAdvice.floor}`)
+        : skillsAdvice.status === "many"
+          ? (isSv ? `För många skills: ${skillsAdvice.current}, max ${skillsAdvice.cap}` : `Too many skills: ${skillsAdvice.current}, cap ${skillsAdvice.cap}`)
+          : (isSv ? `Skills-sektionen: ${skillsActionCount} förslag` : `Skills section: ${skillsActionCount} suggestions`),
       body: isSv ? "8–12 skills med annonsens exakta ord vinner både rekryterarens skim och sökningen." : "8–12 skills in the ad's exact words win both the recruiter's skim and the search." }] : []),
   ] as ReadyCheck[]).filter(c => !acceptedChecks.has(c.id));
   // The one honest reorder: move an existing proof bullet to the top of its role.
@@ -515,6 +519,22 @@ export function InsightsPanel({
   // Skills advisor rows — shared by the queue card and the details sheet.
   const skillsRows = () => skillsAdvice && (
     <div className="space-y-1.5">
+      {/* The COUNT is its own verdict: 8-12 is the band, and the advisor says so
+          out loud instead of only listing edits. */}
+      {skillsAdvice.status === "few" && (
+        <p className="text-[11px] font-medium text-warning">
+          {isSv
+            ? `${skillsAdvice.current} skills är under golvet på ${skillsAdvice.floor}.${skillsAdvice.deficit > 0 ? ` Även med alla tillägg nedan fattas ${skillsAdvice.deficit}, svara på frågorna så fler kan läggas till ärligt.` : " Tilläggen nedan tar dig över golvet."}`
+            : `${skillsAdvice.current} skills is under the floor of ${skillsAdvice.floor}.${skillsAdvice.deficit > 0 ? ` Even with every addition below you're ${skillsAdvice.deficit} short, answer the questions so more can be added honestly.` : " The additions below get you over the floor."}`}
+        </p>
+      )}
+      {skillsAdvice.status === "many" && (
+        <p className="text-[11px] font-medium text-warning">
+          {isSv
+            ? `${skillsAdvice.current} skills är över taket på ${skillsAdvice.cap}. Allt över läses som utfyllnad, ta bort raderna nedan.`
+            : `${skillsAdvice.current} skills is over the cap of ${skillsAdvice.cap}. Everything above it reads as padding, remove the rows below.`}
+        </p>
+      )}
       {skillsAdvice.add.map(a => (
         <div key={a.term} className="flex items-center justify-between gap-2 text-xs">
           <span>+ <span className="font-medium">{a.term}</span>{a.theme && <span className="text-muted-foreground"> · {a.theme}</span>}</span>
@@ -1063,10 +1083,10 @@ export function InsightsPanel({
                   words — Teamtailor has no auto-scoring, so the list optimizes for
                   recruiter skim and manual search. Adds are honesty-gated: only terms
                   the CV or verified answers already prove; the rest become questions. */}
-              {skillsAdvice && (skillsActionCount > 0 || skillsAdvice.unproven.length > 0) && (
+              {skillsAdvice && (skillsActionCount > 0 || skillsAdvice.unproven.length > 0 || skillsAdvice.status !== "ok") && (
                 <div className="surface-sheet space-y-1.5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    {isSv ? "Skills-sektionen" : "Skills section"} · {skillsAdvice.current}/{skillsAdvice.cap}
+                    {isSv ? "Skills-sektionen" : "Skills section"} · {skillsAdvice.current} {isSv ? "av" : "of"} {skillsAdvice.floor}–{skillsAdvice.cap}
                   </p>
                   <p className="text-[10px] text-muted-foreground">
                     {isSv ? "8–12 är optimalt. Annonsens exakta ord vinner både rekryterarens skim och sökningen." : "8–12 is the sweet spot. The ad's exact words win both the recruiter's skim and the search."}

@@ -63,6 +63,25 @@ describe("adviseSkills", () => {
     expect(a.trim).not.toContain("Salesforce");
   });
 
+  it("calls out a too-short list with the remaining deficit", () => {
+    const a = adviseSkills(cvWith(["Prissättning", "Excel"]), profile, [])!;
+    expect(a.status).toBe("few");
+    expect(a.add.length).toBe(0);
+    expect(a.deficit).toBe(6);
+  });
+
+  it("trims nice-theme matches before must-theme ones when everything is ad-relevant", () => {
+    const skills = [
+      "förändringsledning", "transformationsprojekt", "processautomatisering", "digitalisering", "Salesforce",
+      "Affärsutveckling nordics", "Affärsutveckling b2b", "Affärsutveckling b2c", "Affärsutveckling saas",
+      "Affärsutveckling retail", "Affärsutveckling energi", "Affärsutveckling industri", "Affärsutveckling bygg",
+    ];
+    const a = adviseSkills(cvWith(skills), profile, [])!;
+    expect(a.status).toBe("many");
+    expect(a.trim.length).toBe(1);
+    expect(a.trim[0]).toMatch(/Affärsutveckling/);
+  });
+
   it("never lists a term and its synonym among additions", () => {
     const cv = cvWith(["Digital transformation"], ["Drev digitalisering och processautomatisering med mätbar effekt"]);
     const a = adviseSkills(cv, profile, [])!;

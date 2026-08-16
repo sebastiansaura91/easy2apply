@@ -25,10 +25,16 @@ export interface SkillsAdvice {
   /** Least ad-relevant current skills beyond the cap — candidates for the character budget. */
   trim: string[];
   cap: number;
+  floor: number;
   current: number;
+  /** Band verdict on the COUNT itself: under 8 = "few", over 12 = "many". */
+  status: "few" | "ok" | "many";
+  /** How many entries short of the floor the list stays even after every proven add. */
+  deficit: number;
 }
 
 const CAP = 12;
+const FLOOR = 8;
 
 const norm = (s: string) => s.toLowerCase().replace(/[-–—]/g, " ").replace(/\s+/g, " ").trim();
 const stem = (s: string) => (s.length >= 6 ? s.replace(/(erna|arna|orna|en|et|er|ar|or|s)$/i, "") : s);
@@ -117,21 +123,32 @@ export function adviseSkills(
     if (target && !inSkills(norm(target.term))) reword.push({ from: skills[i], to: target.term });
   }
 
-  // Over the cap: keep everything the ad asks for; the rest are trim candidates,
-  // least-recently-listed last (end of list goes first).
+  // Over the cap: trim in the order a recruiter would — ad-irrelevant skills first,
+  // then nice-theme matches; must-theme matches and named tools are never trimmed.
   const trim: string[] = [];
-  if (skills.length > CAP) {
-    const relevant = (s: string, i: number) => {
+  const overflow = skills.length - CAP;
+  if (overflow > 0) {
+    const rankOf = (i: number): number => {
       const n = skillsNorm[i];
       const g = groupOf(n);
-      return targets.some(t => {
+      let best = 0;
+      for (const t of targets) {
         const tn = norm(t.term);
-        return tn === n || tn.includes(n) || n.includes(tn) || (g >= 0 && groupOf(tn) === g);
-      });
+        const hit = tn === n || tn.includes(n) || n.includes(tn) || (g >= 0 && groupOf(tn) === g);
+        if (!hit) continue;
+        const th = themes.find(x => x.theme === t.theme);
+        best = Math.max(best, !t.theme || th?.importance === "must" ? 2 : 1);
+      }
+      return best;
     };
-    const candidates = skills.filter((s, i) => !relevant(s, i));
-    trim.push(...candidates.slice(-(skills.length - CAP)));
+    const irrelevant = skills.filter((_, i) => rankOf(i) === 0);
+    const niceOnly = skills.filter((_, i) => rankOf(i) === 1);
+    trim.push(...irrelevant.slice(-Math.min(overflow, irrelevant.length)));
+    if (trim.length < overflow) trim.push(...niceOnly.slice(-(overflow - trim.length)));
   }
 
-  return { add, unproven, reword, trim, cap: CAP, current: skills.length };
+  const status: SkillsAdvice["status"] = skills.length > CAP ? "many" : skills.length < FLOOR ? "few" : "ok";
+  const deficit = Math.max(0, FLOOR - (skills.length + add.length));
+
+  return { add, unproven, reword, trim, cap: CAP, floor: FLOOR, current: skills.length, status, deficit };
 }
