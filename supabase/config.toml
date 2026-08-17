@@ -2,8 +2,12 @@ project_id = "suokeaxtmhgakgtgcdwc"
 
 # H7: these functions accept CV text and burn the AI gateway key. They must require a
 # valid Supabase JWT so they can't be called anonymously (cost/DoS + unauth CV text to
-# a 3rd party). CORS is additionally restricted to the app origin inside each function
-# (see _shared/cors.ts). Do NOT set verify_jwt = false here again.
+# a 3rd party). Do NOT set verify_jwt = false here again.
+# All AI functions route through supabase/functions/_shared/gateway.ts, which enforces
+# per-user daily quotas, request size caps, timeouts, injection fencing and usage
+# logging. CORS is wildcard-origin by design (JWT in localStorage, no cookie ambient
+# authority) — an earlier comment claimed a per-function origin restriction that
+# never existed.
 [functions.optimize-bullets]
 verify_jwt = true
 

@@ -1,24 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders, makeGateway } from "../_shared/gateway.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
 
-// Model chain: strongest first; on an unknown-model rejection (400/404) step down,
-// so a gateway id rename can never break the app.
-const MODEL_CHAIN = ["openai/gpt-5.5", "openai/gpt-5", "google/gemini-3.6-flash", "google/gemini-2.5-flash"];
-let lastModelUsed = "";
-async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
-  let res: Response | null = null;
-  for (const m of MODEL_CHAIN) {
-    lastModelUsed = m;
-    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
-    if (res.status !== 400 && res.status !== 404) return res;
-  }
-  return res as Response;
-}
 
 /**
  * Skill inference, honesty preserved: read the CV for competences the experience
@@ -28,6 +11,7 @@ async function gatewayFetch(build: (model: string) => RequestInit): Promise<Resp
  */
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const gw = makeGateway(req, "infer-competences", "wording");
 
   try {
     const { resume_content_json, known, locale } = await req.json();
@@ -58,7 +42,7 @@ Return via the inferred_competences tool.`;
 
     const userPrompt = `## KNOWN (skip these)\n${knownList.slice(0, 40).join("; ") || "(none)"}\n\n## CV\n${cvContext || "(empty)"}`;
 
-    const response = await gatewayFetch((model) => ({
+    const response = await gw.fetch((model) => ({
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -127,7 +111,7 @@ Return via the inferred_competences tool.`;
     result.inferences = (result.inferences || [])
       .filter((i: any) => i?.competence && !knownSet.has(norm(i.competence)) && !cvText.includes(norm(i.competence)))
       .slice(0, 5);
-    result._meta = { model: lastModelUsed };
+    result._meta = { model: gw.model() };
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

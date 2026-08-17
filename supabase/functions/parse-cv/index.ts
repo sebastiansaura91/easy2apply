@@ -1,25 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { unzipSync, strFromU8 } from "https://esm.sh/fflate@0.8.2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders, makeGateway } from "../_shared/gateway.ts";
 
 
-// Model chain: strongest first; on an unknown-model rejection (400/404) step down,
-// so a gateway id rename can never break the app.
-const MODEL_CHAIN = ["google/gemini-3.6-flash", "google/gemini-2.5-flash"];
-let lastModelUsed = "";
-async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
-  let res: Response | null = null;
-  for (const m of MODEL_CHAIN) {
-    lastModelUsed = m;
-    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
-    if (res.status !== 400 && res.status !== 404) return res;
-  }
-  return res as Response;
-}
+
 
 /**
  * Base64-encode bytes in chunks. `btoa(String.fromCharCode(...bytes))` spreads the
@@ -99,6 +83,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  const gw = makeGateway(req, "parse-cv", "scoring");
 
   try {
     const formData = await req.formData();
@@ -167,7 +152,7 @@ serve(async (req) => {
       ];
     }
 
-    const response = await gatewayFetch((model) => ({
+    const response = await gw.fetch((model) => ({
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,

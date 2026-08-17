@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders, makeGateway, HUMAN_WRITING_RULES, stripAiDashes } from "../_shared/gateway.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
 
 // Recency policy (what the big matchers weight and consumer tools skip): old proof
 // is weaker proof, and the note must say so instead of hiding it.
@@ -29,44 +25,12 @@ VERIFIED EVIDENCE RULES (rating with the ledger):
 
 
 
-// Model chain: strongest first; on an unknown-model rejection (400/404) step down,
-// so a gateway id rename can never break the app.
-const MODEL_CHAIN = ["google/gemini-3.6-flash", "google/gemini-2.5-flash"];
-let lastModelUsed = "";
-async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
-  let res: Response | null = null;
-  for (const m of MODEL_CHAIN) {
-    lastModelUsed = m;
-    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
-    if (res.status !== 400 && res.status !== 404) return res;
-  }
-  return res as Response;
-}
 
-// Distilled human-writing rules (from the "signs of AI writing" guide): suggested
-// text must read like a person wrote it. Recruiters discard obvious AI wording.
-const HUMAN_WRITING_RULES = `
 
-HUMAN WRITING RULES for every piece of suggested text:
-- Plain verbs, plain claims: led/built/increased (ledde/byggde/ökade). Banned CV-slop verbs: spearheaded, leveraged, utilized, orchestrated, championed, pioneered.
-- Banned buzzwords (EN): passionate, dynamic, results-driven, proven track record, synergy, seamless, cutting-edge, vibrant, pivotal, crucial, testament, showcase, delve, robust, holistic, "landscape"/"tapestry" (figurative).
-- Banned (SV): brinner för, passionerad, dynamisk, visionär, spjutspetskompetens, "mervärde" och "framgångsrikt" som utfyllnad.
-- No "-ing"/"vilket" tails that fake depth ("...driving growth, enhancing efficiency" / "...vilket skapade synergier"). One bullet, one concrete claim.
-- No rule-of-three padding: two facts get two items, not a forced third. No "not only... but also" / "inte bara... utan även".
-- Never use em dashes (—) or en dashes (–). Use a comma, period or colon instead.
-- Cut filler: "in order to" -> "to", "responsible for ensuring" -> "ensured", "i syfte att" -> "för att", "ansvarade för att säkerställa" -> "säkerställde".
-- Every word must carry a checkable fact (what, scale, outcome) or be cut. Vary sentence length; never end on a generic upbeat close.`;
-
-// Em dashes are the most reliable AI tell: strip them from every suggested string
-// no matter what the model returns. Hyphens and digit ranges stay untouched;
-// values under an "original" key quote the CV verbatim and must survive for matching.
-const stripAiDashes = (v: unknown): unknown =>
-  typeof v === "string" ? v.replace(/\s*—\s*/g, ", ")
-    : Array.isArray(v) ? v.map(stripAiDashes)
-    : v && typeof v === "object" ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, k === "original" || k === "proof_bullet" ? x : stripAiDashes(x)])) : v;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const gw = makeGateway(req, "ats-check", "scoring");
 
   try {
     const { resume_content_json, job_posting_text, locale, demand_profile, previous_themes, verified_evidence } = await req.json();
@@ -127,7 +91,7 @@ serve(async (req) => {
     }
     userPrompt += `Perform the full ATS + Recruiter Scan analysis now. Return the result via the ats_check_result tool. ALL text output MUST be in ${lang === "sv" ? "Swedish" : "English"}.`;
 
-    const response = await gatewayFetch((model) => ({
+    const response = await gw.fetch((model) => ({
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -371,7 +335,7 @@ serve(async (req) => {
       }
     }
 
-    (result as any)._meta = { model: lastModelUsed, guards: guardHits };
+    (result as any)._meta = { model: gw.model(), guards: guardHits };
     return new Response(JSON.stringify(stripAiDashes(result)), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

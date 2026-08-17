@@ -1,28 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { corsHeaders, makeGateway } from "../_shared/gateway.ts";
 
 
-// Model chain: strongest first; on an unknown-model rejection (400/404) step down,
-// so a gateway id rename can never break the app.
-const MODEL_CHAIN = ["google/gemini-3.6-flash", "google/gemini-2.5-flash"];
-let lastModelUsed = "";
-async function gatewayFetch(build: (model: string) => RequestInit): Promise<Response> {
-  let res: Response | null = null;
-  for (const m of MODEL_CHAIN) {
-    lastModelUsed = m;
-    res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", build(m));
-    if (res.status !== 400 && res.status !== 404) return res;
-  }
-  return res as Response;
-}
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const gw = makeGateway(req, "analyze-job-posting", "scoring");
 
   try {
     const { job_posting_text, registry } = await req.json();
@@ -35,7 +19,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const response = await gatewayFetch((model) => ({
+    const response = await gw.fetch((model) => ({
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -214,7 +198,7 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
       }
     }
 
-    (result as any)._meta = { model: lastModelUsed };
+    (result as any)._meta = { model: gw.model() };
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
