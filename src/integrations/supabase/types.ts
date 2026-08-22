@@ -68,6 +68,30 @@ export type Database = {
         }
         Relationships: []
       }
+      app_events: {
+        Row: {
+          created_at: string
+          event: string
+          id: string
+          props: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          id?: string
+          props?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          id?: string
+          props?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       bullet_bank: {
         Row: {
           created_at: string
