@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_calls: {
+        Row: {
+          created_at: string
+          fn: string
+          id: string
+          model: string
+          ms: number
+          status: number
+          tokens_in: number | null
+          tokens_out: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fn: string
+          id?: string
+          model: string
+          ms: number
+          status: number
+          tokens_in?: number | null
+          tokens_out?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fn?: string
+          id?: string
+          model?: string
+          ms?: number
+          status?: number
+          tokens_in?: number | null
+          tokens_out?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_usage_daily: {
+        Row: {
+          calls: number
+          day: string
+          user_id: string
+        }
+        Insert: {
+          calls?: number
+          day?: string
+          user_id: string
+        }
+        Update: {
+          calls?: number
+          day?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bullet_bank: {
         Row: {
           created_at: string
@@ -225,6 +279,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_ai_usage: {
+        Args: { p_fn: string; p_user: string }
+        Returns: number
       }
     }
     Enums: {
