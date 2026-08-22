@@ -1248,7 +1248,7 @@ export function InsightsPanel({
       {/* One toggle between guided queue and the full dashboard. */}
       {themes.length > 0 && (
         <button type="button" className="w-full text-center text-[11px] text-muted-foreground underline-offset-2 hover:underline" onClick={() => setShowDetails(v => !v)}>
-          {showDetails ? (isSv ? "↑ Tillbaka till guiden" : "↑ Back to the guide") : (isSv ? "Visa detaljer" : "Show details")}
+          {showDetails ? (isSv ? "↑ Tillbaka till guiden" : "↑ Back to the guide") : (isSv ? "Visa rapporten" : "Show the report")}
         </button>
       )}
 
