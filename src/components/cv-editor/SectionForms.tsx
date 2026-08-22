@@ -14,9 +14,7 @@ import { CVContent, ExperienceItem, EducationItem } from "@/types/cv";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { BulletWizard } from "./BulletWizard";
 import { ExplainWizard } from "./ExplainWizard";
-import { SummaryKitDialog } from "./SummaryKitDialog";
 import { analyzeBullet } from "@/lib/cv-quality";
 
 const bulletTipsSv = [
@@ -68,7 +66,6 @@ export function ContactForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
 export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   const isSv = cvLanguage !== "en";
   const [drafting, setDrafting] = useState(false);
-  const [kitOpen, setKitOpen] = useState(false);
   const { toast } = useToast();
 
   const draft = async () => {
@@ -94,10 +91,6 @@ export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
       <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">{t("sectionProfile")}</CardTitle>
         <div className="flex items-center gap-1.5">
-          <Button size="sm" className="h-9 text-xs" onClick={() => setKitOpen(true)}>
-            <Wand2 className="h-3 w-3 mr-1" />
-            {isSv ? "Positionera & skriv" : "Position & write"}
-          </Button>
           <Button variant="outline" size="sm" className="h-9 text-xs" onClick={draft} disabled={drafting}>
             {drafting && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
             {isSv ? "Utkast från erfarenhet" : "Draft from experience"}
@@ -107,7 +100,6 @@ export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
       <CardContent>
         <Textarea rows={4} value={cv.profile} onChange={(e) => updateCv("profile", e.target.value)} placeholder={cvLanguage === "en" ? "Write a short professional summary..." : "Skriv en kort professionell sammanfattning..."} />
       </CardContent>
-      <SummaryKitDialog open={kitOpen} onOpenChange={setKitOpen} cv={cv} cvLanguage={isSv ? "sv" : "en"} onApply={(s) => updateCv("profile", s)} />
     </Card>
   );
 }
@@ -115,13 +107,9 @@ export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
 export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   const isSv = cvLanguage !== "en";
   const [improvingKey, setImprovingKey] = useState<string | null>(null);
-  const [improvingAll, setImprovingAll] = useState<number | null>(null);
-  const [wizardExpIdx, setWizardExpIdx] = useState<number | null>(null);
   const [explainExpIdx, setExplainExpIdx] = useState<number | null>(null);
   // Preview state: { expIdx-bulletIdx: { original, improved, reason } }
   const [previews, setPreviews] = useState<Record<string, { original: string; improved: string; reason: string }>>({});
-  // "Improve all" preview: expIdx -> array of previews
-  const [allPreviews, setAllPreviews] = useState<{ expIdx: number; items: { bulletIdx: number; original: string; improved: string; reason: string }[] } | null>(null);
   const { toast } = useToast();
 
   const addExperience = () => {
@@ -221,69 +209,6 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
       delete next[key];
       return next;
     });
-  };
-
-  const improveAllBullets = async (expIdx: number) => {
-    const exp = cv.experience[expIdx];
-    const nonEmpty = exp.bullets.map((b, i) => ({ b, i })).filter(({ b }) => b.trim().length > 0);
-    if (nonEmpty.length === 0) {
-      toast({ title: "Inga punkter att förbättra", variant: "destructive" });
-      return;
-    }
-
-    setImprovingAll(expIdx);
-    const items: { bulletIdx: number; original: string; improved: string; reason: string }[] = [];
-
-    for (const { b, i: bIdx } of nonEmpty) {
-      try {
-        const { data, error } = await supabase.functions.invoke("improve-bullet", {
-          body: { bullet: b, jobTitle: exp.title, company: exp.company, language: cvLanguage || "sv" },
-        });
-        if (!error && data?.improved) {
-          items.push({ bulletIdx: bIdx, original: b, improved: data.improved, reason: data.reason || "Förbättrad formulering." });
-        }
-      } catch {
-        // continue
-      }
-    }
-
-    setImprovingAll(null);
-    if (items.length > 0) {
-      setAllPreviews({ expIdx, items });
-    } else {
-      toast({ title: "Kunde inte förbättra några punkter", variant: "destructive" });
-    }
-  };
-
-  const acceptAllPreviews = () => {
-    if (!allPreviews) return;
-    const exp = cv.experience[allPreviews.expIdx];
-    const newBullets = [...exp.bullets];
-    for (const item of allPreviews.items) {
-      newBullets[item.bulletIdx] = item.improved;
-    }
-    updateExperience(allPreviews.expIdx, { bullets: newBullets });
-    toast({ title: `✨ ${allPreviews.items.length} punkter uppdaterade` });
-    setAllPreviews(null);
-  };
-
-  const acceptSingleFromAll = (itemIdx: number) => {
-    if (!allPreviews) return;
-    const item = allPreviews.items[itemIdx];
-    const exp = cv.experience[allPreviews.expIdx];
-    const newBullets = [...exp.bullets];
-    newBullets[item.bulletIdx] = item.improved;
-    updateExperience(allPreviews.expIdx, { bullets: newBullets });
-    const remaining = allPreviews.items.filter((_, i) => i !== itemIdx);
-    if (remaining.length === 0) setAllPreviews(null);
-    else setAllPreviews({ ...allPreviews, items: remaining });
-  };
-
-  const rejectSingleFromAll = (itemIdx: number) => {
-    if (!allPreviews) return;
-    const remaining = allPreviews.items.filter((_, i) => i !== itemIdx);
-    if (remaining.length === 0) setAllPreviews(null);
-    else setAllPreviews({ ...allPreviews, items: remaining });
   };
 
   return (
@@ -408,35 +333,6 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                       </TooltipTrigger>
                       <TooltipContent><p className="text-xs">{cvLanguage === "en" ? "Answer questions to generate bullets" : "Svara på frågor för att generera bullets"}</p></TooltipContent>
                     </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-9 text-xs gap-1"
-                          onClick={() => improveAllBullets(idx)}
-                          disabled={improvingAll === idx}
-                        >
-                          {improvingAll === idx && <Loader2 className="h-3 w-3 animate-spin" />}
-                          {isSv ? "Förbättra alla" : "Improve all"}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p className="text-xs">{isSv ? "Förbättra alla punkter med AI" : "Improve all bullets with AI"}</p></TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-9 text-xs gap-1"
-                          onClick={() => setWizardExpIdx(idx)}
-                        >
-                          <Wand2 className="h-3 w-3" />
-                          {isSv ? "Skapa bullets" : "Create bullets"}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p className="text-xs">{isSv ? "Generera nya bullets med AI-wizard" : "Generate new bullets with AI wizard"}</p></TooltipContent>
-                    </Tooltip>
                   </div>
                 </div>
                 {exp.bullets.map((bullet, bIdx) => {
@@ -534,25 +430,6 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
         </CardContent>
       </Card>
 
-      {/* Bullet Wizard Dialog */}
-      {wizardExpIdx !== null && (
-        <BulletWizard
-          open={true}
-          onClose={() => setWizardExpIdx(null)}
-          jobTitle={cv.experience[wizardExpIdx]?.title || ""}
-          company={cv.experience[wizardExpIdx]?.company || ""}
-          startDate={cv.experience[wizardExpIdx]?.startDate || ""}
-          endDate={cv.experience[wizardExpIdx]?.endDate || ""}
-          isPresent={cv.experience[wizardExpIdx]?.isPresent || false}
-          language={cvLanguage}
-          onAcceptBullets={(bullets) => {
-            const exp = cv.experience[wizardExpIdx];
-            const existingNonEmpty = exp.bullets.filter((b) => b.trim().length > 0);
-            updateExperience(wizardExpIdx, { bullets: [...existingNonEmpty, ...bullets] });
-            toast({ title: `✨ ${bullets.length} ${cvLanguage === "en" ? "bullets added" : "bullets tillagda"}`, description: cvLanguage === "en" ? "Review and fill in [FILL IN] placeholders." : "Granska och fyll i [FYLL I]-platshållare." });
-          }}
-        />
-      )}
 
       {/* Explain Wizard */}
       {explainExpIdx !== null && (
@@ -587,58 +464,6 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
         />
       )}
 
-      {/* Improve All Preview Dialog */}
-      {allPreviews && (
-        <Dialog open={true} onOpenChange={() => setAllPreviews(null)}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                                {isSv ? "Förhandsgranskning" : "Preview"} – {allPreviews.items.length} {isSv ? "förbättringar" : "improvements"}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              {allPreviews.items.map((item, i) => (
-                <div key={i} className="rounded-md border border-border p-3 space-y-2">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground line-through">{item.original}</p>
-                    <Textarea
-                      rows={2}
-                      value={item.improved}
-                      onChange={(e) => {
-                        setAllPreviews((prev) => {
-                          if (!prev) return prev;
-                          const items = [...prev.items];
-                          items[i] = { ...items[i], improved: e.target.value };
-                          return { ...prev, items };
-                        });
-                      }}
-                      className="min-h-[40px] text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground italic">{item.reason}</p>
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => rejectSingleFromAll(i)}>
-                      <X className="h-3 w-3 mr-1" />
-                      {isSv ? "Skippa" : "Skip"}
-                    </Button>
-                    <Button size="sm" className="h-8 text-xs" onClick={() => acceptSingleFromAll(i)}>
-                      <Check className="h-3 w-3 mr-1" />
-                       {isSv ? "Acceptera" : "Accept"}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between pt-2 border-t border-border">
-              <Button variant="ghost" onClick={() => setAllPreviews(null)}>{isSv ? "Avbryt" : "Cancel"}</Button>
-              <Button onClick={acceptAllPreviews}>
-                <Check className="h-4 w-4 mr-1" />
-                {isSv ? "Acceptera alla" : "Accept all"} ({allPreviews.items.length})
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </>
   );
 }

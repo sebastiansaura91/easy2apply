@@ -26,9 +26,9 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
 
   const path = location.pathname;
+  // Templates merged into Home — three destinations, one mental model.
   const items: NavItem[] = [
-    { label: isSv ? "Hem" : "Home", icon: Home, to: "/dashboard", match: (p) => p === "/dashboard" || p.startsWith("/editor") || p.startsWith("/apply") },
-    { label: isSv ? "Mallar" : "Templates", icon: Files, to: "/templates", match: (p) => p.startsWith("/templates") || p.startsWith("/wizard") },
+    { label: isSv ? "Hem" : "Home", icon: Home, to: "/dashboard", match: (p) => p === "/dashboard" || p.startsWith("/editor") || p.startsWith("/apply") || p.startsWith("/wizard") || p.startsWith("/templates") },
     { label: isSv ? "Profilen" : "Profile", icon: Compass, to: "/profile", match: (p) => p.startsWith("/profile") },
     { label: isSv ? "Inställningar" : "Settings", icon: Settings, to: "/settings", match: (p) => p.startsWith("/settings") },
   ];

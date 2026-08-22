@@ -14,7 +14,6 @@ import CreateWizard from "./pages/wizards/CreateWizard";
 // Onboarding removed — first run is handled inline on the dashboard.
 import SettingsPage from "./pages/Settings";
 import Profile from "./pages/Profile";
-import Templates from "./pages/Templates";
 import Apply from "./pages/Apply";
 import OAuthConsent from "./pages/OAuthConsent";
 import NotFound from "./pages/NotFound";
@@ -52,7 +51,8 @@ const App = () => (
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/editor/:id" element={<ProtectedRoute><CVEditor /></ProtectedRoute>} />
                 <Route path="/apply" element={<ProtectedRoute><Apply /></ProtectedRoute>} />
-                <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
+                {/* Templates merged into Home — old links keep working. */}
+                <Route path="/templates" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                 <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />

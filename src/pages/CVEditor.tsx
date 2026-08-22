@@ -61,7 +61,6 @@ const CVEditor = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [translating, setTranslating] = useState(false);
-  const [mode, setMode] = useState<"step" | "overview">("overview");
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const toggleSectionOpen = (id: string) =>
     setOpenSections((prev) => {
@@ -69,7 +68,6 @@ const CVEditor = () => {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  const [stepIdx, setStepIdx] = useState(0);
   const [styleOpen, setStyleOpen] = useState(false);
   // Split view (category standard: form left, live document right). On narrow screens
   // or when the improve panel is docked, one pane at a time via the Redigera/Förhandsgranska toggle.
@@ -195,34 +193,7 @@ const CVEditor = () => {
   };
 
   const enabledSections = [...cv.sections].sort((a, b) => a.order - b.order).filter(s => s.enabled);
-  const clampedStep = Math.min(stepIdx, Math.max(0, enabledSections.length - 1));
-  const currentSection = enabledSections[clampedStep];
-  const isFirst = clampedStep === 0;
-  const isLast = clampedStep >= enabledSections.length - 1;
 
-  const goNext = () => {
-    if (isLast) return;
-    setStepIdx(clampedStep + 1);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-  const goPrev = () => {
-    if (isFirst) return;
-    setStepIdx(clampedStep - 1);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    if (mode !== "step") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Enter") return;
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
-      e.preventDefault();
-      goNext();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [mode, clampedStep, enabledSections.length]);
 
   // Tailoring analysis carried in from a wizard, scoped to THIS resume so a stale
   // analysis from another CV never shows here.
@@ -304,8 +275,8 @@ const CVEditor = () => {
     return changed;
   };
   const navigateToSection = (sectionType: string) => {
-    const idx = enabledSections.findIndex(s => s.type === sectionType);
-    if (idx >= 0) { setMode("step"); setStepIdx(idx); }
+    const sec = enabledSections.find(s => s.type === sectionType);
+    if (sec) { setView("edit"); setOpenSections(prev => new Set(prev).add(sec.id)); }
     setTailorOpen(false);
   };
 
@@ -455,17 +426,6 @@ const CVEditor = () => {
             )}
           </div>
           <div className="flex flex-shrink-0 items-center gap-1.5">
-            {/* Mode toggle — icon only */}
-            <div className="flex items-center rounded-md border border-border p-0.5 bg-muted/30">
-              <button type="button" title={cvLanguage === "en" ? "Overview" : "Översikt"} onClick={() => setMode("overview")}
-                className={`grid h-8 w-8 place-items-center rounded ${mode === "overview" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
-                <LayoutList className="h-4 w-4" />
-              </button>
-              <button type="button" title={cvLanguage === "en" ? "Step-by-step" : "Steg-för-steg"} onClick={() => setMode("step")}
-                className={`grid h-8 w-8 place-items-center rounded ${mode === "step" ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
-                <ListChecks className="h-4 w-4" />
-              </button>
-            </div>
             <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => { setTailorOpen(true); if (isWide) setView("preview"); }}>
               {cvLanguage === "en" ? "Improve" : "Förbättra"}
             </Button>
@@ -532,68 +492,6 @@ const CVEditor = () => {
       {/* Main */}
       <div className="flex min-h-0 flex-1">
       {(showBoth || view === "edit") && (
-      mode === "step" ? (
-        <main className="min-w-0 flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-6 py-8">
-            <div className="rounded-lg border border-border bg-card/40 p-8">
-              {/* Progress bar */}
-              <div className="flex items-center gap-1.5 mb-8">
-                {enabledSections.map((s, i) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setStepIdx(i)}
-                    aria-label={tCv(`section${s.type.charAt(0).toUpperCase() + s.type.slice(1)}`)}
-                    className={`h-1 flex-1 rounded-full transition-colors ${i <= clampedStep ? "bg-primary" : "bg-muted"}`}
-                  />
-                ))}
-              </div>
-
-              {/* Section title */}
-              {currentSection && (
-                <div className="mb-6 flex items-center justify-between">
-                  <h2 className="text-2xl font-semibold tracking-tight">
-                    {tCv(`section${currentSection.type.charAt(0).toUpperCase() + currentSection.type.slice(1)}`)}
-                  </h2>
-                  <span className="text-[11px] text-muted-foreground">
-                    {clampedStep + 1} / {enabledSections.length}
-                  </span>
-                </div>
-              )}
-
-              {/* Current section form */}
-              {currentSection && (
-                <div className="[&_.card]:border-0">
-                  <SectionFormRenderer sectionType={currentSection.type} cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />
-                </div>
-              )}
-            </div>
-
-            {/* Footer nav */}
-            <div className="flex items-center justify-between mt-6 px-2">
-              <Button variant="ghost" size="sm" onClick={goPrev} disabled={isFirst}>
-                <ArrowLeft className="h-4 w-4 mr-1.5" />{cvLanguage === "en" ? "Back" : "Tillbaka"}
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {cvLanguage === "en" ? "Press Enter to continue." : "Tryck Enter för att fortsätta."}
-              </span>
-              {isLast ? (
-                <Button size="sm" onClick={doExport}>
-                  <FileDown className="h-4 w-4 mr-1.5" />{cvLanguage === "en" ? "Download PDF" : "Ladda ner PDF"}
-                </Button>
-              ) : (
-                <Button size="sm" onClick={goNext}>
-                  {cvLanguage === "en" ? "Continue" : "Fortsätt"}<ArrowRight className="h-4 w-4 ml-1.5" />
-                </Button>
-              )}
-            </div>
-
-            <p className="text-center text-[11px] text-muted-foreground mt-2">
-              {cvLanguage === "en" ? "You can edit this later." : "Du kan redigera detta senare."}
-            </p>
-          </div>
-        </main>
-      ) : (
         <main className="min-w-0 flex-1 overflow-hidden">
           <ScrollArea className="h-full">
             <div className="max-w-3xl mx-auto p-4 sm:p-6">
@@ -621,7 +519,6 @@ const CVEditor = () => {
             </div>
           </ScrollArea>
         </main>
-      )
       )}
 
       {/* The document itself, always in sight (visibility of system status): live A4,

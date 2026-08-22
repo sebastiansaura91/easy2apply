@@ -20,12 +20,12 @@ import { sixSecondTest } from "@/lib/six-second";
 import { adviseSkills } from "@/lib/skills-advisor";
 import { estimatePages, profileCoverage, shortenTargets } from "@/lib/readiness";
 import { CVMeta } from "@/types/cv";
-import { FixIssueWizard } from "@/components/cv-editor/FixIssueWizard";
 import {
   CheckCircle2, AlertTriangle, AlertOctagon, Loader2, ChevronDown, ChevronRight,
   Languages, Target, Eye, Zap, ArrowRight, Sparkles, Wrench, RefreshCw, TrendingUp, TrendingDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface Props {
   cv: CVContent;
@@ -94,21 +94,6 @@ function CountUp({ from, value }: { from: number; value: number }) {
   return <>{n}</>;
 }
 
-function severityIcon(severity: CvIssue["severity"]) {
-  switch (severity) {
-    case "error": return <AlertOctagon className="h-4 w-4 text-destructive flex-shrink-0" />;
-    case "warning": return <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />;
-    case "tip": return <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />;
-  }
-}
-
-function severityBorder(severity: CvIssue["severity"]) {
-  switch (severity) {
-    case "error": return "border-destructive/30 bg-destructive/5";
-    case "warning": return "border-warning/30 bg-warning/5";
-    case "tip": return "border-primary/20 bg-primary/5";
-  }
-}
 
 export function InsightsPanel({
   cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
@@ -123,14 +108,10 @@ export function InsightsPanel({
   const [loading, setLoading] = useState(false);
   const [jobText, setJobText] = useState(jobPostingText || "");
   const [showJob, setShowJob] = useState(false);
-  const [fixingIssue, setFixingIssue] = useState<FirstScanIssue | null>(null);
   const [analyzedSnapshot, setAnalyzedSnapshot] = useState<string | null>(!initialResult && stored ? stored.hash : null);
   const [analyzedAt, setAnalyzedAt] = useState<Date | null>(null);
   const [lastDelta, setLastDelta] = useState<number | null>(null);
   const [sinceLast, setSinceLast] = useState<SinceLast | null>(null);
-  const [openBuckets, setOpenBuckets] = useState<Set<string>>(new Set(["keywords"]));
-  const toggleBucket = (k: string) =>
-    setOpenBuckets(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; });
   // Minimal keyword placements: which bullet to touch and the 1–2-word swap to make.
   interface Placement { keyword: string; exp_index: number; bullet_index: number; original: string; revised: string; note: string }
   const [placing, setPlacing] = useState(false);
@@ -184,24 +165,10 @@ export function InsightsPanel({
   const reframesTried = useRef(false);
   interface EvidenceItem { keyword: string; answer: string; statements?: string[]; detail?: string; role?: string }
   const answeredRef = useRef<EvidenceItem[]>([]);
-  const cycleKw = (k: string) =>
-    setKwConfirm(prev => {
-      const cur = prev[k];
-      const next = { ...prev };
-      if (cur === undefined) next[k] = "yes";
-      else if (cur === "yes") next[k] = "no";
-      else delete next[k];
-      return next;
-    });
-  const [autoFixingIdx, setAutoFixingIdx] = useState<number | null>(null);
-  const [autoFixPreview, setAutoFixPreview] = useState<{
-    issueIdx: number;
-    target: "profile" | "experience" | "skills";
-    targetIdx?: number;
-    text: string;
-    explanation: string;
-  } | null>(null);
-  const isSv = cvLanguage === "sv";
+  // Panel chrome follows the APP language; the CV's language only steers content
+  // sent to the AI. A Swedish user editing an English CV gets a Swedish panel.
+  const { language: appLanguage } = useLanguage();
+  const isSv = appLanguage === "sv";
 
   // ── Real-time issues (client-side, instant) ──
   const issues = useMemo(() => findCvIssues(cv, cvLanguage), [cv, cvLanguage]);
@@ -386,109 +353,6 @@ export function InsightsPanel({
 
   const canFix = !!onUpdateProfile && !!onUpdateExperienceBullets && !!onUpdateSkills;
 
-  // ── Heuristic: infer target section from issue text ──
-  const inferTarget = (issue: FirstScanIssue): { target: "profile" | "experience" | "skills"; targetIdx?: number } => {
-    const haystack = `${issue.title} ${issue.why_it_matters} ${issue.fix}`.toLowerCase();
-    const skillsKw = ["skill", "kompeten", "färdighet", "keyword", "nyckelord", "tech stack", "teknik"];
-    const expKw = ["bullet", "punkt", "experience", "erfarenhet", "role", "roll", "achievement", "resultat", "outcome", "metric", "mätbar", "quantif", "siffr"];
-    const profileKw = ["profile", "profil", "summary", "sammanfattning", "headline", "rubrik", "objective"];
-    // The issue text often names the role it concerns — match against titles/companies
-    // instead of always hitting experience[0].
-    const expIdxFor = (): number => {
-      const hit = cv.experience.findIndex(e =>
-        (e.title && haystack.includes(e.title.toLowerCase())) ||
-        (e.company && haystack.includes(e.company.toLowerCase())));
-      return hit >= 0 ? hit : 0;
-    };
-    if (skillsKw.some(k => haystack.includes(k))) return { target: "skills" };
-    if (profileKw.some(k => haystack.includes(k))) return { target: "profile" };
-    if (expKw.some(k => haystack.includes(k)) && cv.experience.length > 0) return { target: "experience", targetIdx: expIdxFor() };
-    // Default: profile if exists, else first experience, else skills
-    if (cv.profile || cv.experience.length === 0) return { target: "profile" };
-    return { target: "experience", targetIdx: expIdxFor() };
-  };
-
-  const runAutoFix = async (issue: FirstScanIssue, issueIdx: number) => {
-    if (!canFix) return;
-    setAutoFixingIdx(issueIdx);
-    setAutoFixPreview(null);
-    const { target, targetIdx } = inferTarget(issue);
-    try {
-      const { data, error } = await supabase.functions.invoke("fix-issue", {
-        body: {
-          issue, cv, job_posting_text: jobText || jobPostingText,
-          answers: [],
-          target_section: target,
-          target_index: targetIdx,
-          locale: cvLanguage,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      setAutoFixPreview({
-        issueIdx,
-        target,
-        targetIdx,
-        text: data.suggestion_text,
-        explanation: data.explanation,
-      });
-    } catch (e: any) {
-      toast({ title: isSv ? "Auto-fix misslyckades" : "Auto-fix failed", description: e.message, variant: "destructive" });
-    } finally {
-      setAutoFixingIdx(null);
-    }
-  };
-
-  const applyAutoFix = () => {
-    if (!autoFixPreview) return;
-    onSnapshot?.(isSv ? "Auto-fix" : "Auto-fix");
-    appliedSinceScanRef.current = true;
-    const { target, targetIdx, text } = autoFixPreview;
-    // The CV is plain text — strip any markdown/bullet characters the AI might emit
-    // so they never end up printed literally in the PDF.
-    const clean = (s: string) => s.replace(/\*\*|__|`|^#+\s*/g, "").replace(/^[•*\-–]\s*/, "").trim();
-    if (target === "profile") {
-      onUpdateProfile?.(clean(text));
-      onNavigateToSection?.("profile");
-    } else if (target === "experience" && targetIdx !== undefined) {
-      const newBullets = text.split("\n").map(clean).filter(b => b.length > 0);
-      const existing = cv.experience[targetIdx]?.bullets || [];
-      const merged = [...existing, ...newBullets.filter(nb => !existing.includes(nb))];
-      onUpdateExperienceBullets?.(targetIdx, merged);
-      onNavigateToSection?.("experience");
-    } else if (target === "skills") {
-      // Grouped lines ("Category: a, b, c") stay as ONE entry — the research-backed
-      // grouped-skills pattern; plain lines are split on commas as before.
-      // MERGE with the existing list — an AI suggestion must never erase the
-      // user's own skills (this used to replace the whole list).
-      const newSkills = text.split("\n").map(clean).filter(Boolean).flatMap(line =>
-        line.includes(":") ? [line] : line.split(",").map(s => s.trim()).filter(Boolean)
-      );
-      if (newSkills.length > 0) {
-        const seen = new Set(cv.skills.map(s => s.toLowerCase().trim()));
-        onUpdateSkills?.([...cv.skills, ...newSkills.filter(s => !seen.has(s.toLowerCase().trim()))]);
-      }
-      onNavigateToSection?.("skills");
-    }
-    toast({ title: isSv ? "✅ Fix applicerad" : "✅ Fix applied" });
-    setAutoFixPreview(null);
-  };
-
-  // ── ATS buckets: group every finding by the kind of fix it needs ──
-  type BucketKey = "keywords" | "bullets" | "formatting" | "language" | "other";
-  const catOf = (txt: string): BucketKey => {
-    const s = txt.toLowerCase();
-    if (/keyword|nyckelord|phrase|fras|terminolog/.test(s)) return "keywords";
-    if (/bullet|punkt|metric|siffr|quantif|mätbar|verb|achievement|resultat/.test(s)) return "bullets";
-    if (/language|språk|spell|stav|grammar|grammatik/.test(s)) return "language";
-    if (/format|layout|kolumn|column|datum|date|struktur|structure|sektion|section|parse|överlapp|overlap|kontakt|contact|längd|length|sida|page/.test(s)) return "formatting";
-    return "other";
-  };
-  const localBy: Record<BucketKey, CvIssue[]> = { keywords: [], bullets: [], formatting: [], language: [], other: [] };
-  issues.forEach(i => localBy[catOf(`${i.id} ${i.title} ${i.description}`)].push(i));
-  const deepIssues = (deepResult?.first_scan_issues ?? []).map((iss, i) => ({ iss, i, cat: catOf(`${iss.title} ${iss.why_it_matters} ${iss.fix}`) }));
-  const deepBy = (k: BucketKey) => deepIssues.filter(d => d.cat === k);
-  const scanFails = deepResult ? [...deepResult.scanability_check, ...deepResult.parse_check].filter(c => c.status !== "pass") : [];
   // Recruiter lens: competence themes with supporting terms. missingKw = the union of
   // every genuinely-missing term (flat list kept as fallback + for the interview flow).
   // Pedigree proxies (the ad's brand examples) are class labels, never keywords: they are
@@ -509,9 +373,6 @@ export function InsightsPanel({
     ...themes.flatMap(t => t.supporting_terms_missing || []),
     ...missingTools,
   ].map(s => s.trim()).filter(Boolean))).filter(p => !isPedigreeTerm(p, proxyTerms));
-  const unthemedKw = missingKw.filter(p => !themes.some(t => (t.supporting_terms_missing || []).includes(p)));
-  const genericKw = deepResult?.job_language_match.generic_phrases_to_replace ?? [];
-  const weakFeedback = (deepResult?.bullet_feedback ?? []).filter(b => b.score < 7);
 
   // ── Färdigmodellen: EVERYTHING that can improve the CV becomes a queue card, and
   // "done" means the queue is empty. The match score measures theme evidence; these
@@ -889,488 +750,6 @@ export function InsightsPanel({
     toast({ title: isSv ? "Nyckelord inlagt — sparas i CV:t" : "Keyword placed — saved to the CV" });
   };
 
-  const bucketCounts: Record<BucketKey, number> = {
-    keywords: missingKw.length + genericKw.length + localBy.keywords.length + deepBy("keywords").length,
-    bullets: weakBullets + weakFeedback.length + localBy.bullets.length + deepBy("bullets").length,
-    formatting: scanFails.length + localBy.formatting.length + deepBy("formatting").length,
-    language: mismatchSections.length + localBy.language.length + deepBy("language").length,
-    other: localBy.other.length + deepBy("other").length,
-  };
-
-  // Auto-expand any bucket that has findings (the user can still collapse it manually;
-  // it only re-opens when its count changes).
-  const countsKey = (Object.keys(bucketCounts) as BucketKey[]).map(k => `${k}:${bucketCounts[k]}`).join("|");
-  useEffect(() => {
-    setOpenBuckets(prev => {
-      const n = new Set(prev);
-      (Object.keys(bucketCounts) as BucketKey[]).forEach(k => { if (bucketCounts[k] > 0) n.add(k); });
-      return n;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countsKey]);
-
-  // ── Fix issue wizard overlay ──
-  if (fixingIssue && canFix) {
-    return (
-      <div className="p-4">
-        <FixIssueWizard
-          issue={fixingIssue}
-          cv={cv}
-          cvLanguage={cvLanguage}
-          jobPostingText={jobText || jobPostingText}
-          onApplyToProfile={onUpdateProfile}
-          onApplyToExperience={onUpdateExperienceBullets}
-          onApplyToSkills={onUpdateSkills}
-          onClose={() => setFixingIssue(null)}
-          onNavigateToSection={onNavigateToSection}
-        />
-      </div>
-    );
-  }
-
-  const renderLocalIssue = (issue: CvIssue) => (
-    <button
-      key={issue.id}
-      className={`w-full text-left rounded-lg border p-3 space-y-1 transition-colors hover:shadow-sm ${severityBorder(issue.severity)}`}
-      onClick={() => onNavigateToSection?.(issue.section)}
-    >
-      <div className="flex items-start gap-2">
-        {severityIcon(issue.severity)}
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold">{issue.title}</p>
-          <p className="text-[10px] text-muted-foreground leading-relaxed">{issue.description}</p>
-          <p className="text-[10px] font-medium text-primary mt-1 flex items-center gap-1">
-            <ArrowRight className="h-2.5 w-2.5" /> {issue.fix}
-          </p>
-        </div>
-      </div>
-    </button>
-  );
-
-  const renderDeepIssue = (issue: FirstScanIssue, i: number) => (
-    <div key={`d${i}`} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-2">
-      <p className="text-xs font-bold">{issue.title}</p>
-      <p className="text-[10px] text-muted-foreground leading-relaxed">{issue.why_it_matters}</p>
-      <p className="text-[10px] font-medium text-primary flex items-center gap-1">
-        <ArrowRight className="h-2.5 w-2.5" /> {issue.fix}
-      </p>
-      {canFix && (
-        autoFixPreview?.issueIdx === i ? (
-          <div className="space-y-2 mt-1 rounded-md border border-primary/30 bg-background p-2">
-            <span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-primary flex items-center gap-1">
-              {isSv ? "Förslag" : "Suggestion"} →{" "}
-              {autoFixPreview.target === "profile" ? (isSv ? "Profil" : "Profile")
-                : autoFixPreview.target === "skills" ? (isSv ? "Kompetenser" : "Skills")
-                : (cv.experience[autoFixPreview.targetIdx ?? 0]?.title || "Experience")}
-            </span>
-            <Textarea
-              value={autoFixPreview.text}
-              onChange={e => setAutoFixPreview(p => p ? { ...p, text: e.target.value } : p)}
-              rows={4}
-              className="text-[10px] leading-relaxed"
-            />
-            <p className="text-[9px] text-muted-foreground italic">{autoFixPreview.explanation}</p>
-            <div className="flex gap-1.5">
-              <Button size="sm" className="flex-1 h-9 text-[10px] gap-1" onClick={applyAutoFix}>
-                {isSv ? "Applicera" : "Apply"}
-              </Button>
-              <Button variant="ghost" size="sm" className="h-9 text-[10px]" onClick={() => setAutoFixPreview(null)}>
-                {isSv ? "Avbryt" : "Cancel"}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex gap-1.5 mt-1">
-            <Button variant="default" size="sm" className="flex-1 h-9 text-[10px] gap-1.5" disabled={autoFixingIdx !== null} onClick={() => runAutoFix(issue, i)}>
-              {autoFixingIdx === i && <Loader2 className="h-3 w-3 animate-spin" />}
-              {autoFixingIdx === i ? (isSv ? "Fixar..." : "Fixing...") : (isSv ? "Auto-fixa" : "Auto-fix")}
-            </Button>
-            <Button variant="outline" size="sm" className="h-9 text-[10px] gap-1" onClick={() => setFixingIssue(issue)}>
-              {isSv ? "Anpassa" : "Refine"}
-            </Button>
-          </div>
-        )
-      )}
-    </div>
-  );
-
-  const buckets: { key: BucketKey; title: string; count: number; body: React.ReactNode }[] = [
-    {
-      key: "keywords",
-      title: isSv ? "Nyckelord" : "Keywords",
-      count: missingKw.length + genericKw.length + localBy.keywords.length + deepBy("keywords").length,
-      body: (
-        <>
-          {missingKw.length > 0 && (
-            <div className="space-y-1.5">
-              {(() => {
-                const kwChip = (p: string) => {
-                  const s = kwConfirm[p];
-                  return (
-                    <button key={p} type="button" onClick={() => cycleKw(p)}
-                      className={`inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[10px] font-medium transition-colors ${
-                        s === "yes" ? "border-green-600/40 bg-green-600/10 text-green-700 dark:text-green-500"
-                        : s === "no" ? "border-border text-muted-foreground line-through opacity-60"
-                        : "border-destructive/40 bg-destructive/5 text-destructive"
-                      }`}>
-                      {s === "yes" ? "✓" : s === "no" ? "✕" : "?"} {p}
-                    </button>
-                  );
-                };
-                const evidenceBadge = (e: string) =>
-                  e === "strong"
-                    ? <span className="rounded-full bg-green-600/10 px-2 py-0.5 text-[9px] font-semibold text-green-700 dark:text-green-500">{isSv ? "Stark evidens" : "Strong evidence"}</span>
-                    : e === "partial"
-                      ? <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[9px] font-semibold text-warning">{isSv ? "Delvis" : "Partial"}</span>
-                      : <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[9px] font-semibold text-destructive">{isSv ? "Saknar evidens" : "No evidence"}</span>;
-                return (
-                  <>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                      {themes.length > 0 ? (isSv ? "Kompetensområden rollen screenar på" : "Competence areas the role screens for") : (isSv ? "Saknade nyckelord" : "Missing keywords")}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {isSv ? "Tryck på varje ord: ✓ = jag har detta på riktigt · ✕ = har inte (utelämnas ärligt)." : "Tap each word: ✓ = I genuinely have this · ✕ = I don't (honestly omitted)."}
-                    </p>
-                    {(cv.__meta?.demandProfile?.knockout_requirements?.length ?? 0) > 0 && (
-                      <div className="space-y-1 rounded-lg border border-warning/40 bg-warning/5 p-2.5">
-                        <p className="text-[11px] font-semibold">{isSv ? "Hårda krav — svara ärligt i ansökan" : "Hard requirements — answer honestly in the application"}</p>
-                        <p className="text-[9px] text-muted-foreground">{isSv ? "De enda automatiska avslagen. CV-formuleringar hjälper inte här." : "The only automatic rejections. CV wording can't help here."}</p>
-                        <ul className="list-disc pl-4 text-[11px]">
-                          {cv.__meta!.demandProfile!.knockout_requirements!.map(k => <li key={k}>{k}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                    {themes.length > 0 ? (
-                      <div className="space-y-2">
-                        {[...themes]
-                          .sort((a, b) => ((a.importance === "must" ? 0 : 1) - (b.importance === "must" ? 0 : 1)) || ((a.rating ?? 3) - (b.rating ?? 3)))
-                          .map((th, i) => {
-                          const accepted = (cv.__meta?.acceptedGaps || []).includes(th.theme);
-                          const r = Math.max(1, Math.min(5, Math.round(th.rating ?? (th.evidence === "strong" ? 4 : th.evidence === "missing" ? 1 : 3))));
-                          return (
-                          <div key={i} className={`rounded-lg border p-2.5 space-y-1.5 ${accepted ? "border-border opacity-55" : th.importance === "must" && th.evidence === "missing" ? "border-destructive/30" : "border-border"}`}>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-xs font-semibold">{th.theme}</span>
-                              {th.importance === "must" && (
-                                <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">{isSv ? "Krav" : "Must"}</span>
-                              )}
-                              {/* Scorecard rating dots (1–5) */}
-                              <span className="ml-auto flex items-center gap-0.5" title={`${r}/5`} aria-label={`${r}/5`}>
-                                {[1, 2, 3, 4, 5].map(n => (
-                                  <span key={n} className={`h-1.5 w-1.5 rounded-full ${n <= r ? (r >= 4 ? "bg-green-600" : r >= 2 ? "bg-warning" : "bg-destructive") : "bg-muted"}`} />
-                                ))}
-                              </span>
-                              {accepted && <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">{isSv ? "Accepterat gap" : "Accepted gap"}</span>}
-                            </div>
-                            {!accepted && (
-                              <>
-                                <p className="text-[10px] leading-relaxed text-muted-foreground">{th.evidence_note}</p>
-                                {/* The recruiter's real question: which ONE sentence proves this theme? */}
-                                {th.proof_bullet ? (
-                                  <p className="rounded border-l-2 border-primary/40 bg-muted/40 px-2 py-1 text-[11px] leading-relaxed">
-                                    <span className="font-serif italic">"{th.proof_bullet}"</span>
-                                    {th.proof_gap === "outcome" && <span className="ml-1 text-[9px] font-semibold text-warning">{isSv ? "· saknar utfall" : "· lacks outcome"}</span>}
-                                    {th.proof_gap === "scope" && <span className="ml-1 text-[9px] font-semibold text-warning">{isSv ? "· saknar omfång" : "· lacks scope"}</span>}
-                                    {th.proof_gap === "none" && <span className="ml-1 text-[9px] font-semibold text-green-700 dark:text-green-500">{isSv ? "· bär temat" : "· carries the theme"}</span>}
-                                  </p>
-                                ) : (
-                                  <p className="text-[10px] text-muted-foreground">{isSv ? "Ingen mening i CV:t bär det här temat än." : "No sentence in the CV carries this theme yet."}</p>
-                                )}
-                                {/* Motsvarande-bridge: what the ad's pedigree examples actually mean. */}
-                                {(() => {
-                                  const dp = (cv.__meta?.demandProfile?.competence_themes || []).find(d => d.theme.toLowerCase().trim() === th.theme.toLowerCase().trim());
-                                  if (!dp?.proxy_terms?.length) return null;
-                                  return (
-                                    <div className="rounded-lg bg-muted/40 px-2 py-1.5 text-[10px] leading-relaxed">
-                                      <span className="text-muted-foreground">{isSv ? "Annonsen säger" : "The ad says"}: </span>
-                                      <span className="font-medium">{dp.proxy_terms.join(", ")} {isSv ? "eller motsvarande" : "or equivalent"}</span>
-                                      <span className="text-muted-foreground"> → {isSv ? "det betyder" : "meaning"}: </span>
-                                      <span className="font-medium">{dp.proxy_translation || (dp.supporting_terms || []).slice(0, 4).join(", ")}</span>
-                                      <span className="block text-muted-foreground">{isSv ? "Varumärket ska aldrig stå i CV:t — beviset ska." : "The brand never goes in the CV — the proof does."}</span>
-                                    </div>
-                                  );
-                                })()}
-                                {(th.supporting_terms_present || []).length > 0 && (
-                                  <p className="text-[10px] text-green-700 dark:text-green-500">✓ {th.supporting_terms_present.join(" · ")}</p>
-                                )}
-                                {(th.supporting_terms_missing || []).length > 0 && (
-                                  <div className="flex flex-wrap gap-1">{th.supporting_terms_missing.map(kwChip)}</div>
-                                )}
-                                {r < 4 && canFix && (
-                                  <div className="flex gap-1.5 pt-0.5">
-                                    <Button variant="outline" size="sm" className="h-8 flex-1 text-[10px]" disabled={loadingQ || placing}
-                                      onClick={() => fetchQuestions([th.theme, ...(th.supporting_terms_missing || [])])}>
-                                      {isSv ? "Överbrygga: fråga mig" : "Bridge: ask me"}
-                                    </Button>
-                                    {onUpdateMeta && (
-                                      <Button variant="ghost" size="sm" className="h-8 text-[10px] text-muted-foreground"
-                                        onClick={() => onUpdateMeta({ acceptedGaps: [...(cv.__meta?.acceptedGaps || []), th.theme] })}>
-                                        {isSv ? "Ärligt gap" : "Honest gap"}
-                                      </Button>
-                                    )}
-                                  </div>
-                                )}
-                              </>
-                            )}
-                            {accepted && onUpdateMeta && (
-                              <button type="button" className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
-                                onClick={() => onUpdateMeta({ acceptedGaps: (cv.__meta?.acceptedGaps || []).filter(g => g !== th.theme) })}>
-                                {isSv ? "Ångra" : "Undo"}
-                              </button>
-                            )}
-                          </div>
-                          );
-                        })}
-                        {unthemedKw.length > 0 && <div className="flex flex-wrap gap-1">{unthemedKw.map(kwChip)}</div>}
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">{missingKw.map(kwChip)}</div>
-                    )}
-                  </>
-                );
-              })()}
-              {/* Skills advisor: deterministic, zero AI. 8-12 skills in the ad's exact
-                  words — Teamtailor has no auto-scoring, so the list optimizes for
-                  recruiter skim and manual search. Adds are honesty-gated: only terms
-                  the CV or verified answers already prove; the rest become questions. */}
-              {skillsAdvice && (skillsActionCount > 0 || skillsAdvice.unproven.length > 0 || skillsAdvice.status !== "ok") && (
-                <div className="surface-sheet space-y-1.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    {isSv ? "Skills-sektionen" : "Skills section"} · {skillsAdvice.current} {isSv ? "av" : "of"} {skillsAdvice.floor}–{skillsAdvice.cap}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {isSv ? "8–12 är optimalt. Annonsens exakta ord vinner både rekryterarens skim och sökningen." : "8–12 is the sweet spot. The ad's exact words win both the recruiter's skim and the search."}
-                  </p>
-                  {skillsRows()}
-                </div>
-              )}
-              {Object.values(kwConfirm).filter(v => v === "no").length > 0 && (
-                <p className="text-[10px] text-muted-foreground">
-                  {isSv
-                    ? `${Object.values(kwConfirm).filter(v => v === "no").length} markerade som "har inte" — de läggs aldrig in. Ärlighet slår nyckelord.`
-                    : `${Object.values(kwConfirm).filter(v => v === "no").length} marked "don't have" — never inserted. Honesty beats keywords.`}
-                </p>
-              )}
-              {canFix && !kwQuestions && (() => {
-                const confirmed = missingKw.filter(p => kwConfirm[p] === "yes");
-                const unknowns = missingKw.filter(p => !kwConfirm[p]);
-                return (
-                  <div className="mt-1 space-y-1.5">
-                    {unknowns.length > 0 && (
-                      <Button variant="default" size="sm" className="h-9 w-full text-xs" onClick={() => fetchQuestions()} disabled={loadingQ || placing}>
-                        {loadingQ && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                        {loadingQ ? (isSv ? "Skapar frågor…" : "Creating questions…") : (isSv ? `Fråga mig om ${unknowns.length} nyckelord` : `Ask me about ${unknowns.length} keywords`)}
-                      </Button>
-                    )}
-                    {confirmed.length > 0 && (
-                      <Button variant="outline" size="sm" className="h-9 w-full text-xs"
-                        onClick={() => runPlacements(confirmed)} disabled={placing}>
-                        {placing && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                        {placing ? (isSv ? "Letar placeringar…" : "Finding placements…") : (isSv ? `Placera ${confirmed.length} bekräftade nyckelord` : `Place ${confirmed.length} confirmed keywords`)}
-                      </Button>
-                    )}
-                  </div>
-                );
-              })()}
-              {kwQuestions && kwQuestions.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    {isSv ? "Har du detta? Svara kort — dina svar blir underlaget." : "Do you have this? Answer briefly — your answers become the evidence."}
-                  </p>
-                  {kwQuestions.map(q => (
-                    <div key={q.keyword} className="rounded-lg border border-border p-2.5 space-y-1.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <Badge variant="secondary" className="text-[9px] h-5">{q.keyword}</Badge>
-                        <button type="button" className="text-[10px] text-muted-foreground underline-offset-2 hover:underline" onClick={() => dismissQuestion(q.keyword)}>
-                          {isSv ? "Har inte" : "Don't have it"}
-                        </button>
-                      </div>
-                      <p className="text-xs leading-relaxed">{q.question}</p>
-                      {optionsFor(q).map(opt => (
-                        <button key={opt} type="button" onClick={() => toggleChoice(q.keyword, opt)}
-                          className={`w-full rounded-lg border p-2 text-left text-[11px] leading-relaxed transition-colors ${(kwChoice[q.keyword] || []).includes(opt) ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
-                          {opt}
-                        </button>
-                      ))}
-                      <Textarea
-                        rows={2}
-                        value={kwAnswers[q.keyword] || ""}
-                        onChange={e => setKwAnswers(prev => ({ ...prev, [q.keyword]: e.target.value }))}
-                        placeholder={q.hint || (isSv ? "Frivillig detalj: system, omfattning, resultat…" : "Optional detail: system, scope, outcome…")}
-                        className="text-xs"
-                      />
-                      {roleSelect(q.keyword, "h-9 text-[11px]")}
-                    </div>
-                  ))}
-                  <div className="flex gap-1.5">
-                    <Button size="sm" className="h-9 flex-1 text-xs" onClick={submitAnswers}
-                      disabled={placing || !(kwQuestions || []).some(canSubmitQ)}>
-                      {placing && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                      {isSv ? "Skicka svar & placera" : "Submit answers & place"}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => setKwQuestions(null)} disabled={placing}>
-                      {isSv ? "Avbryt" : "Cancel"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {newBullets?.map((nb, i) => (
-                <div key={`nb${i}`} className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 space-y-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <Badge className="text-[9px] h-5">{isSv ? "NY PUNKT" : "NEW BULLET"}</Badge>
-                    <Badge variant="secondary" className="text-[9px] h-5">{nb.keyword}</Badge>
-                    <span className="truncate text-[10px] text-muted-foreground">{cv.experience[nb.exp_index]?.title}</span>
-                  </div>
-                  <p className="text-xs leading-relaxed">{nb.bullet}</p>
-                  <p className="text-[9px] italic text-muted-foreground">{nb.note}</p>
-                  <Button size="sm" variant={appliedNew.has(i) ? "secondary" : "outline"} className="h-9 w-full text-xs"
-                    disabled={appliedNew.has(i)} onClick={() => applyNewBullet(nb, i)}>
-                                        {appliedNew.has(i) ? (isSv ? "Tillagd" : "Added") : (isSv ? "Lägg till" : "Add")}
-                  </Button>
-                </div>
-              ))}
-              {placements?.map((p, i) => (
-                <div key={i} className="rounded-lg border border-border p-2.5 space-y-1.5">
-                  <Badge variant="secondary" className="text-[9px] h-5">{p.keyword}</Badge>
-                  {renderPlacementDiff(p)}
-                  <p className="text-[9px] italic text-muted-foreground">{p.note}</p>
-                  <Button
-                    size="sm"
-                    variant={appliedPlacements.has(i) ? "secondary" : "outline"}
-                    className="h-9 w-full text-xs"
-                    disabled={appliedPlacements.has(i)}
-                    onClick={() => applyPlacement(p, i)}
-                  >
-                                        {appliedPlacements.has(i) ? (isSv ? "Inlagd" : "Applied") : (isSv ? "Använd" : "Apply")}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-          {genericKw.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Generiska fraser att byta ut" : "Generic phrases to replace"}</p>
-              <div className="flex flex-wrap gap-1">{genericKw.map(p => <Badge key={p} variant="outline" className="text-[9px] h-5">{p}</Badge>)}</div>
-            </div>
-          )}
-          {adTools.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Verktyg & system i annonsen" : "Tools & systems in the ad"}</p>
-              <div className="flex flex-wrap gap-1">
-                {adTools.map(t => (
-                  <Badge key={t.tool} variant="outline" className={`h-5 text-[9px] ${t.ok ? "border-green-600/50 text-green-700 dark:text-green-500" : "border-warning/60 text-warning"}`}>
-                    {t.tool}{t.ok ? " ✓" : ""}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-          {localBy.keywords.map(renderLocalIssue)}
-          {deepBy("keywords").map(d => renderDeepIssue(d.iss, d.i))}
-          {!deepResult && (
-            <p className="text-[10px] text-muted-foreground">{isSv ? "Klistra in jobbannonsen och kör analysen för nyckelordstäckning." : "Paste the job posting and run the analysis for keyword coverage."}</p>
-          )}
-        </>
-      ),
-    },
-    {
-      key: "bullets",
-      title: isSv ? "Svaga punkter" : "Weak bullets",
-      count: weakBullets + weakFeedback.length + localBy.bullets.length + deepBy("bullets").length,
-      body: (
-        <>
-          {totalBullets > 0 && (
-            <div className="rounded-lg border border-border p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium flex items-center gap-1.5">{isSv ? "Punktkvalitet" : "Bullet quality"}</span>
-                <span className="text-[10px] text-muted-foreground">{totalBullets} totalt</span>
-              </div>
-              <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-muted">
-                {goodBullets > 0 && <div className="bg-green-500" style={{ width: `${(goodBullets / totalBullets) * 100}%` }} />}
-                {(totalBullets - goodBullets - weakBullets) > 0 && <div className="bg-yellow-400" style={{ width: `${((totalBullets - goodBullets - weakBullets) / totalBullets) * 100}%` }} />}
-                {weakBullets > 0 && <div className="bg-destructive" style={{ width: `${(weakBullets / totalBullets) * 100}%` }} />}
-              </div>
-              <div className="flex justify-between mt-1.5">
-                <span className="text-[9px] text-green-600">● {goodBullets} {isSv ? "starka" : "strong"}</span>
-                <span className="text-[9px] text-yellow-600">● {totalBullets - goodBullets - weakBullets} {isSv ? "okej" : "okay"}</span>
-                <span className="text-[9px] text-destructive">● {weakBullets} {isSv ? "svaga" : "weak"}</span>
-              </div>
-            </div>
-          )}
-          {localBy.bullets.map(renderLocalIssue)}
-          {deepBy("bullets").map(d => renderDeepIssue(d.iss, d.i))}
-          {weakFeedback.map((b, i) => (
-            <div key={`bf${i}`} className="text-[10px] p-2 rounded border border-border">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Badge variant={b.score < 4 ? "destructive" : "outline"} className="text-[8px] h-3.5">{b.score}/10</Badge>
-                <span className="text-muted-foreground truncate">{b.bullet_id}</span>
-              </div>
-              <p className="text-muted-foreground">{b.recruiter_comment}</p>
-              {b.suggestions.length > 0 && b.suggestions[0].rewrite && onApplyBullet && (
-                <Button variant="ghost" size="sm" className="h-6 text-[9px] mt-1 text-primary" onClick={() => onApplyBullet(b.bullet_id, b.suggestions[0].rewrite)}>
-                  {isSv ? "Applicera förslag" : "Apply suggestion"}
-                </Button>
-              )}
-            </div>
-          ))}
-        </>
-      ),
-    },
-    {
-      key: "formatting",
-      title: isSv ? "Formatering & struktur" : "Formatting & structure",
-      count: scanFails.length + localBy.formatting.length + deepBy("formatting").length,
-      body: (
-        <>
-          {scanFails.map((c, i) => (
-            <div key={`sf${i}`} className={`rounded-lg border p-3 ${severityBorder(c.status === "fail" ? "error" : "warning")}`}>
-              <p className="text-xs font-semibold">{c.dimension.replace(/_/g, " ")}</p>
-              <p className="text-[10px] text-muted-foreground leading-relaxed">{c.why_it_matters}</p>
-              <p className="text-[10px] font-medium text-primary mt-1">→ {c.recommendation}</p>
-            </div>
-          ))}
-          {localBy.formatting.map(renderLocalIssue)}
-          {deepBy("formatting").map(d => renderDeepIssue(d.iss, d.i))}
-        </>
-      ),
-    },
-    {
-      key: "language",
-      title: isSv ? "Språk & stavning" : "Language & spelling",
-      count: mismatchSections.length + localBy.language.length + deepBy("language").length,
-      body: (
-        <>
-          {mismatchSections.length > 0 && (
-            <div className={`rounded-lg border p-3 ${severityBorder("warning")}`}>
-              <div className="flex items-center gap-2 mb-1">
-                <Languages className="h-3.5 w-3.5 text-warning" />
-                <span className="text-xs font-semibold">{isSv ? "Blandade språk" : "Mixed languages"}</span>
-              </div>
-              <p className="text-[10px] text-muted-foreground leading-relaxed">
-                {isSv
-                  ? `${mismatchSections.length} sektion(er) verkar vara på fel språk: ${mismatchSections.map(s => s.section).join(", ")}`
-                  : `${mismatchSections.length} section(s) appear to be in the wrong language: ${mismatchSections.map(s => s.section).join(", ")}`}
-              </p>
-              <p className="text-[10px] font-medium text-primary mt-1">→ {isSv ? "Använd 'Konvertera alla' i verktygsfältet" : "Use 'Convert all' in the toolbar"}</p>
-            </div>
-          )}
-          {localBy.language.map(renderLocalIssue)}
-          {deepBy("language").map(d => renderDeepIssue(d.iss, d.i))}
-        </>
-      ),
-    },
-    {
-      key: "other",
-      title: isSv ? "Övrigt" : "Other",
-      count: localBy.other.length + deepBy("other").length,
-      body: (
-        <>
-          {localBy.other.map(renderLocalIssue)}
-          {deepBy("other").map(d => renderDeepIssue(d.iss, d.i))}
-        </>
-      ),
-    },
-  ];
 
   return (
     <div className="p-4 space-y-4">
@@ -1504,23 +883,7 @@ export function InsightsPanel({
             )}
           </div>
         )}
-        <div className="flex justify-center gap-3 mt-2">
-          {errorCount > 0 && (
-            <span className="flex items-center gap-1 text-[10px] text-destructive">
-              <AlertOctagon className="h-3 w-3" /> {errorCount} {isSv ? "kritiska" : "critical"}
-            </span>
-          )}
-          {warningCount > 0 && (
-            <span className="flex items-center gap-1 text-[10px] text-warning">
-              <AlertTriangle className="h-3 w-3" /> {warningCount} {isSv ? "varningar" : "warnings"}
-            </span>
-          )}
-          {errorCount === 0 && warningCount === 0 && (
-            <span className="flex items-center gap-1 text-[10px] text-green-600">
-              <CheckCircle2 className="h-3 w-3" /> {isSv ? "Inga problem hittade" : "No issues found"}
-            </span>
-          )}
-        </div>
+        
       </div>
 
       {/* A failed hard requirement is the one thing tailoring can't fix — keep it visible. */}
@@ -1890,38 +1253,31 @@ export function InsightsPanel({
       )}
 
       <div className={themes.length > 0 && !showDetails ? "hidden" : "space-y-4"}>
-      {/* ── What to fix: ATS buckets ── */}
-      <div className="space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          {isSv ? "Vad du bör åtgärda" : "What to fix"}
-        </p>
-        {buckets.map(b => (
-          <Collapsible key={b.key} open={openBuckets.has(b.key)} onOpenChange={() => toggleBucket(b.key)}>
-            <CollapsibleTrigger asChild>
-              <button className="flex h-11 w-full items-center justify-between rounded-lg border border-border px-3 text-left transition-colors hover:bg-accent/50">
-                <span className="flex items-center gap-2 text-xs font-semibold">
-                  {openBuckets.has(b.key) ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                  {b.title}
-                </span>
-                {b.count > 0 ? (
-                  <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold text-warning">{b.count}</span>
-                ) : deepResult ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                ) : (
-                  <span className="text-[10px] text-muted-foreground">—</span>
-                )}
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 pt-2">
-              {b.count > 0 || b.key === "keywords" ? b.body : deepResult ? (
-                <p className="px-1 text-[10px] text-muted-foreground">{isSv ? "Inga problem hittade." : "No issues found."}</p>
-              ) : (
-                <p className="px-1 text-[10px] text-muted-foreground">{isSv ? "Kör analysen för att fylla i detaljerna." : "Run the analysis to populate details."}</p>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
-        ))}
-      </div>
+      {/* ── Report: a read-only list of what remains. All ACTIONS live in the queue —
+          this view explains, it never competes (the old bucket dashboard did). ── */}
+      {themes.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            {isSv ? "Kvar att göra" : "Left to do"}
+          </p>
+          {(() => {
+            const accepted = new Set(cv.__meta?.acceptedGaps || []);
+            const ratingOf = (t: typeof themes[number]) => Math.round((t.rating as number) ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
+            const gapRows = themes.filter(t => ratingOf(t) < 4 && !accepted.has(t.theme))
+              .map(t => ({ id: `g:${t.theme}`, label: (isSv ? "Tema: " : "Theme: ") + t.theme, note: `${ratingOf(t)}/5` }));
+            const readyRows = readiness.map(r => ({ id: r.id, label: r.title, note: "" }));
+            const rows = [...gapRows, ...readyRows];
+            if (!rows.length) return <p className="text-[11px] text-muted-foreground">{isSv ? "Inget — kön är tom." : "Nothing — the queue is empty."}</p>;
+            return rows.map(r => (
+              <p key={r.id} className="flex items-baseline justify-between gap-2 border-b border-border/60 py-1 text-[11px]">
+                <span>{r.label}</span>
+                {r.note && <span className="tabular-nums text-muted-foreground">{r.note}</span>}
+              </p>
+            ));
+          })()}
+          <p className="text-[10px] text-muted-foreground">{isSv ? "Allt åtgärdas i guiden ovan." : "Everything is actioned in the guide above."}</p>
+        </div>
+      )}
 
       {/* ── Job posting context ── */}
       <Collapsible open={showJob} onOpenChange={setShowJob}>

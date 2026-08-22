@@ -347,8 +347,12 @@ const Dashboard = () => {
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-stretch gap-2">
-                <Button size="lg" className="h-12 px-6 text-base" onClick={() => openApply()} disabled={templates.length === 0}>
-                  {isSv ? "Sök en ny tjänst" : "Apply for a new position"}
+                {/* Never a dead end: with no template yet, the same button starts the
+                    template instead of sitting disabled without explanation. */}
+                <Button size="lg" className="h-12 px-6 text-base" onClick={() => templates.length === 0 ? navigate("/wizard/create") : openApply()}>
+                  {templates.length === 0
+                    ? (isSv ? "Skapa din mall först" : "Create your template first")
+                    : (isSv ? "Sök en ny tjänst" : "Apply for a new position")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
                 <button type="button" onClick={() => setAddOpen(true)}
@@ -406,6 +410,26 @@ const Dashboard = () => {
                 {doneOpen && <div className="space-y-2">{pipeline.done.map((r) => renderCard(r, "application"))}</div>}
               </section>
             )}
+
+            {/* Templates live HERE now — one home, one mental model. The old /templates
+                page duplicated every card action on this one. */}
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground tabular-nums">
+                  {isSv ? "Mallar" : "Templates"} · {templates.length}
+                </p>
+                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => navigate("/wizard/create")}>
+                  <Plus className="mr-1 h-3.5 w-3.5" />{isSv ? "Skapa mall" : "Create template"}
+                </Button>
+              </div>
+              {templates.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+                  {isSv ? "Ingen mall än — mallen är ditt master-CV som varje ansökan utgår från." : "No template yet — the template is the master CV every application starts from."}
+                </div>
+              ) : (
+                <div className="space-y-2">{templates.map((r) => renderCard(r, "template"))}</div>
+              )}
+            </section>
           </div>
         )}
       </div>

@@ -9,7 +9,7 @@ import { Shield, Mail, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Auth = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
   const [params] = useSearchParams();
   // Preserve consent-route return path through the magic-link round-trip so external
@@ -57,6 +57,15 @@ const Auth = () => {
                 </div>
                 <CardTitle>{t("authSent")}</CardTitle>
                 <CardDescription>{t("authSentDesc")}</CardDescription>
+                {/* Never a dead end: resend and wrong-address recovery. */}
+                <div className="mt-4 flex flex-col gap-2">
+                  <Button variant="outline" size="sm" className="h-9 text-xs" disabled={loading} onClick={(e) => handleLogin(e as any)}>
+                    {language === "sv" ? "Skicka länken igen" : "Send the link again"}
+                  </Button>
+                  <button type="button" className="text-xs text-muted-foreground underline-offset-4 hover:underline" onClick={() => setSent(false)}>
+                    {language === "sv" ? "Fel e-post? Ändra adressen" : "Wrong email? Change the address"}
+                  </button>
+                </div>
               </>
             ) : (
               <>
