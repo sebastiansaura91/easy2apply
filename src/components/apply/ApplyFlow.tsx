@@ -26,6 +26,7 @@ import { computeMatchScore } from "@/lib/match-score";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CVMeta } from "@/types/cv";
 import { AtsCheckResult } from "@/types/ats-check";
+import { track } from "@/lib/telemetry";
 
 export interface ApplyTemplate {
   id: string;
@@ -135,7 +136,10 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
           registry = (regRow?.content_json as any)?.__meta?.competenceRegistry || undefined;
         } catch { /* no registry yet — themes simply come back untagged */ }
         const { data } = await supabase.functions.invoke("analyze-job-posting", { body: { job_posting_text: jobText.trim(), registry } });
-        if (!(data as any)?.error) ja = data;
+        if (!(data as any)?.error) {
+          ja = data;
+          track("ad_analyzed", { themes: (ja?.competence_themes || []).length, knockouts: (ja?.knockout_requirements || []).length });
+        }
       } catch { /* non-fatal: still show the ATS match */ }
 
       // 1b) Match the demand against the whole profile, before any CV exists.
@@ -197,6 +201,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
   };
 
   const createAndOpen = async () => {
+    track("cv_created", { source: "tailored" });
     if (!userId || !base) return;
     setBusy(true);
     try {
@@ -283,6 +288,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
   };
 
   const downloadCreated = async () => {
+    track("export", { surface: "apply" });
     if (!createdCv) return;
     const tCv = (k: string) => cvHeadings[cvLang]?.[k] ?? k;
     const enabled = [...(createdCv.sections || [])].filter((s: any) => s.enabled).sort((a: any, b: any) => a.order - b.order);

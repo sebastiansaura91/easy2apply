@@ -11,6 +11,7 @@ import { Shield, ArrowLeft, Upload, Linkedin, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { v4 as uuidv4 } from "uuid";
+import { track } from "@/lib/telemetry";
 
 export default function CreateWizard() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ export default function CreateWizard() {
   const [lang, setLang] = useState<"sv" | "en">(language);
 
   const createAndOpen = async (cv: CVContent, title?: string) => {
+    track("cv_created", { source: title ? "blank" : source === "linkedin" ? "linkedin" : "upload" });
     if (!user) return;
     const id = uuidv4();
     const t = title || (cv.contact?.name ? `${cv.contact.name} – CV` : (isSv ? "Nytt CV" : "New CV"));

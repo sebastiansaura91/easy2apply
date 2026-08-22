@@ -22,6 +22,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { v4 as uuidv4 } from "uuid";
+import { track } from "@/lib/telemetry";
 
 interface ResumeRow { id: string; title: string; language: string; updated_at: string; created_at: string; content_json?: { __meta?: CVMeta } | null; }
 
@@ -84,6 +85,7 @@ const Dashboard = () => {
     return { label: isSv ? "Svag match" : "Weak match", cls: "text-destructive", dot: "bg-destructive", lifecycle: false };
   };
   const setStage = async (r: ResumeRow, stage: "sent" | "interview" | "offer" | "rejected" | null) => {
+    track("stage_changed", { stage: stage ?? "draft" });
     const { data } = await supabase.from("resumes").select("content_json").eq("id", r.id).single();
     const prev = (data?.content_json as any) || {};
     const content = {

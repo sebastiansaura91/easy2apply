@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { track } from "@/lib/telemetry";
 
 interface Props {
   cv: CVContent;
@@ -239,6 +240,7 @@ export function InsightsPanel({
     // temperature 0, so if nothing changed since the stored analysis, reuse it.
     if (cv.__meta?.lastAtsResult?.hash === cvSignature && deepResult) {
       setAnalyzedSnapshot(cvSignature);
+      track("scan_completed", { score: Math.round((deepResult as AtsCheckResult).overall_score), cached: true });
       if (!opts?.silent) toast({
         title: isSv ? "Inget har ändrats" : "Nothing changed",
         description: isSv ? "Samma underlag ger samma resultat — visar den sparade analysen." : "Same input gives the same result — showing the stored analysis.",
@@ -310,6 +312,7 @@ export function InsightsPanel({
       onPersistResult?.(requestSig, newResult);
       setAnalyzedSnapshot(requestSig);
       setAnalyzedAt(new Date());
+      track("scan_completed", { score: Math.round(newResult.overall_score), cached: false });
       if (prevScore !== null) {
         const delta = Math.round(newResult.overall_score - prevScore);
         setLastDelta(delta);
@@ -382,7 +385,10 @@ export function InsightsPanel({
   const skillsAdvice = onUpdateSkills ? adviseSkills(cv, cv.__meta?.demandProfile, cv.__meta?.verifiedEvidence) : null;
   const skillsActionCount = skillsAdvice ? skillsAdvice.add.length + skillsAdvice.reword.length + skillsAdvice.trim.length : 0;
   const acceptedChecks = new Set(cv.__meta?.acceptedChecks || []);
-  const acceptCheck = (id: string) => onUpdateMeta?.({ acceptedChecks: [...(cv.__meta?.acceptedChecks || []), id] });
+  const acceptCheck = (id: string) => {
+    track("card_actioned", { type: "check", action: "waive" });
+    onUpdateMeta?.({ acceptedChecks: [...(cv.__meta?.acceptedChecks || []), id] });
+  };
   const pageEst = estimatePages(cv);
   const profMiss = profileCoverage(cv.profile, themes.filter(t => t.importance === "must").slice(0, 3)).filter(c => !c.mentioned);
   const blankScope = cv.experience.slice(0, 2).filter(e => (e.bullets || []).some(b => b.trim()) && !(e.roleScope || "").trim());
@@ -426,8 +432,23 @@ export function InsightsPanel({
     next.splice(s.fromIndex, 1);
     next.unshift(s.bullet);
     onUpdateExperienceBullets(s.expIndex, next);
+    track("card_actioned", { type: "proof_move", action: "accept" });
     toast({ title: isSv ? "Punkten flyttad överst" : "Bullet moved to the top" });
   };
+  // Peak-end telemetry: fire once each time the whole queue empties.
+  const doneReportedRef = useRef(false);
+  const queueEmpty = themes.length > 0 && readiness.length === 0 && themes.every(t => {
+    const r = Math.round((t.rating as number) ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
+    return r >= 4 || (cv.__meta?.acceptedGaps || []).includes(t.theme);
+  });
+  useEffect(() => {
+    if (!queueEmpty) { doneReportedRef.current = false; return; }
+    if (doneReportedRef.current) return;
+    doneReportedRef.current = true;
+    track("readiness_done", { score: computeMatchScore(themes) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queueEmpty]);
+
   // Skills advisor rows — shared by the queue card and the details sheet.
   const skillsRows = () => skillsAdvice && (
     <div className="space-y-1.5">
@@ -587,6 +608,7 @@ export function InsightsPanel({
   };
 
   const dismissQuestion = (keyword: string) => {
+    track("card_actioned", { type: "question", action: "dismiss" });
     setKwConfirm(prev => ({ ...prev, [keyword]: "no" }));
     setKwQuestions(prev => (prev || []).filter(q => q.keyword !== keyword));
   };
@@ -688,6 +710,7 @@ export function InsightsPanel({
   const submitOneAnswer = (q: KwQuestion) => {
     const answer = composedAnswer(q);
     if (answer.length <= 2) return;
+    track("card_actioned", { type: "question", action: "answer" });
     persistEvidence([{ keyword: q.keyword, answer, role: kwRole[q.keyword] || undefined }]);
     answeredRef.current.push({
       keyword: q.keyword, answer: answerWithRole(q),
@@ -728,6 +751,7 @@ export function InsightsPanel({
   const applyNewBullet = (nb: NewBullet, idx: number) => {
     const exp = cv.experience[nb.exp_index];
     if (!exp) return;
+    track("card_actioned", { type: "new_bullet", action: "accept" });
     onSnapshot?.(isSv ? "Ny punkt" : "New bullet");
     appliedSinceScanRef.current = true;
     onUpdateExperienceBullets?.(nb.exp_index, [...exp.bullets, nb.bullet]);
@@ -743,6 +767,7 @@ export function InsightsPanel({
     }
     const next = [...bullets];
     next[p.bullet_index] = p.revised;
+    track("card_actioned", { type: "placement", action: "accept" });
     onSnapshot?.(isSv ? `Ordbyte: ${p.keyword}` : `Swap: ${p.keyword}`);
     appliedSinceScanRef.current = true;
     onUpdateExperienceBullets?.(p.exp_index, next);
@@ -1044,7 +1069,7 @@ export function InsightsPanel({
             {renderPlacementDiff(p)}
             <div className="flex gap-2">
               <Button className="h-11 flex-1 text-sm" onClick={() => applyPlacement(p, pIdx)}>{isSv ? "Använd" : "Accept"}</Button>
-              <Button variant="outline" className="h-11 text-sm" onClick={() => setDismissedPlacements(prev => new Set(prev).add(pIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
+              <Button variant="outline" className="h-11 text-sm" onClick={() => { track("card_actioned", { type: "placement", action: "dismiss" }); setDismissedPlacements(prev => new Set(prev).add(pIdx)); }}>{isSv ? "Avvisa" : "Dismiss"}</Button>
             </div>
           </>);
         } else if (nbIdx >= 0) {
@@ -1057,7 +1082,7 @@ export function InsightsPanel({
             <p className="ai-ink text-sm leading-relaxed">{nb.bullet}</p>
             <div className="flex gap-2">
               <Button className="h-11 flex-1 text-sm" onClick={() => applyNewBullet(nb, nbIdx)}>{isSv ? "Lägg till" : "Add"}</Button>
-              <Button variant="outline" className="h-11 text-sm" onClick={() => setDismissedNew(prev => new Set(prev).add(nbIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
+              <Button variant="outline" className="h-11 text-sm" onClick={() => { track("card_actioned", { type: "new_bullet", action: "dismiss" }); setDismissedNew(prev => new Set(prev).add(nbIdx)); }}>{isSv ? "Avvisa" : "Dismiss"}</Button>
             </div>
           </>);
         } else if (gaps.length > 0) {

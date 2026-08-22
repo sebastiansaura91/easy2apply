@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { trackError } from "@/lib/telemetry";
 
 interface Props {
   children: React.ReactNode;
@@ -23,6 +24,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    trackError(error.message, "ErrorBoundary");
     // Log the component stack for debugging; no user PII is included here.
     console.error("Unhandled render error:", error, info.componentStack);
   }

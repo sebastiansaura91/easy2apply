@@ -31,6 +31,7 @@ import { TEMPLATE_STYLES, getTemplateStyle, withAccent, ACCENT_PRESETS } from "@
 import { detectCvLanguages } from "@/lib/language-detection";
 import { buildEvidenceLookup } from "@/lib/competence-registry";
 import { runParseBackCheck } from "@/lib/parse-check";
+import { track } from "@/lib/telemetry";
 
 const CVEditor = () => {
   const { id } = useParams<{ id: string }>();
@@ -291,7 +292,7 @@ const CVEditor = () => {
   // Every download runs the parse-back check first: a field a real parser can't
   // recover must never be sent unseen. Clean → download; misses → dialog with an
   // explicit "download anyway".
-  const exportNow = () => exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent, cvLanguage).catch(() => toast({ title: "PDF export failed", variant: "destructive" }));
+  const exportNow = () => { track("export", { surface: "editor" }); return exportToPdf(cv, enabledSections, tCv, `${safeName}.pdf`, templateStyleId, templateAccent, cvLanguage).catch(() => toast({ title: "PDF export failed", variant: "destructive" })); };
   const doExport = async () => {
     setParsing(true);
     try {
