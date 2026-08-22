@@ -629,7 +629,6 @@ export function InsightsPanel({
 
   // Evidence travels STRUCTURED (what kinds are true / the specifics / which role),
   // so the server can distill a proper CV bullet instead of quoting a mashed string.
-  interface EvidenceItem { keyword: string; answer: string; statements?: string[]; detail?: string; role?: string }
   const runPlacements = async (phrases: string[], evidence?: EvidenceItem[]) => {
     setPlacing(true);
     setPlacements(null);
