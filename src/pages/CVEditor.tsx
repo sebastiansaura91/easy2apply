@@ -241,8 +241,18 @@ const CVEditor = () => {
   }, [loading, flowScoped, flow.analysis, flow.jobPostingText]);
 
   const updateProfile = (text: string) => updateCv("profile", text);
-  const updateExperienceBullets = (expIdx: number, bullets: string[]) =>
+  // AI-applied bullet changes get a one-shot morph in the preview: the moment foreign
+  // ink becomes the user's own text. Manual typing never routes through here.
+  const [aiHighlight, setAiHighlight] = useState<{ expId: string; bulletIdx: number; key: number } | null>(null);
+  const updateExperienceBullets = (expIdx: number, bullets: string[]) => {
+    const exp = cv.experience[expIdx];
+    if (exp) {
+      let idx = bullets.findIndex((b, i) => b !== exp.bullets[i]);
+      if (idx === -1 && bullets.length > exp.bullets.length) idx = bullets.length - 1;
+      if (idx >= 0) setAiHighlight({ expId: exp.id, bulletIdx: idx, key: Date.now() });
+    }
     setCv(prev => ({ ...prev, experience: prev.experience.map((e, i) => i === expIdx ? { ...e, bullets } : e) }));
+  };
   const updateSkills = (skills: string[]) => updateCv("skills", skills);
 
   // One-step undo for automatic changes: snapshot the document BEFORE the change;
@@ -620,7 +630,7 @@ const CVEditor = () => {
         <div className={`min-w-0 flex-1 overflow-auto bg-muted/40 ${showBoth ? "border-l border-border" : ""}`}>
           <div className="flex justify-center p-6">
             <div style={{ zoom: 0.62 }}>
-              <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} style={templateStyle} />
+              <A4Preview cv={cv} enabledSections={enabledSections} t={tCv} style={templateStyle} highlight={aiHighlight} />
             </div>
           </div>
         </div>
@@ -670,7 +680,7 @@ const CVEditor = () => {
                 <button
                   key={s.id}
                   onClick={() => setTemplateStyle(s.id)}
-                  className={`w-full text-left rounded-lg border p-3 transition-all ${selected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border hover:border-primary/40"}`}
+                  className={`w-full text-left rounded-lg border p-3 transition-[border-color,background-color,box-shadow] duration-150 ${selected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border hover:border-primary/40"}`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-sm" style={{ color: s.accentHex }}>{s.label[cvLanguage]}</span>

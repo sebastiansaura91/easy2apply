@@ -29,7 +29,9 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+  // Tool tempo: the Improve panel opens many times a day. Enter 250ms on the iOS
+  // drawer curve, exit 200ms ease-out — never the 500ms marketing pace this shipped with.
+  "fixed z-50 gap-4 bg-background p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:duration-250 data-[state=open]:ease-drawer data-[state=closed]:duration-200 data-[state=closed]:ease-out",
   {
     variants: {
       side: {

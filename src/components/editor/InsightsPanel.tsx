@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { runAtsCheck } from "@/components/cv-editor/AtsCheck";
 import { detectCvLanguages } from "@/lib/language-detection";
 import { findCvIssues, analyzeAllBullets, CvIssue } from "@/lib/cv-quality";
 import { cvScanSignature } from "@/lib/cv-signature";
@@ -67,6 +66,32 @@ interface SinceLast {
   overall: number;
   subs: { label: string; delta: number }[];
   resolved: string[];
+}
+
+/**
+ * Count-up for the score delta: the session's peak-end moment, and it is RARE —
+ * exactly where a little show is allowed. Respects prefers-reduced-motion.
+ */
+function CountUp({ from, value }: { from: number; value: number }) {
+  const [n, setN] = useState(from);
+  useEffect(() => {
+    if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setN(value);
+      return;
+    }
+    const t0 = performance.now();
+    const dur = 450;
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - t0) / dur);
+      const eased = 1 - Math.pow(1 - p, 3); // strong ease-out
+      setN(Math.round(from + (value - from) * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [from, value]);
+  return <>{n}</>;
 }
 
 function severityIcon(severity: CvIssue["severity"]) {
@@ -1829,7 +1854,7 @@ export function InsightsPanel({
               <p className="font-serif text-4xl font-medium tabular-nums">
                 <span className="text-muted-foreground/50">{curScore! - lastDelta!}</span>
                 <span className="mx-2 text-muted-foreground/50">→</span>
-                <span className={scoreColor(curScore!)}>{curScore}</span>
+                <span className={scoreColor(curScore!)}><CountUp from={curScore! - lastDelta!} value={curScore!} /></span>
               </p>
             ) : (
               <p className="text-lg font-semibold leading-snug text-green-700 dark:text-green-500">✓ {isSv ? "Alla kort hanterade" : "All cards handled"}</p>

@@ -8,9 +8,11 @@ interface A4PreviewProps {
   enabledSections: CVSection[];
   t: (k: any) => string;
   style?: TemplateStyle;
+  /** One-shot morph on the bullet an AI suggestion just changed — foreign ink becoming the user's text. */
+  highlight?: { expId: string; bulletIdx: number; key: number } | null;
 }
 
-export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4Preview({ cv, enabledSections, t, style }, ref) {
+export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4Preview({ cv, enabledSections, t, style, highlight }, ref) {
   // Same detection as the PDF export: keep preview and export dates identical.
   const dateLang: "sv" | "en" = t("present") === "Nuvarande" ? "sv" : "en";
   const styleVars = style
@@ -168,21 +170,18 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
                       </p>
                     )}
                     {exp.roleScope && <p className="role-scope">{exp.roleScope}</p>}
-                    {exp.bullets.filter(Boolean).length > 0 && (
-                      exp.bulletStyle === "numbered" ? (
-                        <ol>
-                          {exp.bullets.filter(Boolean).map((b, i) => (
-                            <li key={i}>{b}</li>
-                          ))}
-                        </ol>
-                      ) : (
-                        <ul>
-                          {exp.bullets.filter(Boolean).map((b, i) => (
-                            <li key={i}>{b}</li>
-                          ))}
-                        </ul>
-                      )
-                    )}
+                    {exp.bullets.filter(Boolean).length > 0 && (() => {
+                      // Original indices are kept (empties render as null) so the
+                      // AI-change highlight lands on the right bullet even with gaps.
+                      const li = (b: string, i: number) => {
+                        if (!b) return null;
+                        const hl = highlight && highlight.expId === exp.id && highlight.bulletIdx === i;
+                        return <li key={hl ? `hl-${highlight!.key}` : i} className={hl ? "text-morph" : undefined}>{b}</li>;
+                      };
+                      return exp.bulletStyle === "numbered"
+                        ? <ol>{exp.bullets.map(li)}</ol>
+                        : <ul>{exp.bullets.map(li)}</ul>;
+                    })()}
                   </div>
                 ))}
               </div>

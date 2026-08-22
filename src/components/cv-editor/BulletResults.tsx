@@ -109,7 +109,7 @@ export function BulletResults({ result, context, onAccept, onRegenerate }: Bulle
     const needsInput = bullet.needs_user_input.length > 0;
 
     return (
-      <Card key={globalIdx} className={`transition-all ${isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "hover:border-muted-foreground/30"}`}>
+      <Card key={globalIdx} className={`transition-[border-color,background-color,box-shadow] duration-150 ${isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "hover:border-muted-foreground/30"}`}>
         <CardContent className="p-3 space-y-2">
           <div className="flex gap-2 items-start">
             <button

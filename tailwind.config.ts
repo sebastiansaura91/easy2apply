@@ -81,6 +81,15 @@ export default {
           foreground: "hsl(var(--warning-foreground))",
         },
       },
+      // Named motion tokens: tailwindcss-animate only mirrors THEME values onto
+      // animation-duration/timing-function (arbitrary [] values silently drop), so
+      // the sheet tempo lives here, not inline.
+      transitionDuration: {
+        "250": "250ms",
+      },
+      transitionTimingFunction: {
+        drawer: "cubic-bezier(0.32, 0.72, 0, 1)",
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

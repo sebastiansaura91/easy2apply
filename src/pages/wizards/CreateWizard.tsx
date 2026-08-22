@@ -73,7 +73,7 @@ export default function CreateWizard() {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <button onClick={() => openUpload("cv")}
-                className="group text-left rounded-xl border border-border bg-card p-6 hover:border-primary/50 hover:shadow-md transition-all">
+                className="group text-left rounded-xl border border-border bg-card p-6 hover:border-primary/50 hover:shadow-md transition-[border-color,box-shadow] duration-150">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <Upload className="h-5 w-5 text-primary" />
                 </div>
@@ -82,7 +82,7 @@ export default function CreateWizard() {
               </button>
 
               <button onClick={() => openUpload("linkedin")}
-                className="group text-left rounded-xl border border-border bg-card p-6 hover:border-primary/50 hover:shadow-md transition-all">
+                className="group text-left rounded-xl border border-border bg-card p-6 hover:border-primary/50 hover:shadow-md transition-[border-color,box-shadow] duration-150">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <Linkedin className="h-5 w-5 text-primary" />
                 </div>

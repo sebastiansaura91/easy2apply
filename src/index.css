@@ -190,13 +190,14 @@
   }
 }
 
-/* Queue-card content: rises 8px from 98% scale through a 2px blur — felt, not watched.
-   The card surface itself never remounts (component persistence); only content animates. */
+/* Queue-card content: rises 6px from 98% scale — felt, not watched. Cards advance
+   dozens of times per session, so this stays quick (150ms), compositor-only
+   (transform + opacity, no filter), and the surface itself never remounts. */
 @keyframes card-enter {
-  from { opacity: 0; transform: translateY(8px) scale(0.98); filter: blur(2px); }
-  to { opacity: 1; transform: none; filter: none; }
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
 }
-.card-enter { animation: card-enter var(--motion-fast) var(--ease-ink) both; }
+.card-enter { animation: card-enter var(--motion-quick) var(--ease-ink) both; }
 
 /* Accepted-wording swap: quick, the blur does the morph. */
 @keyframes text-morph {
@@ -212,8 +213,15 @@
 }
 .check-draw { stroke-dasharray: 26; animation: check-draw var(--motion-emphasis) var(--ease-ink) 120ms both; }
 
+/* Reduced motion is a promise, not a suggestion: clamp EVERY animation and transition
+   (including the dialog/sheet zoom-slides from tailwindcss-animate), not just our own.
+   fill-mode end states survive the 0.01ms duration, so nothing gets stuck mid-state. */
 @media (prefers-reduced-motion: reduce) {
-  .card-enter, .text-morph, .check-draw { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* A4 Preview Styles */
