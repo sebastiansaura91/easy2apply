@@ -182,7 +182,8 @@ export function InsightsPanel({
   const [appliedReframes, setAppliedReframes] = useState<Set<number>>(new Set());
   const [dismissedReframes, setDismissedReframes] = useState<Set<number>>(new Set());
   const reframesTried = useRef(false);
-  const answeredRef = useRef<{ keyword: string; answer: string }[]>([]);
+  interface EvidenceItem { keyword: string; answer: string; statements?: string[]; detail?: string; role?: string }
+  const answeredRef = useRef<EvidenceItem[]>([]);
   const cycleKw = (k: string) =>
     setKwConfirm(prev => {
       const cur = prev[k];
