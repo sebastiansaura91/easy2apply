@@ -161,6 +161,10 @@ export function InsightsPanel({
   const [dismissedNew, setDismissedNew] = useState<Set<number>>(new Set());
   // Whole-bullet reframes toward the target role — queue cards after the gap cards.
   const [reframes, setReframes] = useState<BulletReframe[] | null>(null);
+  // The queue takes at most 3 reframes; the rest wait in the editor. A queue
+  // that GROWS when you answer cards is homework, not guidance.
+  const REFRAME_QUEUE_CAP = 3;
+  const [reframesTotal, setReframesTotal] = useState(0);
   const [appliedReframes, setAppliedReframes] = useState<Set<number>>(new Set());
   const [dismissedReframes, setDismissedReframes] = useState<Set<number>>(new Set());
   const reframesTried = useRef(false);
@@ -203,7 +207,9 @@ export function InsightsPanel({
     const sig = cvScanSignature(cv, jobText) + "|role:" + (cv.__meta?.targetRole || cv.__meta?.targetRoleLabel || "");
     const stored = cv.__meta?.lastRoleFit;
     if (stored && stored.hash === sig) {
-      setReframes(((stored.result as any)?.reframes || []) as BulletReframe[]);
+      const storedAll = ((stored.result as any)?.reframes || []) as BulletReframe[];
+      setReframesTotal(storedAll.length);
+      setReframes(storedAll.slice(0, REFRAME_QUEUE_CAP));
       return;
     }
     (async () => {
@@ -217,7 +223,9 @@ export function InsightsPanel({
         });
         if (error || (data as any)?.error) return;
         onPersistRoleFit?.(sig, data as RoleFitResult);
-        setReframes(((data as any)?.reframes || []) as BulletReframe[]);
+        const all = ((data as any)?.reframes || []) as BulletReframe[];
+        setReframesTotal(all.length);
+        setReframes(all.slice(0, REFRAME_QUEUE_CAP));
       } catch { /* reframes are optional — the queue works without them */ }
     })();
   }, [autoRun]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -797,47 +805,30 @@ export function InsightsPanel({
               <p className="text-xs font-semibold text-muted-foreground">
                 {isSv ? "Matchpoäng · viktad kompetensmatchning" : "Match score · weighted competency match"}
               </p>
-              {/* Endowed progress: the meter never starts at zero — lead with what the
-                  CV already proves before what remains. */}
-              {!done && themes.length - allGaps.length > 0 && (
-                <p className="mt-0.5 text-[11px] text-green-700 dark:text-green-500">
-                  {themes.length - allGaps.length} {isSv ? `av ${themes.length} teman har redan stark evidens` : `of ${themes.length} themes already carry strong evidence`}
-                </p>
-              )}
-              {!done && (
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {remaining} {isSv ? `av ${allGaps.length} gap kvar` : `of ${allGaps.length} gaps left`}
-                  {gap && !accepted.has(gap.theme) && (
-                    <> · {isSv ? "störst:" : "biggest:"} <span className="font-medium text-foreground">{gap.theme}</span></>
-                  )}
-                </p>
-              )}
-              {/* Title alignment — recruiters search by title first; own signal, never
-                  folded into the score. Deterministic, no model. */}
+              {/* ONE status line (the header used to stack five). Title-none keeps its
+                  own explanatory row because it needs a sentence, not a chip. */}
               {(() => {
                 const tm = titleMatch(cv.__meta?.tailoredForJob, cv);
-                if (!tm) return null;
+                const covered = themes.length - allGaps.length;
+                const parts: string[] = [];
+                if (themes.length) parts.push(isSv ? `${covered} av ${themes.length} teman täckta` : `${covered} of ${themes.length} themes covered`);
+                if (remaining > 0 && gap && !accepted.has(gap.theme)) parts.push((isSv ? "störst gap: " : "biggest gap: ") + gap.theme);
+                if (six) parts.push((isSv ? "toppen " : "top ") + `${six.themes.filter(x => x.visible).length}/${six.themes.length}`);
+                if (tm?.level === "exact") parts.push(isSv ? "titel ✓" : "title ✓");
+                if (tm?.level === "partial") parts.push(isSv ? "titel delvis" : "title partial");
                 return (
-                  <p className="mt-1 text-[11px]">
-                    {tm.level === "exact" && <span className="text-green-700 dark:text-green-500">{isSv ? "Titeln matchar annonsens" : "Title matches the ad"} ({tm.cvTitle})</span>}
-                    {tm.level === "partial" && <span className="text-warning">{isSv ? `Titeln matchar delvis (${tm.cvTitle})` : `Title partly matches (${tm.cvTitle})`}</span>}
-                    {tm.level === "none" && (
-                      <span className="text-muted-foreground">
+                  <>
+                    {parts.length > 0 && <p className="mt-1 text-[11px] text-muted-foreground">{parts.join(" · ")}</p>}
+                    {tm?.level === "none" && (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
                         {isSv
-                          ? `Annonsens titel saknas i CV:t. Rekryterare söker på titel — speglar "${cv.__meta?.tailoredForJob}" din nuvarande roll är profilen rätt plats.`
-                          : `The ad's title is absent from the CV. Recruiters search by title — if "${cv.__meta?.tailoredForJob}" reflects your current role, the profile is the place for it.`}
-                      </span>
+                          ? `Annonsens titel saknas i CV:t — speglar "${cv.__meta?.tailoredForJob}" din roll är profilen rätt plats.`
+                          : `The ad's title is absent from the CV — if "${cv.__meta?.tailoredForJob}" reflects your role, the profile is the place for it.`}
+                      </p>
                     )}
-                  </p>
+                  </>
                 );
               })()}
-              {/* Six-second status: one quiet line. The ACTIONS live as queue cards —
-                  the overview reports, the queue guides. */}
-              {six && (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {isSv ? "Toppen visar" : "Top third shows"} {six.themes.filter(t => t.visible).length}/{six.themes.length} {isSv ? "krav-teman" : "must themes"} · {six.quantifiedTop}/{six.topCount} {isSv ? "punkter med siffror" : "bullets with numbers"}
-                </p>
-              )}
               {done && (
                 <div className="mx-auto mt-2 max-w-xs space-y-1.5 rounded-lg border border-green-600/30 bg-green-600/10 p-3">
                   {/* The one celebration in the whole app: a pen-stroke check, drawn once,
@@ -857,15 +848,6 @@ export function InsightsPanel({
                     </Button>
                   )}
                 </div>
-              )}
-              {typeof window !== "undefined" && !window.localStorage.getItem("matchModelSeen") && (
-                <button
-                  type="button"
-                  className="mt-1 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
-                  onClick={(e) => { window.localStorage.setItem("matchModelSeen", "1"); (e.target as HTMLElement).remove(); }}
-                >
-                  {isSv ? "Ny poängmodell: som en rekryterares scorecard — krav-teman väger dubbelt. (göm)" : "New scoring model: like a recruiter's scorecard — must-themes weigh double. (hide)"}
-                </button>
               )}
             </>
           );
@@ -1291,7 +1273,9 @@ export function InsightsPanel({
             const gapRows = themes.filter(t => ratingOf(t) < 4 && !accepted.has(t.theme))
               .map(t => ({ id: `g:${t.theme}`, label: (isSv ? "Tema: " : "Theme: ") + t.theme, note: `${ratingOf(t)}/5` }));
             const readyRows = readiness.map(r => ({ id: r.id, label: r.title, note: "" }));
-            const rows = [...gapRows, ...readyRows];
+            const rfInQueue = (reframes || []).filter((_, i) => !appliedReframes.has(i) && !dismissedReframes.has(i)).length;
+            const rfRows = rfInQueue > 0 ? [{ id: "rf", label: isSv ? "Omformuleringar i kön" : "Reframes in the queue", note: `${rfInQueue}${reframesTotal > REFRAME_QUEUE_CAP ? ` (+${reframesTotal - REFRAME_QUEUE_CAP} ${isSv ? "till i editorn" : "more in the editor"})` : ""}` }] : [];
+            const rows = [...gapRows, ...readyRows, ...rfRows];
             if (!rows.length) return <p className="text-[11px] text-muted-foreground">{isSv ? "Inget — kön är tom." : "Nothing — the queue is empty."}</p>;
             return rows.map(r => (
               <p key={r.id} className="flex items-baseline justify-between gap-2 border-b border-border/60 py-1 text-[11px]">

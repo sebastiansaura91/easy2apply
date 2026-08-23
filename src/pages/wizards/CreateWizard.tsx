@@ -80,17 +80,9 @@ export default function CreateWizard() {
                   <Upload className="h-5 w-5 text-primary" />
                 </div>
                 <h3 className="font-semibold text-sm">{isSv ? "Ladda upp CV (PDF)" : "Upload a CV (PDF)"}</h3>
-                <p className="text-xs text-muted-foreground mt-1">{isSv ? "Vi läser in allt — du granskar och redigerar." : "We'll extract everything — you review and edit."}</p>
+                <p className="text-xs text-muted-foreground mt-1">{isSv ? "Vi läser in allt — du granskar och redigerar. LinkedIn-exporten (PDF) funkar utmärkt." : "We'll extract everything — you review and edit."}</p>
               </button>
 
-              <button onClick={() => openUpload("linkedin")}
-                className="group text-left rounded-xl border border-border bg-card p-6 hover:border-primary/50 hover:shadow-md transition-[border-color,box-shadow] duration-150">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <Linkedin className="h-5 w-5 text-primary" />
-                </div>
-                <h3 className="font-semibold text-sm">{isSv ? "Importera från LinkedIn" : "Import from LinkedIn"}</h3>
-                <p className="text-xs text-muted-foreground mt-1">{isSv ? "Ladda upp din LinkedIn-PDF." : "Upload your LinkedIn PDF export."}</p>
-              </button>
             </div>
 
             <div className="pt-2">

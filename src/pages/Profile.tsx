@@ -232,15 +232,17 @@ export default function Profile() {
                 {isSv ? "Allt du gjort, i den ordning du gjorde det. Varje verifierat svar sparas under rätt roll." : "Everything you have done, in the order you did it. Every verified answer is filed under its role."}
               </p>
             </div>
-            <Button variant="outline" className="h-9 text-xs" onClick={buildRegistry} disabled={building || loading}>
-              {building && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-              {building ? (isSv ? "Klustrar…" : "Clustering…") : (isSv ? "Uppdatera matchningsmotorn" : "Update the matching engine")}
-            </Button>
+
           </div>
           {!loading && roles.length > 0 && (
             <p className="mt-2 text-xs text-muted-foreground tabular-nums">
               {roles.length} {isSv ? "roller" : "roles"} · {evidenceCount} {isSv ? "verifierade bevis" : "verified answers"}
               {registry && <> · {isSv ? "motor v" : "engine v"}{registry.version}</>}
+              {" · "}
+              {/* Machinery, demoted: a text action, not a hero button. */}
+              <button type="button" className="underline-offset-4 hover:underline disabled:opacity-50" onClick={buildRegistry} disabled={building || loading}>
+                {building ? (isSv ? "klustrar…" : "clustering…") : (isSv ? "bygg om matchningsregistret" : "rebuild the matching registry")}
+              </button>
             </p>
           )}
 
@@ -285,7 +287,7 @@ export default function Profile() {
                         </div>
                         <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground tabular-nums">
                           {r.evidence.length > 0 && <span className="rounded-full bg-accent px-2 py-0.5 text-accent-foreground">{r.evidence.length} {isSv ? "bevis" : "proofs"}</span>}
-                          {r.bullets.length} {isSv ? "punkter" : "bullets"}
+                          {r.bullets.length} {isSv ? "punkter" : "bullets"}{r.bullets.length === 0 && (isSv ? " · tom — öppna mallen och använd ”Förklara vad du gjorde”" : " · empty — open the template and use ”Explain what you did”")}
                           <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                         </span>
                       </button>

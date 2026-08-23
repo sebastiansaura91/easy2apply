@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ExplainWizard } from "./ExplainWizard";
 import { analyzeBullet } from "@/lib/cv-quality";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 const bulletTipsSv = [
   "💡 Kvantifiera resultat: \"Ökade försäljningen med 25% på 6 månader\"",
@@ -45,7 +46,7 @@ interface SectionFormProps {
 }
 
 export function ContactForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
-  const isSv = cvLanguage !== "en";
+  const isSv = useLanguage().language === "sv";
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -64,7 +65,7 @@ export function ContactForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
 }
 
 export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
-  const isSv = cvLanguage !== "en";
+  const isSv = useLanguage().language === "sv";
   const [drafting, setDrafting] = useState(false);
   const { toast } = useToast();
 
@@ -76,7 +77,7 @@ export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
     setDrafting(true);
     try {
       const { data, error } = await supabase.functions.invoke("draft-summary", {
-        body: { resume_content_json: cv, system_language: isSv ? "sv" : "en" },
+        body: { resume_content_json: cv, system_language: cvLanguage || "sv" },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -105,7 +106,7 @@ export function ProfileForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
 }
 
 export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
-  const isSv = cvLanguage !== "en";
+  const isSv = useLanguage().language === "sv";
   const [improvingKey, setImprovingKey] = useState<string | null>(null);
   const [explainExpIdx, setExplainExpIdx] = useState<number | null>(null);
   // Preview state: { expIdx-bulletIdx: { original, improved, reason } }
@@ -469,7 +470,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
 }
 
 export function EducationForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
-  const isSv = cvLanguage !== "en";
+  const isSv = useLanguage().language === "sv";
   const addEducation = () => {
     updateCv("education", [...cv.education, { id: uuidv4(), degree: "", school: "", field: "", startDate: "", endDate: "" }]);
   };
@@ -517,7 +518,7 @@ export function EducationForm({ cv, updateCv, t, cvLanguage }: SectionFormProps)
 
 export function SkillsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   const [newSkill, setNewSkill] = useState("");
-  const isSv = cvLanguage !== "en";
+  const isSv = useLanguage().language === "sv";
   const addSkill = () => {
     if (!newSkill.trim()) return;
     updateCv("skills", [...cv.skills, newSkill.trim()]);
@@ -550,7 +551,7 @@ export function SkillsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
 }
 
 export function CertificationsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
-  const isSv = cvLanguage !== "en";
+  const isSv = useLanguage().language === "sv";
   const { toast } = useToast();
   const currentYear = new Date().getFullYear();
   const addCertification = () => {
@@ -692,7 +693,7 @@ export function OtherForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
 }
 
 export function ProjectsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
-  const isSv = cvLanguage !== "en";
+  const isSv = useLanguage().language === "sv";
   const addProject = () => {
     updateCv("projects", [...cv.projects, { id: uuidv4(), name: "", description: "", bullets: [""] }]);
   };

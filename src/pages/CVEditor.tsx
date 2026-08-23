@@ -36,7 +36,9 @@ import { track } from "@/lib/telemetry";
 const CVEditor = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language: appLanguage } = useLanguage();
+  // Chrome speaks the APP language; only the document follows the CV's language.
+  const isSvApp = appLanguage === "sv";
   const { user } = useAuth();
   const flow = useFlow();
   const { toast } = useToast();
@@ -187,7 +189,7 @@ const CVEditor = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setCv(prev => ({ ...prev, contact: data.contact || prev.contact, profile: data.profile ?? prev.profile, experience: data.experience || prev.experience, education: data.education || prev.education, skills: data.skills || prev.skills, certifications: data.certifications || prev.certifications, projects: data.projects || prev.projects, languages: data.languages || prev.languages, other: data.other ?? prev.other }));
-      toast({ title: cvLanguage === "en" ? "CV translated to English" : "CV översatt till svenska" });
+      toast({ title: !isSvApp ? "CV translated to English" : "CV översatt till svenska" });
     } catch (err: any) {
       toast({ title: "Translation failed", description: err.message, variant: "destructive" });
     } finally { setTranslating(false); }
@@ -242,10 +244,10 @@ const CVEditor = () => {
       const { __meta, ...cur } = prev;
       return {
         ...(snap.doc as any),
-        __meta: { ...__meta, lastSnapshot: { at: new Date().toISOString(), label: cvLanguage === "en" ? `Undid: ${snap.label}` : `Ångrade: ${snap.label}`, doc: cur as any } },
+        __meta: { ...__meta, lastSnapshot: { at: new Date().toISOString(), label: !isSvApp ? `Undid: ${snap.label}` : `Ångrade: ${snap.label}`, doc: cur as any } },
       };
     });
-    toast({ title: cvLanguage === "en" ? "Undone" : "Ångrat", description: cvLanguage === "en" ? "Press again to redo." : "Tryck igen för att göra om." });
+    toast({ title: !isSvApp ? "Undone" : "Ångrat", description: !isSvApp ? "Press again to redo." : "Tryck igen för att göra om." });
   };
   // Replace a bullet with its reframe. Matches tolerantly (trimmed, then across all
   // experiences as a fallback) and reports whether anything actually changed, so the
@@ -267,7 +269,7 @@ const CVEditor = () => {
       next = { ...cv, experience: cv.experience.map(e => ({ ...e, bullets: replaceIn(e.bullets) })) };
     }
     if (changed) {
-      takeSnapshot(cvLanguage === "en" ? "Reframe" : "Omformulering");
+      takeSnapshot(!isSvApp ? "Reframe" : "Omformulering");
       setCv(prev => {
         // Recompute against the freshest state (snapshot updated __meta an instant ago).
         return { ...prev, experience: next.experience };
@@ -315,7 +317,7 @@ const CVEditor = () => {
       setParseCtx("manual");
       setParseChecks(await runParseBackCheck(cv, enabledSections, tCv, templateStyleId, templateAccent, cvLanguage));
     } catch (e: any) {
-      toast({ title: cvLanguage === "en" ? "Parse test failed" : "Parsningstestet kraschade", description: e.message, variant: "destructive" });
+      toast({ title: !isSvApp ? "Parse test failed" : "Parsningstestet kraschade", description: e.message, variant: "destructive" });
     } finally { setParsing(false); }
   };
 
@@ -324,7 +326,7 @@ const CVEditor = () => {
     if (saveTimeout.current) { clearTimeout(saveTimeout.current); saveTimeout.current = null; }
     dirtyRef.current = false;
     await saveCV();
-    toast({ title: cvLanguage === "en" ? "Saved" : "Sparat" });
+    toast({ title: !isSvApp ? "Saved" : "Sparat" });
   };
 
   // Live page count from the real PDF engine (debounced), so the editor always shows
@@ -344,7 +346,7 @@ const CVEditor = () => {
   // One-tap ATS-recommended order: summary + core competencies up top, then experience.
   const applyAtsOrder = () => {
     updateCv("sections", cv.sections.map(s => ({ ...s, order: atsSectionOrder.indexOf(s.type) })));
-    toast({ title: cvLanguage === "en" ? "Sections arranged for ATS" : "Sektioner ordnade för ATS" });
+    toast({ title: !isSvApp ? "Sections arranged for ATS" : "Sektioner ordnade för ATS" });
   };
 
   // Propagate a structural fix (dates, company, contact, education…) to the master template
@@ -365,7 +367,7 @@ const CVEditor = () => {
     }
     setSyncing(false);
     setSyncOpen(false);
-    toast({ title: cvLanguage === "en" ? `Facts synced to ${n} CV${n === 1 ? "" : "s"}` : `Fakta synkade till ${n} CV:n` });
+    toast({ title: !isSvApp ? `Facts synced to ${n} CV${n === 1 ? "" : "s"}` : `Fakta synkade till ${n} CV:n` });
   };
 
   // One prop set for both homes of the improve panel: docked column (wide screens)
@@ -412,62 +414,62 @@ const CVEditor = () => {
               value={title}
               onChange={e => setTitle(e.target.value)}
               className="h-8 w-56 text-sm font-medium border-transparent hover:border-input focus:border-input bg-transparent"
-              placeholder={cvLanguage === "en" ? "Untitled resume" : "Namnlöst CV"}
+              placeholder={!isSvApp ? "Untitled resume" : "Namnlöst CV"}
             />
-            {saving && <span className="text-[10px] text-muted-foreground ml-1">{cvLanguage === "en" ? "Saving…" : "Sparar…"}</span>}
+            {saving && <span className="text-[10px] text-muted-foreground ml-1">{!isSvApp ? "Saving…" : "Sparar…"}</span>}
             {pageCount !== null && (
               <span
                 className={`ml-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium ${
                   pageCount > 2 ? "border-warning/50 bg-warning/10 text-warning" : "border-border text-muted-foreground"
                 }`}
-                title={pageCount > 2 ? (cvLanguage === "en" ? "Aim for max 2 pages — shorten the longest bullets." : "Sikta på max 2 sidor — korta de längsta punkterna.") : undefined}
+                title={pageCount > 2 ? (!isSvApp ? "Aim for max 2 pages — shorten the longest bullets." : "Sikta på max 2 sidor — korta de längsta punkterna.") : undefined}
               >
-                {pageCount} {cvLanguage === "en" ? (pageCount === 1 ? "page" : "pages") : (pageCount === 1 ? "sida" : "sidor")}{pageCount > 2 ? " ⚠" : ""}
+                {pageCount} {!isSvApp ? (pageCount === 1 ? "page" : "pages") : (pageCount === 1 ? "sida" : "sidor")}{pageCount > 2 ? " ⚠" : ""}
               </span>
             )}
           </div>
           <div className="flex flex-shrink-0 items-center gap-1.5">
             <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => { setTailorOpen(true); if (isWide) setView("preview"); }}>
-              {cvLanguage === "en" ? "Improve" : "Förbättra"}
+              {!isSvApp ? "Improve" : "Förbättra"}
             </Button>
             {!showBoth && (
               <div className="flex items-center rounded-md border border-border bg-muted/30 p-0.5">
                 <button type="button" onClick={() => setView("edit")}
                   className={`h-8 whitespace-nowrap rounded px-2.5 text-xs ${view === "edit" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
-                  {cvLanguage === "en" ? "Edit" : "Redigera"}
+                  {!isSvApp ? "Edit" : "Redigera"}
                 </button>
                 <button type="button" onClick={() => setView("preview")}
                   className={`h-8 whitespace-nowrap rounded px-2.5 text-xs ${view === "preview" ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
-                  {cvLanguage === "en" ? "Preview" : "Förhandsgranska"}
+                  {!isSvApp ? "Preview" : "Förhandsgranska"}
                 </button>
               </div>
             )}
-            <Button variant="outline" size="icon" className="h-9 w-9" title={cvLanguage === "en" ? "Save" : "Spara"} onClick={manualSave} disabled={saving}>
+            <Button variant="outline" size="icon" className="h-9 w-9" title={!isSvApp ? "Save" : "Spara"} onClick={manualSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             </Button>
             <Button size="sm" className="h-9 whitespace-nowrap text-xs" onClick={doExport}>
-              <FileDown className="mr-1.5 h-3.5 w-3.5" />{cvLanguage === "en" ? "Download PDF" : "Ladda ner PDF"}
+              <FileDown className="mr-1.5 h-3.5 w-3.5" />{!isSvApp ? "Download PDF" : "Ladda ner PDF"}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-9 w-9" title={cvLanguage === "en" ? "More" : "Mer"}><MoreHorizontal className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" className="h-9 w-9" title={!isSvApp ? "More" : "Mer"}><MoreHorizontal className="h-4 w-4" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => setStyleOpen(true)}><Palette className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Style" : "Stil"}</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSyncOpen(true)}><RefreshCw className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Sync facts" : "Synka fakta"}</DropdownMenuItem>
-                <DropdownMenuItem onClick={applyAtsOrder}><ListOrdered className="mr-2 h-4 w-4" />{cvLanguage === "en" ? "Arrange for ATS" : "Ordna för ATS"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStyleOpen(true)}><Palette className="mr-2 h-4 w-4" />{!isSvApp ? "Style" : "Stil"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSyncOpen(true)}><RefreshCw className="mr-2 h-4 w-4" />{!isSvApp ? "Sync facts" : "Synka fakta"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={applyAtsOrder}><ListOrdered className="mr-2 h-4 w-4" />{!isSvApp ? "Arrange for ATS" : "Ordna för ATS"}</DropdownMenuItem>
                 <DropdownMenuItem onClick={runParseTest} disabled={parsing}>
                   <ListChecks className="mr-2 h-4 w-4" />
-                  {parsing ? (cvLanguage === "en" ? "Parsing…" : "Parsar…") : (cvLanguage === "en" ? "Test parsing" : "Testa parsning")}
+                  {parsing ? (!isSvApp ? "Parsing…" : "Parsar…") : (!isSvApp ? "Test parsing" : "Testa parsning")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={undoLast} disabled={!cv.__meta?.lastSnapshot}>
                   <RotateCcw className="mr-2 h-4 w-4" />
                   {cv.__meta?.lastSnapshot
-                    ? `${cvLanguage === "en" ? "Undo" : "Ångra"}: ${cv.__meta.lastSnapshot.label}`
-                    : (cvLanguage === "en" ? "Undo last change" : "Ångra senaste ändring")}
+                    ? `${!isSvApp ? "Undo" : "Ångra"}: ${cv.__meta.lastSnapshot.label}`
+                    : (!isSvApp ? "Undo last change" : "Ångra senaste ändring")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Globe className="h-3 w-3" />{cvLanguage === "en" ? "Language" : "Språk"}</DropdownMenuLabel>
+                <DropdownMenuLabel className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Globe className="h-3 w-3" />{!isSvApp ? "Language" : "Språk"}</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => setCvLanguage("sv")}>Svenska {cvLanguage === "sv" && <Check className="ml-auto h-4 w-4" />}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setCvLanguage("en")}>English {cvLanguage === "en" && <Check className="ml-auto h-4 w-4" />}</DropdownMenuItem>
               </DropdownMenuContent>
@@ -508,8 +510,8 @@ const CVEditor = () => {
                         isOpen={openSections.has(section.id)}
                         onToggleOpen={() => toggleSectionOpen(section.id)}
                         onToggleEnabled={() => toggleSection(section.id)}
-                        hiddenLabel={cvLanguage === "en" ? "hidden" : "dold"}
-                        toggleTitle={section.enabled ? (cvLanguage === "en" ? "Hide from CV" : "Dölj i CV") : (cvLanguage === "en" ? "Show in CV" : "Visa i CV")}
+                        hiddenLabel={!isSvApp ? "hidden" : "dold"}
+                        toggleTitle={section.enabled ? (!isSvApp ? "Hide from CV" : "Dölj i CV") : (!isSvApp ? "Show in CV" : "Visa i CV")}
                       >
                         <SectionFormRenderer sectionType={section.type} cv={cv} updateCv={updateCv} t={t} cvLanguage={cvLanguage} />
                       </SortableEditorSection>
@@ -543,7 +545,7 @@ const CVEditor = () => {
       <Dialog open={syncOpen} onOpenChange={setSyncOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{cvLanguage === "en" ? "Sync facts to all your CVs" : "Synka fakta till alla dina CV:n"}</DialogTitle>
+            <DialogTitle>{!isSvApp ? "Sync facts to all your CVs" : "Synka fakta till alla dina CV:n"}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             {cvLanguage === "en"
@@ -551,10 +553,10 @@ const CVEditor = () => {
               : "Kopierar de strukturella fakta från det här CV:t — kontakt, roll-datum & företag, utbildning, certifieringar, språk — till din master och alla ansökningar som byggts från den. Din skräddarsydda profil, punkter och kompetenser rörs inte."}
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSyncOpen(false)} disabled={syncing}>{cvLanguage === "en" ? "Cancel" : "Avbryt"}</Button>
+            <Button variant="outline" onClick={() => setSyncOpen(false)} disabled={syncing}>{!isSvApp ? "Cancel" : "Avbryt"}</Button>
             <Button onClick={syncFacts} disabled={syncing}>
               {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              {cvLanguage === "en" ? "Sync facts" : "Synka fakta"}
+              {!isSvApp ? "Sync facts" : "Synka fakta"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -564,7 +566,7 @@ const CVEditor = () => {
       <Dialog open={styleOpen} onOpenChange={setStyleOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{cvLanguage === "en" ? "Style" : "Stil"}</DialogTitle>
+            <DialogTitle>{!isSvApp ? "Style" : "Stil"}</DialogTitle>
           </DialogHeader>
           <p className="text-xs text-muted-foreground -mt-1">
             {cvLanguage === "en"
@@ -582,7 +584,7 @@ const CVEditor = () => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-sm" style={{ color: s.accentHex }}>{s.label[cvLanguage]}</span>
-                    {selected && <span className="text-[10px] text-primary">{cvLanguage === "en" ? "Selected" : "Vald"}</span>}
+                    {selected && <span className="text-[10px] text-primary">{!isSvApp ? "Selected" : "Vald"}</span>}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{s.desc[cvLanguage]}</p>
                 </button>
@@ -590,7 +592,7 @@ const CVEditor = () => {
             })}
           </div>
           <div className="mt-4">
-            <p className="text-xs font-medium text-muted-foreground mb-2">{cvLanguage === "en" ? "Accent colour" : "Accentfärg"}</p>
+            <p className="text-xs font-medium text-muted-foreground mb-2">{!isSvApp ? "Accent colour" : "Accentfärg"}</p>
             <div className="flex items-center gap-2">
               {ACCENT_PRESETS.map((a) => {
                 const active = templateStyle.accentHex.toLowerCase() === a.hex.toLowerCase();
@@ -616,7 +618,7 @@ const CVEditor = () => {
       <Dialog open={!!parseChecks} onOpenChange={(o) => !o && setParseChecks(null)}>
         <DialogContent className="max-h-[80vh] max-w-md overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{cvLanguage === "en" ? "Parse test" : "Parsningstest"}</DialogTitle>
+            <DialogTitle>{!isSvApp ? "Parse test" : "Parsningstest"}</DialogTitle>
           </DialogHeader>
           {parseChecks && (() => {
             const ok = parseChecks.filter(c => c.ok).length;
@@ -630,21 +632,21 @@ const CVEditor = () => {
                 </p>
                 {misses.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    {cvLanguage === "en" ? "Everything survives extraction. This export is machine-readable, measured, not promised." : "Allt överlever extraktion. Exporten är maskinläsbar — uppmätt, inte lovat."}
+                    {!isSvApp ? "Everything survives extraction. This export is machine-readable, measured, not promised." : "Allt överlever extraktion. Exporten är maskinläsbar — uppmätt, inte lovat."}
                   </p>
                 ) : (
                   <div className="space-y-1.5">
-                    <p className="text-xs text-muted-foreground">{cvLanguage === "en" ? "Not recovered:" : "Återfanns inte:"}</p>
+                    <p className="text-xs text-muted-foreground">{!isSvApp ? "Not recovered:" : "Återfanns inte:"}</p>
                     {misses.map((m, i) => (
                       <p key={i} className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">{m.label}</p>
                     ))}
                     {parseCtx === "export" && (
                       <div className="flex gap-2 pt-2">
                         <Button size="sm" className="h-10 flex-1 text-xs" onClick={() => setParseChecks(null)}>
-                          {cvLanguage === "en" ? "Fix first" : "Fixa först"}
+                          {!isSvApp ? "Fix first" : "Fixa först"}
                         </Button>
                         <Button variant="outline" size="sm" className="h-10 text-xs" onClick={() => { setParseChecks(null); exportNow(); }}>
-                          {cvLanguage === "en" ? "Download anyway" : "Ladda ner ändå"}
+                          {!isSvApp ? "Download anyway" : "Ladda ner ändå"}
                         </Button>
                       </div>
                     )}

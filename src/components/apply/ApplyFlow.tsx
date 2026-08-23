@@ -458,22 +458,6 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
               )}
             </div>
 
-            {report?.kind === "job" && mapCover && mapCover.length > 0 && (
-              <div className="space-y-1.5 pt-1">
-                <p className="text-[11px] font-medium text-muted-foreground">{isSv ? "Mot hela profilen: alla CV:n och sparade svar" : "Against your whole profile: every CV and saved answer"}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {mapCover.map(c => (
-                    <span key={c.theme} className={`rounded-full px-2 py-1 text-[10px] font-medium ${
-                      c.status === "covered" ? "bg-green-600/10 text-green-700 dark:text-green-500"
-                      : c.status === "partial" ? "bg-warning/15 text-warning"
-                      : "border border-dashed border-warning/60 text-warning"}`}>
-                      {c.theme} · {c.status === "covered" ? (isSv ? "Täckt" : "Covered") : c.status === "partial" ? (isSv ? "Delvis" : "Partial") : "Gap"}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className="space-y-1.5 pt-1">
               <label className="text-sm font-medium">{isSv ? "Företag" : "Company"} <span className="font-normal text-muted-foreground">({isSv ? "för din överblick" : "for your tracking"})</span></label>
               <Input

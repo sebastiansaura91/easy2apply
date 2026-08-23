@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Copy, Trash2, Edit3, Settings, LogOut, Briefcase, Target, Plus, Star, Tag, ArrowRight, Loader2 } from "lucide-react";
+import { FileText, Copy, Trash2, Edit3, Settings, LogOut, Briefcase, Target, Plus, Star, Tag, ArrowRight, Loader2, MoreHorizontal } from "lucide-react";
 import { RolePicker, CUSTOM_ROLE } from "@/components/role/RolePicker";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -298,10 +298,19 @@ const Dashboard = () => {
                 {isSv ? "Sök" : "Apply"}
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Kategorisera roll" : "Set role"} onClick={() => openRole(r)}><Tag className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Redigera" : "Edit"} onClick={() => navigate(`/editor/${r.id}`)}><Edit3 className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Kopiera" : "Duplicate"} onClick={() => duplicateResume(r)}><Copy className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Radera" : "Delete"} onClick={() => setDeleteId(r.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+            {/* Three visible actions max: the card itself opens, the pill sets status,
+                everything else lives in one menu. Edit was a duplicate of clicking. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9" title={isSv ? "Fler åtgärder" : "More actions"}><MoreHorizontal className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => openRole(r)}>{isSv ? "Kategorisera roll" : "Set role"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => duplicateResume(r)}>{isSv ? "Kopiera" : "Duplicate"}</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={() => setDeleteId(r.id)}>{isSv ? "Radera" : "Delete"}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardContent>
       </Card>

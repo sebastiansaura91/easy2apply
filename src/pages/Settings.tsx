@@ -51,7 +51,7 @@ const SettingsPage = () => {
       <div className="mx-auto max-w-2xl px-6 py-10">
         <Button variant="ghost" className="mb-6" onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          {t("navDashboard")}
+          {language === "sv" ? "Hem" : "Home"}
         </Button>
 
         <h1 className="font-serif text-3xl font-medium mb-8">{t("settingsTitle")}</h1>

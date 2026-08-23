@@ -48,6 +48,9 @@ Always base seniority on the title, NOT on the job description content.
 ## COMPETENCE THEMES (how recruiters screen)
 Recruiters evaluate candidates on 4–7 CORE COMPETENCE BUCKETS, not keyword lists.
 Derive them from the posting (e.g. "Controlling", "Transformation", "Commercial leadership").
+THEME NAMES may only use words that appear in the posting or standard competence
+vocabulary (ledarskap, strategi, analys, transformation...). NEVER invent metaphors or
+novel compounds - a theme name a recruiter wouldn't recognize is a defect.
 ALWAYS return at least 4 themes, even for a short posting: split distinct capabilities
 (e.g. pricing vs commercial ownership vs analysis/tools vs the employer context) into
 separate buckets instead of merging them into one broad theme.
@@ -180,6 +183,41 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
             t.canonical_id = c.id;
             break;
           }
+        }
+      }
+    }
+
+    // Theme-name hallucination guard: every content word in a theme name must come
+    // from the posting, the theme's own supporting terms, or standard competence
+    // vocabulary. A name that fails ("...& Nordisk skalle" happened in production)
+    // is replaced by the theme's first supporting term - deterministic, never clever.
+    const STANDARD_VOCAB = new Set([
+      "kommersiell", "kommersiellt", "ledarskap", "strategi", "strategisk", "strategiskt",
+      "transformation", "analys", "ekonomi", "försäljning", "marknad", "marknadsföring",
+      "drift", "operativ", "utveckling", "projektledning", "förändringsledning",
+      "kommunikation", "kund", "kunder", "digital", "digitalisering", "teknik", "teknisk",
+      "verktyg", "uppföljning", "integration", "prissättning", "paketering", "affär",
+      "affärsutveckling", "erbjudande", "produkt", "tillväxt", "lönsamhet", "styrning",
+      "commercial", "leadership", "strategy", "strategic", "analysis", "finance", "sales",
+      "marketing", "operations", "operational", "development", "management", "growth",
+      "pricing", "packaging", "offering", "product", "tools", "integration", "customer",
+    ]);
+    const normWord = (w: string) => w.toLowerCase().replace(/[^a-zåäö]/g, "");
+    const stemW = (w: string) => (w.length >= 6 ? w.replace(/(erna|arna|orna|ande|ningen|ning|en|et|er|ar|or|s)$/i, "") : w);
+    const postingNorm = " " + job_posting_text.toLowerCase() + " ";
+    if (Array.isArray(result.competence_themes)) {
+      for (const t of result.competence_themes) {
+        const termsNorm = ((t.supporting_terms || []) as string[]).join(" ").toLowerCase();
+        const words = String(t.theme || "").split(/\s+/);
+        const bad = words.some((w: string) => {
+          const c = normWord(w);
+          if (c.length < 4) return false; // connectors, &, av, och...
+          const st = stemW(c);
+          return !postingNorm.includes(st) && !termsNorm.includes(st) && !STANDARD_VOCAB.has(c) && !STANDARD_VOCAB.has(st);
+        });
+        if (bad) {
+          const alt = (t.supporting_terms || [])[0];
+          if (alt) t.theme = String(alt).charAt(0).toUpperCase() + String(alt).slice(1);
         }
       }
     }
