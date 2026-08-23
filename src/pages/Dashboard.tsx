@@ -121,11 +121,23 @@ const Dashboard = () => {
     { key: "sent", label: isSv ? "Skickad" : "Sent" },
     { key: "interview", label: isSv ? "Intervju" : "Interview" },
   ];
-  const overview = STAGE_META
-    .filter(s => pipeline[s.key].length > 0)
-    .map(s => `${pipeline[s.key].length} ${s.label.toLowerCase()}`)
-    .join(" · ");
   const [doneOpen, setDoneOpen] = useState(false);
+
+  // The week's progress, from first-party telemetry. Tolerates a missing table
+  // (the migration can lag behind the frontend) — the stat simply doesn't render.
+  const [weekActions, setWeekActions] = useState<number | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const { count, error } = await (supabase as any).from("app_events")
+          .select("id", { count: "exact", head: true })
+          .eq("event", "card_actioned")
+          .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString());
+        if (!error && typeof count === "number") setWeekActions(count);
+      } catch { /* telemetry is optional */ }
+    })();
+  }, [user]);
 
   // "Sökt jobb": log an application that already went out (often outside the app).
   // Picking a CV stores a copy — the receipt of exactly what was sent.
@@ -346,8 +358,33 @@ const Dashboard = () => {
           <div className="space-y-8">
             <div>
               <h1 className="font-serif text-3xl font-medium tracking-tight">{isSv ? "Hem" : "Home"}</h1>
-              {overview && <p className="mt-1.5 text-sm text-muted-foreground tabular-nums">{overview}</p>}
             </div>
+
+            {/* The state of play in one glance — big serif numbers over hairlines,
+                the dashboard idea WITHOUT the colored-card dashboard look. */}
+            {(() => {
+              const scores = applications
+                .map(r => getResumeMeta(r).lastAtsScore?.score)
+                .filter((s): s is number => typeof s === "number");
+              const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+              const stats: { label: string; value: number | string }[] = [
+                { label: isSv ? "Att fixa" : "To fix", value: pipeline.fix.length },
+                { label: isSv ? "Redo" : "Ready", value: pipeline.ready.length },
+                { label: isSv ? "Skickade" : "Sent", value: pipeline.sent.length + pipeline.interview.length + pipeline.done.length },
+                { label: isSv ? "Snittpoäng" : "Avg score", value: avg ?? "–" },
+                ...(weekActions !== null ? [{ label: isSv ? "Kort i veckan" : "Cards this week", value: weekActions }] : []),
+              ];
+              return (
+                <div className="flex divide-x divide-border border-y border-border">
+                  {stats.map(s => (
+                    <div key={s.label} className="flex-1 px-4 py-3 first:pl-0">
+                      <p className="font-serif text-3xl font-medium tabular-nums">{s.value}</p>
+                      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* Hero action — the one move that matters */}
             <section className="flex flex-col gap-4 rounded-xl border border-border bg-accent/50 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
