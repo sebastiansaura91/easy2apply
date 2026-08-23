@@ -4,6 +4,7 @@ import { InsightsPanel } from "@/components/editor/InsightsPanel";
 import { CVContent } from "@/types/cv";
 import { AtsCheckResult } from "@/types/ats-check";
 import { RoleFitResult } from "@/types/role-fit";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface Props {
   open: boolean;
@@ -43,7 +44,9 @@ export function TailorPanel({
   open, onOpenChange, cv, cvLanguage, t, seededJob, seededResult,
   onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit, onUpdateMeta, onDownload, profileEvidence, onSnapshot, docked,
 }: Props) {
-  const isSv = cvLanguage === "sv";
+  // Chrome follows the APP language, never the document's.
+  const { language: appLanguage } = useLanguage();
+  const isSv = appLanguage === "sv";
 
   const inner = (
     <InsightsPanel
