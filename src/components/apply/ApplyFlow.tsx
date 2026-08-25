@@ -16,7 +16,8 @@ import { roleLabel, getRoleAdvice } from "@/lib/role-advice";
 import { getResumeMeta } from "@/lib/resume-grouping";
 import { cvScanSignature } from "@/lib/cv-signature";
 import { deriveRoleFromTitle } from "@/lib/role-from-title";
-import { REGISTRY_ROW_TITLE, buildStrengthLookup, buildEvidenceLookup } from "@/lib/competence-registry";
+import { buildStrengthLookup, buildEvidenceLookup } from "@/lib/competence-registry";
+import { loadRegistry, recordAnalysis } from "@/lib/data-store";
 import { InsightsPanel } from "@/components/editor/InsightsPanel";
 import { exportToPdf } from "@/lib/export-pdf";
 import { runParseBackCheck } from "@/lib/parse-check";
@@ -132,8 +133,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
       try {
         let registry: any = undefined;
         try {
-          const { data: regRow } = await supabase.from("resumes").select("content_json").eq("title", REGISTRY_ROW_TITLE).maybeSingle();
-          registry = (regRow?.content_json as any)?.__meta?.competenceRegistry || undefined;
+          registry = (await loadRegistry()) || undefined;
         } catch { /* no registry yet — themes simply come back untagged */ }
         const { data } = await supabase.functions.invoke("analyze-job-posting", { body: { job_posting_text: jobText.trim(), registry } });
         if (!(data as any)?.error) {
@@ -239,6 +239,13 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
         id, user_id: userId, title, language: base.language, template_id: "default", content_json: content,
       });
       if (error) throw error;
+      // The creation scan is analysis #1 in the new CV's history.
+      if (report?.kind === "job") {
+        recordAnalysis({
+          resumeId: id, kind: "scan", hash: cvScanSignature(cv, jobText.trim()), result: report.ats,
+          score: Math.round(report.ats.overall_score), grade: report.ats.grade, subscores: report.ats.subscores,
+        });
+      }
       // Seed the editor so the Improve panel opens pre-run against this ad/role.
       flow.setResumeId(id);
       flow.setJobPostingText(jobText.trim());
@@ -497,8 +504,14 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
                 onUpdateSkills={(skills) => mutateCreated(cv => ({ ...cv, skills }))}
                 onUpdateMeta={(patch) => mutateCreated(cv => ({ ...cv, __meta: { ...cv.__meta, ...patch } }))}
                 onPersistScore={(score, grade, subscores) => mutateCreated(cv => ({ ...cv, __meta: { ...cv.__meta, lastAtsScore: { score, grade, at: new Date().toISOString(), subscores } } }))}
-                onPersistResult={(hash, result) => mutateCreated(cv => ({ ...cv, __meta: { ...cv.__meta, lastAtsResult: { hash, at: new Date().toISOString(), result } } }))}
-                onPersistRoleFit={(hash, result) => mutateCreated(cv => ({ ...cv, __meta: { ...cv.__meta, lastRoleFit: { hash, at: new Date().toISOString(), result } } }))}
+                onPersistResult={(hash, result) => {
+                  if (createdId) recordAnalysis({ resumeId: createdId, kind: "scan", hash, result, score: Math.round((result as any)?.overall_score ?? NaN) || undefined, grade: (result as any)?.grade, subscores: (result as any)?.subscores });
+                  mutateCreated(cv => ({ ...cv, __meta: { ...cv.__meta, lastAtsResult: { hash, at: new Date().toISOString(), result } } }));
+                }}
+                onPersistRoleFit={(hash, result) => {
+                  if (createdId) recordAnalysis({ resumeId: createdId, kind: "rolefit", hash, result });
+                  mutateCreated(cv => ({ ...cv, __meta: { ...cv.__meta, lastRoleFit: { hash, at: new Date().toISOString(), result } } }));
+                }}
                 onApplyReframe={applyReframeCreated}
                 onDownload={downloadCreated}
                 profileEvidence={profileLookup ?? undefined}

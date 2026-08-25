@@ -12,6 +12,7 @@ import { CVMeta, ExperienceItem, emptyCV } from "@/types/cv";
 import {
   CanonicalCompetence, CompetenceRegistry, REGISTRY_ROW_TITLE, buildEvidenceLookup, normName,
 } from "@/lib/competence-registry";
+import { saveRegistryRow } from "@/lib/data-store";
 import { format } from "date-fns";
 
 interface Row { id: string; title: string; meta: CVMeta; experience: ExperienceItem[] }
@@ -197,6 +198,9 @@ export default function Profile() {
         });
         if (error) throw error;
       }
+      // Dual-write: the registry's own table is the v2 home; the hidden resume
+      // row stays until every reader has migrated (loadRegistry falls back to it).
+      saveRegistryRow(reg);
       setDraft(null);
       toast({ title: isSv ? "Registret sparat" : "Registry saved", description: isSv ? `${cleaned.length} kompetenser i matchningsmotorn.` : `${cleaned.length} competences in the matching engine.` });
       fetchRows();

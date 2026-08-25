@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw, RotateCcw, MoreHorizontal, Check, Eye, ListOrdered, Save } from "lucide-react";
+import { ArrowLeft, FileDown, Globe, Languages, Loader2, Sparkles, Palette, FileText, ArrowRight, LayoutList, ListChecks, Target, UserCog, RefreshCw, RotateCcw, RotateCw, MoreHorizontal, Check, Eye, ListOrdered, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -32,6 +32,7 @@ import { detectCvLanguages } from "@/lib/language-detection";
 import { buildEvidenceLookup } from "@/lib/competence-registry";
 import { runParseBackCheck } from "@/lib/parse-check";
 import { track } from "@/lib/telemetry";
+import { recordAnalysis, saveVersion, loadRegistry } from "@/lib/data-store";
 
 const CVEditor = () => {
   const { id } = useParams<{ id: string }>();
@@ -124,9 +125,11 @@ const CVEditor = () => {
   useEffect(() => {
     if (!tailorOpen || profileEvidence) return;
     (async () => {
-      const { data } = await supabase.from("resumes").select("title, content_json");
+      const [{ data }, registry] = await Promise.all([
+        supabase.from("resumes").select("title, content_json"),
+        loadRegistry(),
+      ]);
       const rows = (data || []).map((r: any) => ({ title: r.title, meta: (r.content_json?.__meta || {}) as CVContent["__meta"] & object }));
-      const registry = rows.find(r => (r.meta as any)?.isRegistryRow)?.meta?.competenceRegistry || null;
       const lookup = buildEvidenceLookup(rows as any, registry as any);
       setProfileEvidence(() => lookup);
     })();
@@ -229,25 +232,46 @@ const CVEditor = () => {
   };
   const updateSkills = (skills: string[]) => updateCv("skills", skills);
 
-  // One-step undo for automatic changes: snapshot the document BEFORE the change;
-  // undo swaps current and snapshot, so pressing it twice is a redo.
+  // Undo/redo stack for automatic changes: snapshot the document BEFORE each
+  // change (capped at 20 steps). Every snapshot also lands in resume_versions —
+  // the durable half that survives a reload. Seeded from the legacy one-step
+  // __meta.lastSnapshot so pre-v2 rows keep their undo.
+  type Snap = { at: string; label: string; doc: Omit<CVContent, "__meta"> };
+  const UNDO_CAP = 20;
+  const [undoStack, setUndoStack] = useState<Snap[]>([]);
+  const [redoStack, setRedoStack] = useState<Snap[]>([]);
+  const cvRef = useRef(cv);
+  useEffect(() => { cvRef.current = cv; }, [cv]);
+  const seededUndoRef = useRef(false);
+  useEffect(() => {
+    if (loading || seededUndoRef.current) return;
+    seededUndoRef.current = true;
+    const legacy = cv.__meta?.lastSnapshot;
+    if (legacy) setUndoStack([legacy as Snap]);
+  }, [loading, cv.__meta?.lastSnapshot]);
   const takeSnapshot = useCallback((label: string) => {
-    setCv(prev => {
-      const { __meta, ...doc } = prev;
-      return { ...prev, __meta: { ...__meta, lastSnapshot: { at: new Date().toISOString(), label, doc: doc as any } } };
-    });
-  }, []);
+    const { __meta: _m, ...doc } = cvRef.current;
+    setUndoStack(s => [...s.slice(-(UNDO_CAP - 1)), { at: new Date().toISOString(), label, doc }]);
+    setRedoStack([]);
+    if (id) saveVersion(id, label, doc);
+  }, [id]);
   const undoLast = () => {
-    setCv(prev => {
-      const snap = prev.__meta?.lastSnapshot;
-      if (!snap) return prev;
-      const { __meta, ...cur } = prev;
-      return {
-        ...(snap.doc as any),
-        __meta: { ...__meta, lastSnapshot: { at: new Date().toISOString(), label: !isSvApp ? `Undid: ${snap.label}` : `Ångrade: ${snap.label}`, doc: cur as any } },
-      };
-    });
-    toast({ title: !isSvApp ? "Undone" : "Ångrat", description: !isSvApp ? "Press again to redo." : "Tryck igen för att göra om." });
+    const snap = undoStack[undoStack.length - 1];
+    if (!snap) return;
+    const { __meta: _m, ...cur } = cvRef.current;
+    setUndoStack(s => s.slice(0, -1));
+    setRedoStack(s => [...s.slice(-(UNDO_CAP - 1)), { at: snap.at, label: snap.label, doc: cur }]);
+    setCv(prev => ({ ...(snap.doc as CVContent), __meta: prev.__meta }));
+    toast({ title: !isSvApp ? "Undone" : "Ångrat", description: snap.label });
+  };
+  const redoLast = () => {
+    const snap = redoStack[redoStack.length - 1];
+    if (!snap) return;
+    const { __meta: _m, ...cur } = cvRef.current;
+    setRedoStack(s => s.slice(0, -1));
+    setUndoStack(s => [...s.slice(-(UNDO_CAP - 1)), { at: snap.at, label: snap.label, doc: cur }]);
+    setCv(prev => ({ ...(snap.doc as CVContent), __meta: prev.__meta }));
+    toast({ title: !isSvApp ? "Redone" : "Omgjort", description: snap.label });
   };
   // Replace a bullet with its reframe. Matches tolerantly (trimmed, then across all
   // experiences as a fallback) and reports whether anything actually changed, so the
@@ -385,10 +409,16 @@ const CVEditor = () => {
     onUpdateSkills: updateSkills,
     onPersistScore: (score: number, grade: string, subscores?: any) =>
       setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastAtsScore: { score, grade, at: new Date().toISOString(), subscores } } })),
-    onPersistResult: (hash: string, result: any) =>
-      setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastAtsResult: { hash, at: new Date().toISOString(), result } } })),
-    onPersistRoleFit: (hash: string, result: any) =>
-      setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastRoleFit: { hash, at: new Date().toISOString(), result } } })),
+    // Dual-write: __meta stays the cache the UI reads; analyses accumulates the
+    // history the score truth layer will read.
+    onPersistResult: (hash: string, result: any) => {
+      if (id) recordAnalysis({ resumeId: id, kind: "scan", hash, result, score: Math.round(result?.overall_score ?? NaN) || undefined, grade: result?.grade, subscores: result?.subscores });
+      setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastAtsResult: { hash, at: new Date().toISOString(), result } } }));
+    },
+    onPersistRoleFit: (hash: string, result: any) => {
+      if (id) recordAnalysis({ resumeId: id, kind: "rolefit", hash, result });
+      setCv(prev => ({ ...prev, __meta: { ...prev.__meta, lastRoleFit: { hash, at: new Date().toISOString(), result } } }));
+    },
     onUpdateMeta: (patch: any) =>
       setCv(prev => ({ ...prev, __meta: { ...prev.__meta, ...patch } })),
     onDownload: doExport,
@@ -462,12 +492,18 @@ const CVEditor = () => {
                   <ListChecks className="mr-2 h-4 w-4" />
                   {parsing ? (!isSvApp ? "Parsing…" : "Parsar…") : (!isSvApp ? "Test parsing" : "Testa parsning")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={undoLast} disabled={!cv.__meta?.lastSnapshot}>
+                <DropdownMenuItem onClick={undoLast} disabled={!undoStack.length}>
                   <RotateCcw className="mr-2 h-4 w-4" />
-                  {cv.__meta?.lastSnapshot
-                    ? `${!isSvApp ? "Undo" : "Ångra"}: ${cv.__meta.lastSnapshot.label}`
+                  {undoStack.length
+                    ? `${!isSvApp ? "Undo" : "Ångra"}: ${undoStack[undoStack.length - 1].label}${undoStack.length > 1 ? ` (${undoStack.length})` : ""}`
                     : (!isSvApp ? "Undo last change" : "Ångra senaste ändring")}
                 </DropdownMenuItem>
+                {redoStack.length > 0 && (
+                  <DropdownMenuItem onClick={redoLast}>
+                    <RotateCw className="mr-2 h-4 w-4" />
+                    {`${!isSvApp ? "Redo" : "Gör om"}: ${redoStack[redoStack.length - 1].label}`}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Globe className="h-3 w-3" />{!isSvApp ? "Language" : "Språk"}</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => setCvLanguage("sv")}>Svenska {cvLanguage === "sv" && <Check className="ml-auto h-4 w-4" />}</DropdownMenuItem>
