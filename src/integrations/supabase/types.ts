@@ -68,6 +68,53 @@ export type Database = {
         }
         Relationships: []
       }
+      analyses: {
+        Row: {
+          created_at: string
+          grade: string | null
+          id: string
+          input_hash: string
+          kind: string
+          result: Json
+          resume_id: string
+          score: number | null
+          subscores: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          input_hash: string
+          kind: string
+          result: Json
+          resume_id: string
+          score?: number | null
+          subscores?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          input_hash?: string
+          kind?: string
+          result?: Json
+          resume_id?: string
+          score?: number | null
+          subscores?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analyses_resume_id_fkey"
+            columns: ["resume_id"]
+            isOneToOne: false
+            referencedRelation: "resumes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_events: {
         Row: {
           created_at: string
@@ -113,6 +160,27 @@ export type Database = {
           tags?: string[] | null
           text?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      competence_registry: {
+        Row: {
+          data: Json
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          data?: Json
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          data?: Json
+          updated_at?: string
+          user_id?: string
+          version?: number
         }
         Relationships: []
       }
