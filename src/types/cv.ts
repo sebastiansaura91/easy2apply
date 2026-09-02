@@ -103,6 +103,11 @@ export interface CVMeta {
     knockout_requirements?: string[];
     /** Explicitly named products/technologies — exact-match keywords, separate from competence judgment. */
     tools_and_systems?: string[];
+    /**
+     * The posting's register (Tonlägeslagret): a values-driven ad wants its value
+     * vocabulary mirrored, not more KPI:er. values_language holds the ad's own words.
+     */
+    register?: { style: "values" | "metrics" | "mixed"; values_language: string[] };
   };
   /** Themes the user has consciously accepted as honest gaps — shown muted, never nagged. */
   acceptedGaps?: string[];

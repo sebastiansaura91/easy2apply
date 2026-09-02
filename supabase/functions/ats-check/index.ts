@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { corsHeaders, makeGateway, HUMAN_WRITING_RULES, stripAiDashes } from "../_shared/gateway.ts";
+import { corsHeaders, makeGateway, HUMAN_WRITING_RULES, registerRules, stripAiDashes } from "../_shared/gateway.ts";
 
 
 // Recency policy (what the big matchers weight and consumer tools skip): old proof
@@ -102,7 +102,7 @@ serve(async (req) => {
         // Deterministic: the same CV + posting must yield the same score and findings.
         temperature: 0,
         messages: [
-          { role: "system", content: systemPrompt + RECENCY_RULE + EVIDENCE_RULE + HUMAN_WRITING_RULES },
+          { role: "system", content: systemPrompt + RECENCY_RULE + EVIDENCE_RULE + HUMAN_WRITING_RULES + registerRules(demand_profile?.register) },
           { role: "user", content: userPrompt },
         ],
         tools: [{

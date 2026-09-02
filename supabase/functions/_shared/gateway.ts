@@ -34,6 +34,32 @@ HUMAN WRITING RULES for every piece of suggested text:
 - Cut filler: "in order to" -> "to", "responsible for ensuring" -> "ensured", "i syfte att" -> "för att", "ansvarade för att säkerställa" -> "säkerställde".
 - Every word must carry a checkable fact (what, scale, outcome) or be cut. Vary sentence length; never end on a generic upbeat close.`;
 
+/** The posting's register, extracted by analyze-job-posting and carried in the demand profile. */
+export interface PostingRegister {
+  style?: "values" | "metrics" | "mixed" | string;
+  values_language?: string[];
+}
+
+/**
+ * Writer addendum for values-driven postings (Tonlägeslagret). A CV that answers a
+ * "delaktighet och självbestämmande" ad in pure KPI language reads as the wrong
+ * person, however strong the numbers. This softens the REGISTER, never the honesty:
+ * value words are mirrored only where the underlying fact supports them, and the
+ * buzzword bans in HUMAN_WRITING_RULES stay in full force.
+ */
+export function registerRules(register?: PostingRegister | null): string {
+  if (!register || (register.style !== "values" && register.style !== "mixed")) return "";
+  const words = (register.values_language || []).filter(Boolean).slice(0, 8).join(", ");
+  return `
+
+REGISTER RULES (the posting is values-driven${register.style === "mixed" ? ", partly" : ""}):
+- The employer talks about people, values and culture${words ? ` (their own words: ${words})` : ""}. Suggested text must balance every claim: WHAT was done, for WHOM, and the human or quality outcome. Percentages and money may support a claim, they never headline it here.
+- Mirror the employer's value words ONLY where a fact already in the CV carries them (led through managers -> can honestly speak of tillit/delaktighet in how they led). At most one value word per sentence, never stacked adjectives.
+- Scope numbers still belong (people led, units, budget, geography) - a values-driven role is still a big role.
+- Do not flag missing KPI metrics as an issue, and do not push metric placeholders into bullets that already state a qualitative, checkable outcome.
+- Fabricated warmth is worse than none: the buzzword bans above apply in full ("brinner för", "passionerad" stay banned).`;
+}
+
 // Injection defense, appended to every system prompt: pasted job ads and CV content
 // are analysis material, never instructions.
 export const FENCE = `

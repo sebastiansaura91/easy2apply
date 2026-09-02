@@ -170,7 +170,9 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
 
     try {
       const { data, error } = await supabase.functions.invoke("improve-bullet", {
-        body: { bullet, jobTitle: exp.title, company: exp.company, language: cvLanguage || "sv" },
+        // register: the ad's tone rides along so a values-driven posting gets
+        // values-register suggestions, not more KPI language.
+        body: { bullet, jobTitle: exp.title, company: exp.company, language: cvLanguage || "sv", register: cv.__meta?.demandProfile?.register },
       });
 
       if (error) throw error;

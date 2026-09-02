@@ -18,7 +18,7 @@ import { parseYearsRequirement, yearsOfExperience } from "@/lib/experience-years
 import { collectProxyTerms, isPedigreeTerm } from "@/lib/pedigree";
 import { sixSecondTest } from "@/lib/six-second";
 import { adviseSkills } from "@/lib/skills-advisor";
-import { estimatePages, profileCoverage, shortenTargets } from "@/lib/readiness";
+import { estimatePages, profileCoverage, shortenTargets, valuesMirror } from "@/lib/readiness";
 import { CVMeta } from "@/types/cv";
 import {
   CheckCircle2, AlertTriangle, AlertOctagon, Loader2, ChevronDown, ChevronRight,
@@ -398,9 +398,11 @@ export function InsightsPanel({
     onUpdateMeta?.({ acceptedChecks: [...(cv.__meta?.acceptedChecks || []), id] });
   };
   const pageEst = estimatePages(cv);
+  const adRegister = cv.__meta?.demandProfile?.register;
+  const valuesChecks = valuesMirror(cv, adRegister);
   const profMiss = profileCoverage(cv.profile, themes.filter(t => t.importance === "must").slice(0, 3)).filter(c => !c.mentioned);
   const blankScope = cv.experience.slice(0, 2).filter(e => (e.bullets || []).some(b => b.trim()) && !(e.roleScope || "").trim());
-  interface ReadyCheck { id: string; kind: "issues" | "six" | "profile" | "scope" | "length" | "skills"; title: string; body: string; theme?: string; expIndex?: number }
+  interface ReadyCheck { id: string; kind: "issues" | "six" | "profile" | "scope" | "length" | "skills" | "values"; title: string; body: string; theme?: string; expIndex?: number }
   const readiness: ReadyCheck[] = (!deepResult || !themes.length) ? [] : ([
     ...(errorCount > 0 ? [{ id: "issues", kind: "issues" as const,
       title: isSv ? `${errorCount} kritiska problem i dokumentet` : `${errorCount} critical document issues`,
@@ -411,6 +413,11 @@ export function InsightsPanel({
     ...profMiss.map(c => ({ id: `profile:${c.theme}`, kind: "profile" as const, theme: c.theme,
       title: isSv ? `Profilen nämner inte: ${c.theme}` : `The profile doesn't mention: ${c.theme}`,
       body: isSv ? "Profiltexten är rekryterarens första läsning och CV:ts bästa nyckelordsyta. Ett krav-tema som saknas där förlorar både skimmen och sökningen." : "The profile paragraph is the recruiter's first read and the CV's best keyword surface. A must theme absent there loses both the skim and the search." })),
+    ...(valuesChecks.length > 0 && !valuesChecks.some(v => v.present) ? [{ id: "values", kind: "values" as const,
+      title: isSv ? "Annonsens värdespråk syns inte" : "The ad's value language isn't visible",
+      body: (isSv
+        ? `Annonsen är värderingsdriven, den som läser letar efter orden: ${valuesChecks.map(v => v.word).join(", ")}. Ingen av dem syns i profilen eller toppen av senaste rollen. Spegla dem där dina fakta bär det, ett ord i taget.`
+        : `The posting is values-driven, the reader looks for: ${valuesChecks.map(v => v.word).join(", ")}. None of them appear in your profile or the top of the latest role. Mirror them where your facts support it, one word at a time.`) }] : []),
     ...blankScope.map(e => ({ id: `scope:${e.id}`, kind: "scope" as const, expIndex: cv.experience.indexOf(e),
       title: isSv ? `Rollomfång saknas: ${e.title}` : `Role scope missing: ${e.title}`,
       body: isSv ? "Mandat, P&L, team, geografi. En tom omfångsrad gör rollen mindre än den var." : "Mandate, P&L, team, geography. An empty scope line makes the role look smaller than it was." })),
@@ -814,6 +821,7 @@ export function InsightsPanel({
                 if (themes.length) parts.push(isSv ? `${covered} av ${themes.length} teman täckta` : `${covered} of ${themes.length} themes covered`);
                 if (remaining > 0 && gap && !accepted.has(gap.theme)) parts.push((isSv ? "störst gap: " : "biggest gap: ") + gap.theme);
                 if (six) parts.push((isSv ? "toppen " : "top ") + `${six.themes.filter(x => x.visible).length}/${six.themes.length}`);
+                if (valuesChecks.length) parts.push((isSv ? "värdespråk " : "value words ") + `${valuesChecks.filter(v => v.present).length}/${valuesChecks.length}`);
                 if (tm?.level === "exact") parts.push(isSv ? "titel ✓" : "title ✓");
                 if (tm?.level === "partial") parts.push(isSv ? "titel delvis" : "title partial");
                 return (
@@ -1172,6 +1180,7 @@ export function InsightsPanel({
             scope: ["Rollomfång", "Role scope"],
             length: ["Längden", "Length"],
             skills: ["Skills-sektionen", "Skills section"],
+            values: ["Tonläget", "Register"],
           };
           const sixFix = rc.kind === "six" && six?.suggestion && six.suggestion.theme === rc.theme;
           content = card(`ready:${rc.id}`, <>
@@ -1201,7 +1210,7 @@ export function InsightsPanel({
               {rc.kind === "six" && !sixFix && (
                 <Button className="h-11 flex-1 text-sm" onClick={() => onNavigateToSection?.("experience")}>{isSv ? "Öppna erfarenheten" : "Open experience"}</Button>
               )}
-              {rc.kind === "profile" && (
+              {(rc.kind === "profile" || rc.kind === "values") && (
                 <Button className="h-11 flex-1 text-sm" onClick={() => onNavigateToSection?.("profile")}>{isSv ? "Öppna profilen" : "Open the profile"}</Button>
               )}
               {(rc.kind === "scope" || rc.kind === "length") && (

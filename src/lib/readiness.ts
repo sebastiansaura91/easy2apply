@@ -77,6 +77,33 @@ export function profileCoverage(
   });
 }
 
+export interface ValuesMirrorCheck {
+  word: string;
+  present: boolean;
+}
+
+/**
+ * Tonlägeslagret's document check: for a values-driven posting, does the recruiter's
+ * first read (profile + latest role's scope line and top bullets) reflect ANY of the
+ * ad's own value words? Pure string matching, lightly stemmed — no model, no score.
+ */
+export function valuesMirror(
+  cv: CVContent,
+  register: { style?: string; values_language?: string[] } | undefined,
+): ValuesMirrorCheck[] {
+  if (!register || (register.style !== "values" && register.style !== "mixed")) return [];
+  const exp = cv.experience?.[0];
+  const blob = norm([cv.profile || "", exp?.roleScope || "", ...(exp?.bullets || []).slice(0, 3)].join(" \n "));
+  return (register.values_language || [])
+    .filter(w => w && w.trim().length >= 3)
+    .slice(0, 8)
+    .map(w => {
+      const n = norm(w);
+      const present = !!blob && (blob.includes(n) || (stem(n) !== n && blob.includes(stem(n))));
+      return { word: w, present };
+    });
+}
+
 export interface ShortenTarget {
   label: string;
   /** Which experience the cut lives in — for navigation. */

@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { corsHeaders, makeGateway, HUMAN_WRITING_RULES, stripAiDashes } from "../_shared/gateway.ts";
+import { corsHeaders, makeGateway, HUMAN_WRITING_RULES, registerRules, stripAiDashes } from "../_shared/gateway.ts";
 
 
 
@@ -48,7 +48,7 @@ serve(async (req) => {
   const gw = makeGateway(req, "improve-bullet", "wording");
 
   try {
-    const { bullet, jobTitle, company, language } = await req.json();
+    const { bullet, jobTitle, company, language, register } = await req.json();
     const lang = language === "en" ? "en" : "sv";
     const systemPrompt = lang === "en" ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_SV;
 
@@ -78,7 +78,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
+          { role: "system", content: systemPrompt + HUMAN_WRITING_RULES + registerRules(register) },
           { role: "user", content: `${lang === "en" ? "Improve this bullet point" : "Förbättra denna punkt"}:${context}\n\n${lang === "en" ? "Bullet" : "Punkt"}: "${bullet}"` },
         ],
         ...(model.startsWith("google/") ? { temperature: 0.4 } : {}),

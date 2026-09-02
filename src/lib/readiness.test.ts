@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimatePages, profileCoverage, shortenTargets } from "./readiness";
+import { estimatePages, profileCoverage, shortenTargets, valuesMirror } from "./readiness";
 import { CVContent, emptyCV, sampleCV } from "@/types/cv";
 
 describe("estimatePages", () => {
@@ -65,5 +65,31 @@ describe("shortenTargets", () => {
 
   it("returns nothing for a tight CV", () => {
     expect(shortenTargets(sampleCV)).toEqual([]);
+  });
+});
+
+describe("valuesMirror (Tonlägeslagret)", () => {
+  const cvWith = (profile: string, bullets: string[] = []): CVContent => ({
+    ...emptyCV,
+    profile,
+    experience: [{ id: "a", title: "Segmentchef", company: "", location: "", startDate: "2020-01", endDate: "", isPresent: true, bullets }],
+  });
+  const reg = { style: "values", values_language: ["delaktighet", "självbestämmande", "tillit"] };
+
+  it("returns empty for metrics postings and missing registers", () => {
+    expect(valuesMirror(cvWith("Ledde tillväxt"), undefined)).toEqual([]);
+    expect(valuesMirror(cvWith("Ledde tillväxt"), { style: "metrics", values_language: ["tillit"] })).toEqual([]);
+  });
+
+  it("finds value words in the profile and top bullets, stemmed", () => {
+    const checks = valuesMirror(cvWith("Ledarskap byggt på tillit.", ["Stärkte medarbetarnas delaktighet i sex regioner"]), reg);
+    expect(checks.find(c => c.word === "tillit")?.present).toBe(true);
+    expect(checks.find(c => c.word === "delaktighet")?.present).toBe(true);
+    expect(checks.find(c => c.word === "självbestämmande")?.present).toBe(false);
+  });
+
+  it("does not look below the top three bullets", () => {
+    const checks = valuesMirror(cvWith("", ["a", "b", "c", "byggde tillit i teamet"]), reg);
+    expect(checks.find(c => c.word === "tillit")?.present).toBe(false);
   });
 });

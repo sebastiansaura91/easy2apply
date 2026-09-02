@@ -2,7 +2,7 @@
 // Grounded strictly in what's already in the CV — it summarises, it never invents new
 // facts, employers, metrics or claims. Especially useful when starting from scratch.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { corsHeaders, makeGateway, HUMAN_WRITING_RULES, stripAiDashes } from "../_shared/gateway.ts";
+import { corsHeaders, makeGateway, HUMAN_WRITING_RULES, registerRules, stripAiDashes } from "../_shared/gateway.ts";
 
 
 
@@ -68,7 +68,7 @@ ${posLines ? "Use the POSITIONING guidance provided to decide what to emphasise 
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
+          { role: "system", content: systemPrompt + HUMAN_WRITING_RULES + registerRules(resume_content_json?.__meta?.demandProfile?.register) },
           { role: "user", content: userPrompt },
         ],
       }),

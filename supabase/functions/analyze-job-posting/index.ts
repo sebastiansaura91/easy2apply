@@ -80,6 +80,13 @@ WISH-FRAMING IS NEVER A KNOCKOUT: items under "vi tror att du har", "för att ly
 A degree or a consulting background under wish-framing is NOT a knockout.
 Empty array if none - most Swedish postings have none.
 
+## REGISTER (how the posting talks)
+Classify the posting's dominant register in the register field:
+- "values": people, values and culture language dominates (omtanke, delaktighet, tillit, självbestämmande, meningsfullhet) and few or no numeric performance demands.
+- "metrics": performance language dominates (KPI:er, tillväxtmål, resultat, effektivitet, targets).
+- "mixed": both registers carry real weight.
+values_language: up to 8 of the POSTING'S OWN value words or short phrases, verbatim in the posting's language, that a recruiter reading applications wants mirrored (e.g. "delaktighet", "självbestämmande", "värderingsstyrd", "tillit"). ONLY words that appear in the posting. Empty array for a pure metrics posting.
+
 ## TOOLS & SYSTEMS (exact-match keywords)
 List products, technologies, systems and certifications the posting NAMES explicitly (e.g. Salesforce, SAP, Power BI, SQL, PMP). Max 10, exact spelling from the posting. Generic words ("CRM system", "affärssystem") only when no product is named. Empty array if none.${Array.isArray(registry?.competences) && registry.competences.length ? `
 
@@ -137,8 +144,18 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
                   items: { type: "string" },
                   description: "Binary hard requirements (work authorization, location, required language, certifications) — the only real auto-rejectors",
                 },
+                register: {
+                  type: "object",
+                  description: "The posting's dominant register and its own value vocabulary",
+                  properties: {
+                    style: { type: "string", enum: ["values", "metrics", "mixed"] },
+                    values_language: { type: "array", items: { type: "string" }, description: "Up to 8 value words/phrases verbatim from the posting; empty for pure metrics postings" },
+                  },
+                  required: ["style", "values_language"],
+                  additionalProperties: false,
+                },
               },
-              required: ["job_title", "company_name", "seniority_level", "key_requirements", "nice_to_have", "core_responsibilities", "key_phrases", "industry", "detected_language", "competence_themes", "knockout_requirements"],
+              required: ["job_title", "company_name", "seniority_level", "key_requirements", "nice_to_have", "core_responsibilities", "key_phrases", "industry", "detected_language", "competence_themes", "knockout_requirements", "register"],
               additionalProperties: false,
             },
           },
@@ -220,6 +237,23 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
           if (alt) t.theme = String(alt).charAt(0).toUpperCase() + String(alt).slice(1);
         }
       }
+    }
+
+    // Register guard: values_language must be the posting's OWN words. Anything the
+    // model volunteered that isn't in the posting (stem-matched) is dropped, capped
+    // at 8. A posting with no surviving value words can't be values-driven.
+    if (result.register && typeof result.register === "object") {
+      const kept = (Array.isArray(result.register.values_language) ? result.register.values_language : [])
+        .map((w: unknown) => String(w || "").trim())
+        .filter((w: string) => {
+          if (!w || w.length < 3 || w.length > 40) return false;
+          const words = w.toLowerCase().split(/\s+/).map(normWord).filter((c: string) => c.length >= 3);
+          return words.length > 0 && words.every((c: string) => postingNorm.includes(stemW(c)));
+        })
+        .slice(0, 8);
+      result.register.values_language = kept;
+      if (!["values", "metrics", "mixed"].includes(result.register.style)) result.register.style = "mixed";
+      if (kept.length === 0 && result.register.style === "values") result.register.style = "metrics";
     }
 
     // Pedigree proxies are class labels, never CV keywords: if the model left a brand
