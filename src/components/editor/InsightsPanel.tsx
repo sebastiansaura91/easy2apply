@@ -19,6 +19,7 @@ import { collectProxyTerms, isPedigreeTerm } from "@/lib/pedigree";
 import { sixSecondTest } from "@/lib/six-second";
 import { adviseSkills } from "@/lib/skills-advisor";
 import { estimatePages, profileCoverage, shortenTargets, valuesMirror } from "@/lib/readiness";
+import { cutPlan, applyCutPlan } from "@/lib/cut-plan";
 import { CVMeta } from "@/types/cv";
 import {
   CheckCircle2, AlertTriangle, AlertOctagon, Loader2, ChevronDown, ChevronRight,
@@ -399,6 +400,7 @@ export function InsightsPanel({
   };
   const pageEst = estimatePages(cv);
   const adRegister = cv.__meta?.demandProfile?.register;
+  const trim = pageEst.pages > 2 ? cutPlan(cv, cv.__meta?.demandProfile) : null;
   const valuesChecks = valuesMirror(cv, adRegister);
   const profMiss = profileCoverage(cv.profile, themes.filter(t => t.importance === "must").slice(0, 3)).filter(c => !c.mentioned);
   const blankScope = cv.experience.slice(0, 2).filter(e => (e.bullets || []).some(b => b.trim()) && !(e.roleScope || "").trim());
@@ -1188,11 +1190,33 @@ export function InsightsPanel({
             <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{rc.title}</p>
             <p className="text-sm leading-relaxed text-muted-foreground">{rc.body}</p>
             {rc.kind === "skills" && skillsRows()}
-            {rc.kind === "length" && (
+            {rc.kind === "length" && (trim ? (
+              <div className="space-y-2">
+                <p className="text-[11px] font-medium text-foreground">
+                  {isSv
+                    ? `${trim.items.length} punkter bär inget för den här annonsen (~${trim.pagesNow} → ${trim.pagesAfter} sidor):`
+                    : `${trim.items.length} bullets carry nothing for this ad (~${trim.pagesNow} → ${trim.pagesAfter} pages):`}
+                </p>
+                <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
+                  {trim.items.slice(0, 6).map(t => (
+                    <li key={`${t.expIndex}-${t.bulletIdx}`}>
+                      <span className="font-medium">{t.roleTitle}:</span> "{t.bullet.slice(0, 70)}{t.bullet.length > 70 ? "…" : ""}"
+                    </li>
+                  ))}
+                  {trim.items.length > 6 && <li>{isSv ? `+ ${trim.items.length - 6} till` : `+ ${trim.items.length - 6} more`}</li>}
+                </ul>
+                {trim.gems.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {isSv ? "Begravda kort, lyft upp dem när du trimmat: " : "Buried strengths, lift them once trimmed: "}
+                    <span className="font-medium text-foreground">{trim.gems.map(g => `"${g.bullet.slice(0, 50)}…"`).join(" · ")}</span>
+                  </p>
+                )}
+              </div>
+            ) : (
               <ul className="list-disc pl-4 text-[11px] text-muted-foreground">
                 {shortenTargets(cv).map(t => <li key={t.label}>{t.label}</li>)}
               </ul>
-            )}
+            ))}
             {rc.kind === "profile" && rc.theme && (() => {
               const dp = themes.find(t => t.theme === rc.theme);
               const words = [...(dp?.supporting_terms_present || []), ...(dp?.supporting_terms_missing || [])].slice(0, 4);
@@ -1213,7 +1237,16 @@ export function InsightsPanel({
               {(rc.kind === "profile" || rc.kind === "values") && (
                 <Button className="h-11 flex-1 text-sm" onClick={() => onNavigateToSection?.("profile")}>{isSv ? "Öppna profilen" : "Open the profile"}</Button>
               )}
-              {(rc.kind === "scope" || rc.kind === "length") && (
+              {rc.kind === "length" && trim && onUpdateExperienceBullets && (
+                <Button className="h-11 flex-1 text-sm" onClick={() => {
+                  onSnapshot?.(isSv ? "Trimning" : "Trim");
+                  appliedSinceScanRef.current = true;
+                  for (const u of applyCutPlan(cv, trim.items)) onUpdateExperienceBullets(u.expIndex, u.bullets);
+                  track("card_actioned", { type: "trim", action: "accept" });
+                  toast({ title: isSv ? `${trim.items.length} punkter borttagna` : `${trim.items.length} bullets removed`, description: isSv ? "Ångra finns i menyn uppe till höger." : "Undo lives in the top-right menu." });
+                }}>{isSv ? `Trimma nu (−${trim.items.length} punkter)` : `Trim now (−${trim.items.length} bullets)`}</Button>
+              )}
+              {(rc.kind === "scope" || (rc.kind === "length" && !(trim && onUpdateExperienceBullets))) && (
                 <Button className="h-11 flex-1 text-sm" onClick={() => onNavigateToSection?.("experience")}>{isSv ? "Öppna erfarenheten" : "Open experience"}</Button>
               )}
               {rc.kind === "skills" && (

@@ -61,17 +61,34 @@ export function MatchScorecard({ themes, knockouts, fallbackScore, fallbackGrade
             .sort((a, b) => ((a.importance === "must" ? 0 : 1) - (b.importance === "must" ? 0 : 1)) || (ratingOf(a) - ratingOf(b)))
             .map((t, i) => {
               const r = ratingOf(t);
+              const present = (t.supporting_terms_present || []).slice(0, 4);
+              const missing = (t.supporting_terms_missing || []).slice(0, 4);
               return (
-                <div key={i} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium">{t.theme}</span>
-                  {t.importance === "must" && (
-                    <span className="flex-shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">{isSv ? "Krav" : "Must"}</span>
+                <div key={i} className="rounded-lg border border-border px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium">{t.theme}</span>
+                    {t.importance === "must" && (
+                      <span className="flex-shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">{isSv ? "Krav" : "Must"}</span>
+                    )}
+                    <span className="flex flex-shrink-0 items-center gap-0.5" title={`${r}/5`}>
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <span key={n} className={`h-1.5 w-1.5 rounded-full ${n <= r ? (r >= 4 ? "bg-green-600" : r >= 2 ? "bg-warning" : "bg-destructive") : "bg-muted"}`} />
+                      ))}
+                    </span>
+                  </div>
+                  {/* The actual comparison, per theme: which of the ad's words your CV
+                      carries and which it lacks. This line IS "my profile vs the ad's". */}
+                  {(present.length > 0 || missing.length > 0) && (
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                      {present.length > 0 && <span className="text-foreground">✓ {present.join(" · ")}</span>}
+                      {present.length > 0 && missing.length > 0 && <span className="mx-1.5">·</span>}
+                      {missing.length > 0 && <span>{isSv ? "saknas: " : "missing: "}{missing.join(" · ")}</span>}
+                    </p>
                   )}
-                  <span className="flex flex-shrink-0 items-center gap-0.5" title={`${r}/5`}>
-                    {[1, 2, 3, 4, 5].map(n => (
-                      <span key={n} className={`h-1.5 w-1.5 rounded-full ${n <= r ? (r >= 4 ? "bg-green-600" : r >= 2 ? "bg-warning" : "bg-destructive") : "bg-muted"}`} />
-                    ))}
-                  </span>
+                  {/* WHY the rating landed there — shown when there is something to fix. */}
+                  {r < 4 && t.evidence_note && (
+                    <p className="mt-0.5 text-[11px] italic leading-relaxed text-muted-foreground">{t.evidence_note}</p>
+                  )}
                 </div>
               );
             })}
