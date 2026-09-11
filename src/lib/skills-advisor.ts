@@ -16,6 +16,8 @@ import { collectProxyTerms, isPedigreeTerm } from "./pedigree";
  */
 
 export interface SkillsAdvice {
+  /** Ad terms the skills list ALREADY carries — the checkmark side of the comparison. */
+  covered: string[];
   /** Ad terms missing from the skills list and proven by CV text or verified answers. */
   add: { term: string; theme?: string }[];
   /** Ad terms nothing proves yet — ask, never claim. */
@@ -106,9 +108,10 @@ export function adviseSkills(
 
   const add: SkillsAdvice["add"] = [];
   const unproven: SkillsAdvice["unproven"] = [];
+  const covered: string[] = [];
   for (const t of targets) {
     const n = norm(t.term);
-    if (inSkills(n)) continue;
+    if (inSkills(n)) { covered.push(t.term); continue; }
     // Synonym already listed → reword case, handled below, not an add.
     const g = groupOf(n);
     if (g >= 0 && skillsNorm.some(s => groupOf(s) === g)) continue;
@@ -150,5 +153,5 @@ export function adviseSkills(
   const status: SkillsAdvice["status"] = skills.length > CAP ? "many" : skills.length < FLOOR ? "few" : "ok";
   const deficit = Math.max(0, FLOOR - (skills.length + add.length));
 
-  return { add, unproven, reword, trim, cap: CAP, floor: FLOOR, current: skills.length, status, deficit };
+  return { covered, add, unproven, reword, trim, cap: CAP, floor: FLOOR, current: skills.length, status, deficit };
 }

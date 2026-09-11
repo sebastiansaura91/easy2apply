@@ -88,3 +88,17 @@ describe("adviseSkills", () => {
     expect(a.add.map(x => x.term)).not.toContain("digitalisering");
   });
 });
+
+describe("covered (the checkmark side)", () => {
+  it("lists ad terms the skills list already carries, and only those", () => {
+    const advice = adviseSkills(cvWith(["Salesforce", "Förändringsledning", "Pricing"]), profile, [])!;
+    expect(advice.covered).toContain("Salesforce");
+    expect(advice.covered).toContain("förändringsledning");
+    expect(advice.covered).not.toContain("digitalisering");
+  });
+
+  it("stays empty when no skill matches the ad", () => {
+    const advice = adviseSkills(cvWith(["Excel", "Powerpoint"]), profile, [])!;
+    expect(advice.covered).toEqual([]);
+  });
+});

@@ -467,8 +467,29 @@ export function InsightsPanel({
   }, [queueEmpty]);
 
   // Skills advisor rows — shared by the queue card and the details sheet.
+  // One snapshot, every safe skills edit at once: trims first (respect the cap),
+  // then rewords, then proven adds. Unproven terms still route to the questions.
+  const applySkillsAll = () => {
+    if (!skillsAdvice || !onUpdateSkills) return;
+    onSnapshot?.(isSv ? "Skills-ändringar" : "Skills changes");
+    appliedSinceScanRef.current = true;
+    let next = cv.skills.filter(s => !skillsAdvice.trim.includes(s));
+    next = next.map(s => skillsAdvice.reword.find(r => r.from === s)?.to ?? s);
+    for (const a of skillsAdvice.add) if (!next.includes(a.term)) next.push(a.term);
+    onUpdateSkills(next);
+    track("card_actioned", { type: "skills", action: "accept_all" });
+    toast({ title: isSv ? "Skills-sektionen uppdaterad" : "Skills section updated", description: isSv ? "Ångra finns i menyn uppe till höger." : "Undo lives in the top-right menu." });
+  };
+  const skillsChangeCount = skillsAdvice ? skillsAdvice.add.length + skillsAdvice.reword.length + skillsAdvice.trim.length : 0;
   const skillsRows = () => skillsAdvice && (
     <div className="space-y-1.5">
+      {/* The comparison first: which of the ad's words the list already carries. */}
+      {skillsAdvice.covered.length > 0 && (
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <span className="text-foreground">✓ {skillsAdvice.covered.slice(0, 6).join(" · ")}</span>
+          {skillsAdvice.covered.length > 6 && <span> +{skillsAdvice.covered.length - 6}</span>}
+        </p>
+      )}
       {/* The COUNT is its own verdict: 8-12 is the band, and the advisor says so
           out loud instead of only listing edits. */}
       {skillsAdvice.status === "few" && (
@@ -515,6 +536,11 @@ export function InsightsPanel({
           }}>{isSv ? "Ta bort" : "Remove"}</Button>
         </div>
       ))}
+      {skillsChangeCount >= 2 && onUpdateSkills && (
+        <Button variant="outline" size="sm" className="h-8 w-full text-[11px]" onClick={applySkillsAll}>
+          {isSv ? `Gör alla ändringar (${skillsChangeCount})` : `Apply all changes (${skillsChangeCount})`}
+        </Button>
+      )}
       {skillsAdvice.unproven.length > 0 && canFix && (
         <div className="flex items-center justify-between gap-2 pt-0.5 text-xs">
           <span className="text-muted-foreground">{isSv ? "Obevisat än:" : "Unproven yet:"} {skillsAdvice.unproven.map(u => u.term).join(", ")}</span>
