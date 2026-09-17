@@ -38,8 +38,7 @@ export interface SkillsAdvice {
 const CAP = 12;
 const FLOOR = 8;
 
-const norm = (s: string) => s.toLowerCase().replace(/[-–—]/g, " ").replace(/\s+/g, " ").trim();
-const stem = (s: string) => (s.length >= 6 ? s.replace(/(erna|arna|orna|en|et|er|ar|or|s)$/i, "") : s);
+import { norm, stem } from "@/lib/text-match";
 
 // Cross-language/synonym pairs mirrored from the server's matching table: a current
 // skill naming the same competence in the other language is a REWORD, not a duplicate.

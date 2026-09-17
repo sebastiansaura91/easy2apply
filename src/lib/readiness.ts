@@ -7,8 +7,7 @@ import { CVContent } from "@/types/cv";
  * Everything here is pure computation: no model, no score impact.
  */
 
-const norm = (s: string) => s.toLowerCase().replace(/[-–—]/g, " ").replace(/\s+/g, " ").trim();
-const stem = (s: string) => (s.length >= 6 ? s.replace(/(erna|arna|orna|en|et|er|ar|or|s)$/i, "") : s);
+import { norm, stem } from "@/lib/text-match";
 
 /** Layout constants mirroring the A4 preview (10pt/1.4 on 160mm text width). */
 const CHARS_PER_LINE = 95;

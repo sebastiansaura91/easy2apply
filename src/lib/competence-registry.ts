@@ -1,4 +1,5 @@
 import { CVMeta } from "@/types/cv";
+import { ratingOf } from "@/lib/text-match";
 
 /**
  * The canonical competence registry: the user's own, hand-approved list of
@@ -78,7 +79,7 @@ export function buildStrengthLookup(
     if (meta.isRegistryRow) continue;
     const scanned = (meta.lastAtsResult?.result as any)?.job_language_match?.competence_themes || [];
     for (const t of scanned) {
-      const r = Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
+      const r = ratingOf(t);
       bump(keyFor(t.theme), r, 0);
     }
     for (const ev of meta.verifiedEvidence || []) bump(keyFor(ev.keyword), null, 1);

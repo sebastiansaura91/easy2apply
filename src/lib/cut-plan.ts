@@ -13,8 +13,7 @@ import { estimatePages } from "@/lib/readiness";
 const CHARS_PER_LINE = 95; // mirrors readiness.ts / the A4 preview
 const LINES_PER_PAGE = 52;
 
-const norm = (s: string) => s.toLowerCase().replace(/[-–—]/g, " ").replace(/\s+/g, " ").trim();
-const stem = (s: string) => (s.length >= 6 ? s.replace(/(erna|arna|orna|en|et|er|ar|or|s)$/i, "") : s);
+import { norm, stem } from "@/lib/text-match";
 
 export interface CutItem {
   expIndex: number;

@@ -18,6 +18,7 @@ import { cvScanSignature } from "@/lib/cv-signature";
 import { deriveRoleFromTitle } from "@/lib/role-from-title";
 import { buildStrengthLookup, buildEvidenceLookup } from "@/lib/competence-registry";
 import { loadRegistry, recordAnalysis } from "@/lib/data-store";
+import { ratingOf } from "@/lib/text-match";
 import { InsightsPanel } from "@/components/editor/InsightsPanel";
 import { exportToPdf } from "@/lib/export-pdf";
 import { runParseBackCheck } from "@/lib/parse-check";
@@ -269,7 +270,7 @@ export function ApplyFlow({ open, onOpenChange, templates, userId, onCreated, in
 
   const advice = getRoleAdvice(roleId);
   const reportThemes = report?.kind === "job" ? (report.ats.job_language_match?.competence_themes ?? []) : [];
-  const gapCount = reportThemes.filter(t => Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3)) < 4).length;
+  const gapCount = reportThemes.filter(t => ratingOf(t) < 4).length;
 
   // ── Improve-in-flow helpers (page mode): the created CV lives here through steps 3–4. ──
   const cvLang: "sv" | "en" = base?.language === "en" ? "en" : "sv";

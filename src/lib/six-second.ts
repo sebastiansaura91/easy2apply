@@ -22,7 +22,7 @@ interface ThemeLike {
   supporting_terms?: string[];
 }
 
-const norm = (s: string) => s.toLowerCase().replace(/[-–—]/g, " ").replace(/\s+/g, " ").trim();
+import { hitIn as sharedHit, norm } from "@/lib/text-match";
 
 /**
  * Deterministic six-second pass: recruiters spend their first seconds on the top
@@ -43,10 +43,10 @@ export function sixSecondTest(cv: CVContent, themes: ThemeLike[]): SixSecondResu
     ...(t.supporting_terms || []),
     ...t.theme.split(/[\s/&,·]+/).filter(w => w.length >= 5),
   ];
-  const hitIn = (blob: string) => (term: string) => {
-    const n = norm(term);
-    return n.length >= 3 && blob.includes(n);
-  };
+  // Shared, stemmed matching: before Matchmotorn this check was the one place
+  // that did NOT stem, so "ledarskapet" passed the profile check next door but
+  // failed here. Same ruler everywhere now.
+  const hitIn = sharedHit;
 
   const checks = must.map(t => ({ theme: t.theme, visible: termsOf(t).some(hitIn(topBlob)) }));
 

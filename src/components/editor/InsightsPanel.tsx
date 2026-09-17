@@ -20,6 +20,7 @@ import { sixSecondTest } from "@/lib/six-second";
 import { adviseSkills } from "@/lib/skills-advisor";
 import { estimatePages, profileCoverage, shortenTargets, valuesMirror } from "@/lib/readiness";
 import { cutPlan, applyCutPlan } from "@/lib/cut-plan";
+import { ratingOf } from "@/lib/text-match";
 import { CVMeta } from "@/types/cv";
 import {
   CheckCircle2, AlertTriangle, AlertOctagon, Loader2, ChevronDown, ChevronRight,
@@ -455,7 +456,7 @@ export function InsightsPanel({
   // Peak-end telemetry: fire once each time the whole queue empties.
   const doneReportedRef = useRef(false);
   const queueEmpty = themes.length > 0 && readiness.length === 0 && themes.every(t => {
-    const r = Math.round((t.rating as number) ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
+    const r = ratingOf(t);
     return r >= 4 || (cv.__meta?.acceptedGaps || []).includes(t.theme);
   });
   useEffect(() => {
@@ -634,7 +635,7 @@ export function InsightsPanel({
     try {
       // Level-up mode: themes with a known rating get questions for the NEXT level's
       // missing attribute (autonomy/scope/outcome), not "do you have this?".
-      const ratingOfT = (t: typeof themes[number]) => Math.round((t.rating as number) ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
+      const ratingOfT = ratingOf;
       const themesCtx = themes
         .filter(t => toAsk.includes(t.theme))
         .map(t => ({ theme: t.theme, rating: ratingOfT(t), evidence_note: t.evidence_note }));
@@ -828,7 +829,6 @@ export function InsightsPanel({
           if (matchScore === null) return null;
           const gap = biggestGap(themes);
           const accepted = new Set(cv.__meta?.acceptedGaps || []);
-          const ratingOf = (t: typeof themes[number]) => Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
           const allGaps = themes.filter(t => ratingOf(t) < 4);
           const remaining = allGaps.filter(t => !accepted.has(t.theme)).length;
           // "Ready to send" means the WHOLE queue is empty — theme gaps AND the
@@ -942,7 +942,6 @@ export function InsightsPanel({
       {/* ── FIX QUEUE: one card at a time (guided mode) ── */}
       {themes.length > 0 && !showDetails && (() => {
         const accepted = new Set(cv.__meta?.acceptedGaps || []);
-        const ratingOf = (t: typeof themes[number]) => Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
         const gaps = [...themes]
           .filter(t => ratingOf(t) < 4 && !accepted.has(t.theme) && !handledThemes.has(t.theme))
           .sort((a, b) => ((a.importance === "must" ? 0 : 1) - (b.importance === "must" ? 0 : 1)) || (ratingOf(a) - ratingOf(b)));
@@ -1337,7 +1336,6 @@ export function InsightsPanel({
           </p>
           {(() => {
             const accepted = new Set(cv.__meta?.acceptedGaps || []);
-            const ratingOf = (t: typeof themes[number]) => Math.round((t.rating as number) ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3));
             const gapRows = themes.filter(t => ratingOf(t) < 4 && !accepted.has(t.theme))
               .map(t => ({ id: `g:${t.theme}`, label: (isSv ? "Tema: " : "Theme: ") + t.theme, note: `${ratingOf(t)}/5` }));
             const readyRows = readiness.map(r => ({ id: r.id, label: r.title, note: "" }));

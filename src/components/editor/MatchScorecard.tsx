@@ -1,5 +1,6 @@
 import { CompetenceTheme } from "@/types/ats-check";
 import { computeMatchScore, biggestGap } from "@/lib/match-score";
+import { ratingOf } from "@/lib/text-match";
 
 interface Props {
   themes?: CompetenceTheme[] | null;
@@ -20,8 +21,7 @@ export function MatchScorecard({ themes, knockouts, fallbackScore, fallbackGrade
   const score = computeMatchScore(list);
   const gap = biggestGap(list);
   const scoreColor = (s: number) => (s >= 75 ? "text-green-600" : s >= 50 ? "text-warning" : "text-destructive");
-  const ratingOf = (t: CompetenceTheme) =>
-    Math.max(1, Math.min(5, Math.round(t.rating ?? (t.evidence === "strong" ? 4 : t.evidence === "missing" ? 1 : 3))));
+
 
   return (
     <div className="space-y-3">

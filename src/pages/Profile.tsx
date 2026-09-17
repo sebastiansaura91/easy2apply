@@ -13,6 +13,7 @@ import {
   CanonicalCompetence, CompetenceRegistry, REGISTRY_ROW_TITLE, buildEvidenceLookup, normName,
 } from "@/lib/competence-registry";
 import { saveRegistryRow } from "@/lib/data-store";
+import { ratingOf } from "@/lib/text-match";
 import { format } from "date-fns";
 
 interface Row { id: string; title: string; meta: CVMeta; experience: ExperienceItem[] }
@@ -125,7 +126,7 @@ export default function Profile() {
         if (t.importance !== "must") continue;
         const scanned = (meta.lastAtsResult?.result as any)?.job_language_match?.competence_themes || [];
         const rated = scanned.find((s: any) => normName(s.theme) === normName(t.theme));
-        const r = rated ? Math.round(rated.rating ?? (rated.evidence === "strong" ? 4 : rated.evidence === "missing" ? 1 : 3)) : 0;
+        const r = rated ? ratingOf(rated) : 0;
         if (r >= 4 || lookup(t.theme).length > 0) continue;
         demanded.set(t.theme, (demanded.get(t.theme) || 0) + 1);
       }

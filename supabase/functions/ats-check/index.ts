@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, makeGateway, HUMAN_WRITING_RULES, registerRules, stripAiDashes } from "../_shared/gateway.ts";
+import { norm as normTM, stem as stemTM } from "../_shared/text-match.ts";
 
 
 // Recency policy (what the big matchers weight and consumer tools skip): old proof
@@ -267,15 +268,15 @@ serve(async (req) => {
       ["go-to-market", "gtm"],
       ["abonnemang", "subscription", "subscriptions"],
     ];
-    const normalize = (s: string) => s.toLowerCase().replace(/[-–—]/g, " ").replace(/\s+/g, " ").trim();
-    const cvText = normalize(renderedText);
+    const cvText = normTM(renderedText);
     const isPresent = (phrase: string): boolean => {
-      const p = normalize(phrase);
+      const p = normTM(phrase);
       if (!p) return true;
       if (cvText.includes(p)) return true;
-      // singular/definite tolerance: match on a lightly stemmed form of longer words
-      const stem = p.replace(/(erna|arna|orna|en|et|er|ar|or|s)$/i, "");
-      if (stem.length >= 5 && cvText.includes(stem)) return true;
+      // singular/definite tolerance, via the shared stemmer (same 6+ char gate as
+      // the client, so screen and score judge a word identically)
+      const st = stemTM(p);
+      if (st !== p && cvText.includes(st)) return true;
       for (const group of SV_EN_TERMS) {
         if (group.some(g => p.includes(g)) && group.some(g => cvText.includes(g))) return true;
       }
