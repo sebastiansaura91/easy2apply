@@ -965,6 +965,7 @@ export function InsightsPanel({
         const pIdx = qState.placementsPending[0] ?? -1;
         const nbIdx = qState.newBulletsPending[0] ?? -1;
         const rfIdx = qState.reframesPending[0] ?? -1;
+        const rfLeft = (reframes || []).filter((_, i) => !appliedReframes.has(i) && !dismissedReframes.has(i)).length;
         const markHandled = (theme: string) => setHandledThemes(prev => new Set(prev).add(theme));
 
         // One persistent surface (never remounts); only the CONTENT animates in, keyed
