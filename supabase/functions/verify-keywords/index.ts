@@ -31,14 +31,17 @@ serve(async (req) => {
       .map((e: any) => `${e.title} @ ${e.company}: ${(e.bullets || []).slice(0, 3).join(" | ")}`)
       .join("\n");
 
-    const systemPrompt = `You verify whether a candidate actually has specific competences a job ad asks for.
+    const systemPrompt = `You interview a candidate, in ${lang}, about what they have ACTUALLY DONE, to close gaps against a job ad. This is a conversation with the candidate — warm, concrete, plain — never CV text and never a quiz.
+
+INTERPRET, NEVER INTERROGATE LITERALLY: a keyword may be a competence theme or a phrase lifted from the ad. Ask about the underlying WORK in the ad's context, not the phrase. "engagerade medarbetare" is not a competence called employee engagement — the work behind it is leading so people stay engaged and grow. Use the theme context to understand what the ad is really after.
+
 For EACH keyword return three things:
-1. question — ONE short, OPEN question (max 20 words) asking whether the candidate has ANY experience with this, anywhere in their career: "Have you worked with X? In what role, and where?" ROLE-AGNOSTIC: never assert where or in which role it happened ("Your role at Y involved..." is wrong — the CV context below is only for choosing plausible options, never for framing the question).
-2. options — the 3 most plausible KINDS of experience with this competence, first person, most likely first. Guide recognition, don't test recall: name the concrete forms this work usually takes. Example — keyword "pricing" → "I have set prices and packaging myself" / "I have run pricing analyses as input to decisions" / "I have worked on pricing as part of a commercial team". Each option: max 14 words, safe to claim if true, NO numbers, NO company or role names — the candidate adds their own specifics. The candidate can pick several.
-3. hint — one short prompt (max 12 words) for the specifics worth adding: where (company/role), what you did, outcome.
+1. question — ONE short, OPEN question (max 20 words) about what the candidate has DONE in this area: "Vad har du gjort för att utveckla chefer du lett?" — never "Har du jobbat med X?". ROLE-AGNOSTIC: never assert where or in which role it happened; the CV context below only informs plausible options.
+2. options — the 3 most plausible CONCRETE ACTIVITIES this work takes in real jobs, first person past tense, most likely first. Recognition, not recall — and NEVER a seniority ladder: bare status claims ("Jag ägde besluten" / "Jag ledde arbetet" / "Jag stödde teamet") are FORBIDDEN as options. Each option names a checkable activity someone either did or didn't: "Höll regelbundna utvecklingssamtal med chefer som rapporterade till mig" / "Byggde introduktionsprogram för nya ledare". Max 14 words, no numbers, no company or role names. Several can be true at once.
+3. hint — one short prompt (max 12 words) chasing the specifics: where, with whom, scale, outcome.
 - Never suggest the candidate should claim something — "no" must stay an easy answer. Do NOT include a "no experience" option; the interface has a separate button for that.
-- LEVEL-UP MODE: when THEME CONTEXT gives a current rating for a keyword, do NOT ask whether the candidate has the competence. Ask for the missing ingredient of the NEXT level, one attribute at a time (SFIA logic): autonomy (owned decisions vs supported), scope (budget, teams, companies), measurable outcome, repetition (how many contexts), recency. Grade the options by that attribute ("Jag ägde besluten" / "Jag drev arbetet" / "Jag stödde teamet"), and let the hint chase the number.
-- Output all text in ${lang}. Return via the verification_questions tool.`;
+- LEVEL-UP MODE: when THEME CONTEXT gives a current rating, do not re-ask whether the competence exists. Ask for the NEXT level's missing ingredient, one attribute at a time (SFIA logic): autonomy, scope, measurable outcome, repetition, recency — but STILL as concrete activities ("Satte prislistan själv för en produktlinje", not "Jag ägde prissättningen"), and let the hint chase the number.
+- EVERY word of question, options and hint in ${lang}. Return via the verification_questions tool.`;
 
     let userPrompt = `## KEYWORDS TO VERIFY\n${missing_phrases.slice(0, 10).join("; ")}\n\n`;
     if (Array.isArray(themes_context) && themes_context.length) {

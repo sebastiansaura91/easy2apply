@@ -530,9 +530,21 @@ export function SkillsForm({ cv, updateCv, t, cvLanguage }: SectionFormProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">{t("sectionSkills")}</CardTitle>
+        <CardTitle className="flex items-baseline justify-between text-base">
+          {t("sectionSkills")}
+          <span className={`text-xs font-normal tabular-nums ${cv.skills.length > 12 ? "text-warning" : "text-muted-foreground"}`}>
+            {cv.skills.length}/12
+          </span>
+        </CardTitle>
       </CardHeader>
       <CardContent>
+        {cv.skills.length > 12 && (
+          <p className="mb-2 text-[11px] text-warning">
+            {isSv
+              ? "Över rekommenderade 12 — allt därutöver läses som utfyllnad. Förbättringspanelen föreslår vilka som kan strykas."
+              : "Over the recommended 12 — everything beyond reads as padding. The improve panel suggests which to drop."}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 mb-3">
           {cv.skills.map((skill, idx) => (
             <Badge key={idx} variant="secondary" className="gap-1 cursor-pointer hover:bg-destructive/10 transition-colors" onClick={() => updateCv("skills", cv.skills.filter((_, i) => i !== idx))}>

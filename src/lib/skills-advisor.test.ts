@@ -102,3 +102,21 @@ describe("covered (the checkmark side)", () => {
     expect(advice.covered).toEqual([]);
   });
 });
+
+describe("dupes (near-duplicate skills)", () => {
+  it("catches the same skill spelled with & vs and, case ignored", () => {
+    const advice = adviseSkills(cvWith([
+      "P&L ownership and profitability management",
+      "P&L Ownership & Profitability Management",
+      "Pricing",
+    ]), profile, [])!;
+    expect(advice.dupes).toHaveLength(1);
+    expect(advice.dupes[0].keep).toBe("P&L ownership and profitability management");
+    expect(advice.dupes[0].drop).toBe("P&L Ownership & Profitability Management");
+  });
+
+  it("does not flag genuinely different skills", () => {
+    const advice = adviseSkills(cvWith(["Pricing strategy", "Pricing analytics", "Salesforce"]), profile, [])!;
+    expect(advice.dupes).toEqual([]);
+  });
+});

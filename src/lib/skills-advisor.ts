@@ -24,6 +24,8 @@ export interface SkillsAdvice {
   unproven: { term: string; theme?: string }[];
   /** Current skill that names the same competence in other words — swap to the ad's term. */
   reword: { from: string; to: string }[];
+  /** Near-duplicate pairs already in the list ("P&L ownership..." twice with &/and) — drop the copy. */
+  dupes: { keep: string; drop: string }[];
   /** Least ad-relevant current skills beyond the cap — candidates for the character budget. */
   trim: string[];
   cap: number;
@@ -39,6 +41,10 @@ const CAP = 12;
 const FLOOR = 8;
 
 import { norm, stem } from "@/lib/text-match";
+
+/** Aggressive comparison form for duplicate detection: &/and unified, punctuation gone. */
+export const skillDupeKey = (s: string) =>
+  norm(s).replace(/&/g, " and ").replace(/[()\[\],.·]/g, " ").replace(/\s+/g, " ").trim();
 
 // Cross-language/synonym pairs mirrored from the server's matching table: a current
 // skill naming the same competence in the other language is a REWORD, not a duplicate.
@@ -117,6 +123,20 @@ export function adviseSkills(
     (proven(n) ? add : unproven).push(t);
   }
 
+  // Near-duplicates in the CURRENT list: same skill spelled twice ("&" vs "and",
+  // case, stray punctuation). Keep the first occurrence, drop the copy.
+  const dupes: SkillsAdvice["dupes"] = [];
+  {
+    const seenKeys = new Map<string, string>();
+    for (const s of skills) {
+      const k = skillDupeKey(s);
+      if (!k) continue;
+      const kept = seenKeys.get(k);
+      if (kept) dupes.push({ keep: kept, drop: s });
+      else seenKeys.set(k, s);
+    }
+  }
+
   const reword: SkillsAdvice["reword"] = [];
   for (let i = 0; i < skills.length; i++) {
     const g = groupOf(skillsNorm[i]);
@@ -152,5 +172,5 @@ export function adviseSkills(
   const status: SkillsAdvice["status"] = skills.length > CAP ? "many" : skills.length < FLOOR ? "few" : "ok";
   const deficit = Math.max(0, FLOOR - (skills.length + add.length));
 
-  return { covered, add, unproven, reword, trim, cap: CAP, floor: FLOOR, current: skills.length, status, deficit };
+  return { covered, add, unproven, reword, dupes, trim, cap: CAP, floor: FLOOR, current: skills.length, status, deficit };
 }

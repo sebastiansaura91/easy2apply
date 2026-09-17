@@ -62,13 +62,24 @@ ${posLines ? "Use the POSITIONING guidance provided to decide what to emphasise 
 
     const userPrompt = `${posLines ? `POSITIONING (how to frame the candidate):\n${posLines}\n\n` : ""}CANDIDATE FACTS (the factual base — do not exceed these):\nEXPERIENCE:\n${experiences || "(none)"}\n\nEDUCATION: ${education || "(none)"}\n\nSKILLS: ${skills || "(none)"}\n\nWrite the positioning-driven summary now, in ${langName}.`;
 
+    // The summary is the recruiter's FIRST read: when this CV targets an ad, the
+    // draft must answer THAT ad, not recap a career. Themes ride in __meta.
+    const dp: any = resume_content_json?.__meta?.demandProfile;
+    const mustThemes = (dp?.competence_themes || []).filter((t: any) => t?.importance === "must");
+    const demandBlock = mustThemes.length
+      ? `
+
+## AD ANCHORING (this CV targets a specific ad)
+The recruiter scans the summary for the ad's own words. Name the ad's must-have themes in the ad's language wherever the CANDIDATE FACTS support them: ${mustThemes.map((t: any) => `${t.theme}${(t.supporting_terms || []).length ? ` (${t.supporting_terms.slice(0, 3).join(", ")})` : ""}`).join("; ")}. Lead with the strongest overlap between the ad and the facts; leave out strengths the ad does not ask about. NEVER claim a theme the facts do not support — skip it instead.`
+      : "";
+
     const response = await gw.fetch((model) => ({
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: systemPrompt + HUMAN_WRITING_RULES + registerRules(resume_content_json?.__meta?.demandProfile?.register) },
+          { role: "system", content: systemPrompt + demandBlock + HUMAN_WRITING_RULES + registerRules(resume_content_json?.__meta?.demandProfile?.register) },
           { role: "user", content: userPrompt },
         ],
       }),

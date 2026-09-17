@@ -20,6 +20,7 @@ import { sixSecondTest } from "@/lib/six-second";
 import { adviseSkills } from "@/lib/skills-advisor";
 import { estimatePages, profileCoverage, shortenTargets, valuesMirror } from "@/lib/readiness";
 import { cutPlan, applyCutPlan } from "@/lib/cut-plan";
+import { skillDupeKey } from "@/lib/skills-advisor";
 import { ratingOf } from "@/lib/text-match";
 import { nextCard, gapQueue, commGapQueue, cardsLeft as countCardsLeft, minutesLeft, pendingIndices, QueueState } from "@/lib/queue";
 import { CVMeta } from "@/types/cv";
@@ -394,7 +395,7 @@ export function InsightsPanel({
   // disagree on screen again. ──
   const six = sixSecondTest(cv, themes.length ? themes : (cv.__meta?.demandProfile?.competence_themes || []));
   const skillsAdvice = onUpdateSkills ? adviseSkills(cv, cv.__meta?.demandProfile, cv.__meta?.verifiedEvidence) : null;
-  const skillsActionCount = skillsAdvice ? skillsAdvice.add.length + skillsAdvice.reword.length + skillsAdvice.trim.length : 0;
+  const skillsActionCount = skillsAdvice ? skillsAdvice.add.length + skillsAdvice.reword.length + skillsAdvice.trim.length + skillsAdvice.dupes.length : 0;
   const acceptedChecks = new Set(cv.__meta?.acceptedChecks || []);
   const acceptCheck = (id: string) => {
     track("card_actioned", { type: "check", action: "waive" });
@@ -475,14 +476,21 @@ export function InsightsPanel({
     if (!skillsAdvice || !onUpdateSkills) return;
     onSnapshot?.(isSv ? "Skills-ändringar" : "Skills changes");
     appliedSinceScanRef.current = true;
-    let next = cv.skills.filter(s => !skillsAdvice.trim.includes(s));
+    const seenKeys = new Set<string>();
+    let next = cv.skills.filter(s => {
+      if (skillsAdvice.trim.includes(s)) return false;
+      const k = skillDupeKey(s);
+      if (seenKeys.has(k)) return false; // the duplicate copies fall away here
+      seenKeys.add(k);
+      return true;
+    });
     next = next.map(s => skillsAdvice.reword.find(r => r.from === s)?.to ?? s);
     for (const a of skillsAdvice.add) if (!next.includes(a.term)) next.push(a.term);
     onUpdateSkills(next);
     track("card_actioned", { type: "skills", action: "accept_all" });
     toast({ title: isSv ? "Skills-sektionen uppdaterad" : "Skills section updated", description: isSv ? "Ångra finns i menyn uppe till höger." : "Undo lives in the top-right menu." });
   };
-  const skillsChangeCount = skillsAdvice ? skillsAdvice.add.length + skillsAdvice.reword.length + skillsAdvice.trim.length : 0;
+  const skillsChangeCount = skillsAdvice ? skillsAdvice.add.length + skillsAdvice.reword.length + skillsAdvice.trim.length + skillsAdvice.dupes.length : 0;
   const skillsRows = () => skillsAdvice && (
     <div className="space-y-1.5">
       {/* The comparison first: which of the ad's words the list already carries. */}
@@ -526,6 +534,22 @@ export function InsightsPanel({
             appliedSinceScanRef.current = true;
             onUpdateSkills?.(cv.skills.map(s => (s === r.from ? r.to : s)));
           }}>{isSv ? "Byt till annonsens ord" : "Use the ad's word"}</Button>
+        </div>
+      ))}
+      {skillsAdvice.dupes.map((d, di) => (
+        <div key={`dupe-${di}`} className="flex items-center justify-between gap-2 text-xs">
+          <span className="text-muted-foreground">− {d.drop} <span className="text-[10px]">({isSv ? "dubblett av" : "duplicate of"} "{d.keep}")</span></span>
+          <Button variant="outline" size="sm" className="h-7 shrink-0 text-[10px]" onClick={() => {
+            onSnapshot?.(isSv ? "Dubblett borttagen" : "Duplicate removed");
+            appliedSinceScanRef.current = true;
+            const k = skillDupeKey(d.drop);
+            let kept = false;
+            onUpdateSkills?.(cv.skills.filter(s => {
+              if (skillDupeKey(s) !== k) return true;
+              if (!kept) { kept = true; return true; }
+              return false;
+            }));
+          }}>{isSv ? "Ta bort" : "Remove"}</Button>
         </div>
       ))}
       {skillsAdvice.trim.map(t => (
@@ -598,10 +622,14 @@ export function InsightsPanel({
     const weakThemes = themes
       .filter(t => t.evidence !== "strong" && !kwConfirm[t.theme] && !accepted.has(t.theme))
       .map(t => t.theme);
+    // Themes only: a raw ad phrase ("engagerade medarbetare", "förtroende") is
+    // context, not a competence — interrogating it literally is how the flow got
+    // clunky. Terms still flow into PLACEMENTS via the theme expansion.
+    const valueWords = new Set((cv.__meta?.demandProfile?.register?.values_language || []).map(w => w.toLowerCase().trim()));
     const unknowns = (scope?.length
       ? scope.filter(p => !kwConfirm[p])
-      : Array.from(new Set([...weakThemes, ...missingKw.filter(p => !kwConfirm[p])]))
-    ).filter(p => !isPedigreeTerm(p, proxyTerms));
+      : Array.from(new Set(weakThemes))
+    ).filter(p => !isPedigreeTerm(p, proxyTerms) && !valueWords.has(p.toLowerCase().trim()));
     if (!unknowns.length) return;
 
     // Cross-CV reuse: a competence verified in ANY CV is never asked about again —
@@ -641,7 +669,9 @@ export function InsightsPanel({
         .filter(t => toAsk.includes(t.theme))
         .map(t => ({ theme: t.theme, rating: ratingOfT(t), evidence_note: t.evidence_note }));
       const { data, error } = await supabase.functions.invoke("verify-keywords", {
-        body: { resume_content_json: cv, missing_phrases: toAsk, locale: cvLanguage, themes_context: themesCtx.length ? themesCtx : undefined },
+        // The interview speaks the APP language (it is a conversation with you);
+        // only the resulting CV text follows the document language.
+        body: { resume_content_json: cv, missing_phrases: toAsk, locale: isSv ? "sv" : "en", themes_context: themesCtx.length ? themesCtx : undefined },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -1052,7 +1082,7 @@ export function InsightsPanel({
             )}
           </>);
         } else if (q.kind === "busy") {
-          content = card("busy", <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{loadingQ ? (isSv ? "Skapar fråga…" : "Creating question…") : (isSv ? "Letar ärliga placeringar…" : "Finding honest placements…")}</p>);
+          content = card("busy", <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{loadingQ ? (isSv ? "Skapar fråga…" : "Creating question…") : (isSv ? "Formulerar utifrån dina svar…" : "Writing from your answers…")}</p>);
         } else if (q.kind === "question" && pendingQ) {
           content = card(`q:${pendingQ.keyword}`, <>
             <div className="flex items-center justify-between gap-2">
@@ -1141,7 +1171,7 @@ export function InsightsPanel({
             })()}
             <div className="space-y-2 pt-1">
               {canFix && (
-                <Button className="h-11 w-full text-sm" onClick={() => { markHandled(g.theme); fetchQuestions([g.theme, ...terms]); }}>
+                <Button className="h-11 w-full text-sm" onClick={() => { markHandled(g.theme); fetchQuestions([g.theme]); }}>
                   {isSv ? "Svara på en fråga" : "Answer one question"}
                 </Button>
               )}
