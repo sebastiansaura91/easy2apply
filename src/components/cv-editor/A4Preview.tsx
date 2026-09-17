@@ -202,9 +202,9 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
             return cv.skills.length > 0 ? (
               <div key={section.id}>
                 <h2>{t("sectionSkills")}</h2>
-                <ul className="skills-cols">
-                  {cv.skills.filter(Boolean).map((s, i) => <li key={i}>{s}</li>)}
-                </ul>
+                {/* One comma-separated paragraph, not a bulleted grid: the same 12
+                    skills take ~4 lines instead of ~10, and ATS reads it identically. */}
+                <p className="skills-inline">{cv.skills.filter(Boolean).join(", ")}</p>
               </div>
             ) : null;
           case "certifications":

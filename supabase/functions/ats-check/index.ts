@@ -34,7 +34,7 @@ serve(async (req) => {
   const gw = makeGateway(req, "ats-check", "scoring");
 
   try {
-    const { resume_content_json, job_posting_text, locale, demand_profile, previous_themes, verified_evidence } = await req.json();
+    const { resume_content_json, job_posting_text, locale, demand_profile, previous_themes, verified_evidence, report_language } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -90,7 +90,13 @@ serve(async (req) => {
       userPrompt += `
 `;
     }
-    userPrompt += `Perform the full ATS + Recruiter Scan analysis now. Return the result via the ats_check_result tool. ALL text output MUST be in ${lang === "sv" ? "Swedish" : "English"}.`;
+    // Two audiences, two languages: analysis prose is read by the USER (app
+    // language); suggested CV text lands in the DOCUMENT (CV language). Before
+    // this split, English evidence notes showed up inside Swedish chrome.
+    const reportLang = (report_language === "en" || report_language === "sv" ? report_language : lang) === "sv" ? "Swedish" : "English";
+    const cvLang = lang === "sv" ? "Swedish" : "English";
+    userPrompt += `Perform the full ATS + Recruiter Scan analysis now. Return the result via the ats_check_result tool.
+LANGUAGE SPLIT: all ANALYSIS PROSE (evidence_note, issue titles/descriptions, recommendations, proof_gap reasoning, question text) MUST be in ${reportLang} — it is read by the candidate in the app. All SUGGESTED CV TEXT (reframe suggestions, rewritten bullets, replacement terms, suggested phrases) MUST be in ${cvLang} — it lands in the document. Never mix the two inside one field.`;
 
     const response = await gw.fetch((model) => ({
       method: "POST",

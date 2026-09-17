@@ -29,7 +29,7 @@ export function estimatePages(cv: CVContent): PageEstimate {
 
   let lines = 4; // name + contact block
   if (cv.profile?.trim()) lines += 2.5 + textLines(cv.profile);
-  if (cv.skills?.length) lines += 2.5 + Math.ceil(cv.skills.length / 3);
+  if (cv.skills?.length) lines += 2.5 + textLines(cv.skills.filter(Boolean).join(", "));
   for (const e of cv.experience || []) {
     lines += 2.5; // title + company/date line
     if (e.roleScope?.trim()) lines += textLines(e.roleScope);

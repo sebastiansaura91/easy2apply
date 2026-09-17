@@ -36,7 +36,8 @@ function functionFiles(): string[] {
 }
 
 describe("edge functions type-sanity (the check tsc never runs)", () => {
-  it("no syntax errors and no undefined identifiers in any function", () => {
+  // The TS program over 20+ functions takes ~5s — give it room beyond the default.
+  it("no syntax errors and no undefined identifiers in any function", { timeout: 30000 }, () => {
     const files = functionFiles();
     expect(files.length).toBeGreaterThan(10);
     const program = ts.createProgram(files, {

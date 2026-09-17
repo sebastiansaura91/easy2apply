@@ -280,15 +280,10 @@
   margin-bottom: 2pt;
 }
 
-/* Skills as three visual columns — DOM stays one linear list (ATS-safe). */
-.a4-preview ul.skills-cols {
-  columns: 3;
-  column-gap: 10pt;
-  padding-left: 14pt;
-  margin-top: 4pt;
-}
-.a4-preview ul.skills-cols li {
-  break-inside: avoid;
+/* Skills as ONE comma-separated paragraph — the densest honest format:
+   ~4 lines instead of a ~10-line bulleted grid, identical for ATS parsing. */
+.a4-preview p.skills-inline {
+  margin-top: 3pt;
 }
 
 .a4-preview .role-meta {

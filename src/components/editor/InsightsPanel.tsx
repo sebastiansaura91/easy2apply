@@ -137,6 +137,11 @@ export function InsightsPanel({
   // Which of your roles the experience belongs to — files the evidence in the right
   // place in the chronological profile.
   const [kwRole, setKwRole] = useState<Record<string, string>>({});
+  // Berattelsemodellen: the question card walks role -> story -> one follow-up.
+  // The role comes FIRST because it is the retrieval cue (cognitive-interview
+  // context reinstatement): memories surface where they were made.
+  const [kwStage, setKwStage] = useState<Record<string, "role" | "story" | "probe">>({});
+  const [kwProbe, setKwProbe] = useState<Record<string, string>>({});
   const roleSelect = (keyword: string, cls: string) => (
     <select value={kwRole[keyword] || ""} onChange={e => setKwRole(prev => ({ ...prev, [keyword]: e.target.value }))}
       className={`${cls} w-full rounded-md border border-input bg-background px-2 text-muted-foreground`}>
@@ -274,6 +279,9 @@ export function InsightsPanel({
           // Anchor themes to the demand profile extracted at application creation, so the
           // report and the editor always talk about the same competence buckets.
           demand_profile: cv.__meta?.demandProfile || undefined,
+          // Analysis prose (notes, issues) is FOR the reader -> app language;
+          // suggested CV text still follows the document via locale.
+          report_language: isSv ? "sv" : "en",
           // Anchor ratings to the previous scan so untouched themes never drift.
           previous_themes: (prevFull?.job_language_match?.competence_themes || [])
             .filter(t => Number.isFinite(t.rating as number))
@@ -756,9 +764,9 @@ export function InsightsPanel({
     );
   };
 
-  // The evidence answer = ticked statements + optional typed detail (either alone is enough).
+  // The evidence answer = ticked statements + typed story + the follow-up's number.
   const composedAnswer = (q: KwQuestion) =>
-    [(kwChoice[q.keyword] || []).join("; "), (kwAnswers[q.keyword] || "").trim()].filter(Boolean).join(" — ");
+    [(kwChoice[q.keyword] || []).join("; "), (kwAnswers[q.keyword] || "").trim(), (kwProbe[q.keyword] || "").trim()].filter(Boolean).join(" — ");
   const canSubmitQ = (q: KwQuestion) => composedAnswer(q).length > 2;
 
   // Every verified answer is profile evidence — persist it (with the role it belongs to)
@@ -1084,35 +1092,83 @@ export function InsightsPanel({
         } else if (q.kind === "busy") {
           content = card("busy", <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{loadingQ ? (isSv ? "Skapar fråga…" : "Creating question…") : (isSv ? "Formulerar utifrån dina svar…" : "Writing from your answers…")}</p>);
         } else if (q.kind === "question" && pendingQ) {
-          content = card(`q:${pendingQ.keyword}`, <>
+          // Berattelsemodellen: role -> story -> one follow-up. One thing per step
+          // (GOV.UK question pages); the role is asked FIRST because your own
+          // timeline is the retrieval cue that makes the story come back.
+          const stage = kwStage[pendingQ.keyword] || "role";
+          const roleOf = (e: { title: string; company: string }) => [e.title, e.company].filter(Boolean).join(" · ");
+          const gapTheme = themes.find(t => t.theme === pendingQ.keyword);
+          const needsProbe = !!gapTheme && ratingOf(gapTheme) >= 2; // basic proof first for the weakest
+          content = card(`q:${pendingQ.keyword}:${stage}`, <>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Fråga" : "Question"}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                {stage === "role" ? (isSv ? "1 av 3 · Var?" : "1 of 3 · Where?") : stage === "story" ? (isSv ? "2 av 3 · Vad hände?" : "2 of 3 · What happened?") : (isSv ? "3 av 3 · Sista frågan" : "3 of 3 · Last one")}
+              </span>
               <span className="text-[10px] text-muted-foreground">{(kwQuestions || []).length} {isSv ? "kvar" : "left"}</span>
             </div>
-            <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{pendingQ.question}</p>
-            {/* Every question justifies itself: the answer maps to a named demand in the ad. */}
-            <p className="text-[11px] text-muted-foreground">
-              {isSv ? <>Svaret täcker annonsens krav på <span className="font-medium text-foreground">{pendingQ.keyword}</span>.</> : <>Your answer covers the ad's demand for <span className="font-medium text-foreground">{pendingQ.keyword}</span>.</>}
-            </p>
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">{isSv ? "Kryssa det som stämmer, flera går bra" : "Tick what's true, several ok"}</p>
-              {optionsFor(pendingQ).map(opt => (
-                <button key={opt} type="button" onClick={() => toggleChoice(pendingQ.keyword, opt)}
-                  className={`w-full rounded-xl border p-3 text-left text-sm leading-relaxed transition-colors ${(kwChoice[pendingQ.keyword] || []).includes(opt) ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
-                  {opt}
+            {stage === "role" ? (<>
+              <p className="text-lg font-semibold leading-snug [text-wrap:balance]">
+                {isSv ? "Hände något sådant i någon av dina roller?" : "Did anything like this happen in one of your roles?"}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {isSv ? <>Annonsen söker <span className="font-medium text-foreground">{pendingQ.keyword}</span>. Rollen väcker minnet, börja där.</> : <>The ad asks for <span className="font-medium text-foreground">{pendingQ.keyword}</span>. The role jogs the memory, start there.</>}
+              </p>
+              <div className="space-y-2">
+                {cv.experience.filter(e => e.title || e.company).slice(0, 6).map(e => (
+                  <button key={e.id} type="button"
+                    onClick={() => { setKwRole(prev => ({ ...prev, [pendingQ.keyword]: roleOf(e) })); setKwStage(prev => ({ ...prev, [pendingQ.keyword]: "story" })); }}
+                    className="w-full rounded-xl border border-border p-3 text-left text-sm leading-relaxed transition-colors hover:bg-muted">
+                    {roleOf(e)}
+                  </button>
+                ))}
+                <button type="button"
+                  onClick={() => { setKwRole(prev => ({ ...prev, [pendingQ.keyword]: "" })); setKwStage(prev => ({ ...prev, [pendingQ.keyword]: "story" })); }}
+                  className="w-full rounded-xl border border-dashed border-border p-3 text-left text-sm text-muted-foreground transition-colors hover:bg-muted">
+                  {isSv ? "I ett annat sammanhang (utbildning, ideellt, eget)" : "In another context (studies, volunteering, own projects)"}
                 </button>
-              ))}
-            </div>
-            <Textarea rows={2} value={kwAnswers[pendingQ.keyword] || ""}
-              onChange={e => setKwAnswers(prev => ({ ...prev, [pendingQ.keyword]: e.target.value }))}
-              placeholder={pendingQ.hint || (isSv ? "Detalj: system, omfattning, resultat…" : "Detail: system, scope, outcome…")} className="text-sm" />
-            {roleSelect(pendingQ.keyword, "h-10 text-xs")}
-            <div className="flex gap-2">
-              <Button className="h-11 flex-1 text-sm" disabled={!canSubmitQ(pendingQ)} onClick={() => submitOneAnswer(pendingQ)}>
-                {isSv ? "Skicka" : "Submit"}
+              </div>
+              <Button variant="outline" className="h-11 w-full text-sm" onClick={() => dismissQuestion(pendingQ.keyword)}>
+                {isSv ? "Nej, ingenstans — ärligt gap" : "No, nowhere — honest gap"}
               </Button>
-              <Button variant="outline" className="h-11 text-sm" onClick={() => dismissQuestion(pendingQ.keyword)}>{isSv ? "Har inte" : "Don't have it"}</Button>
-            </div>
+            </>) : stage === "story" ? (<>
+              <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{pendingQ.question}</p>
+              {(kwRole[pendingQ.keyword] || "").length > 0 && (
+                <p className="text-[11px] text-muted-foreground">{isSv ? "På" : "At"} <span className="font-medium text-foreground">{kwRole[pendingQ.keyword]}</span></p>
+              )}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">{isSv ? "Känner du igen något av detta? Kryssa, flera går bra" : "Recognize any of these? Tick, several ok"}</p>
+                {optionsFor(pendingQ).map(opt => (
+                  <button key={opt} type="button" onClick={() => toggleChoice(pendingQ.keyword, opt)}
+                    className={`w-full rounded-xl border p-3 text-left text-sm leading-relaxed transition-colors ${(kwChoice[pendingQ.keyword] || []).includes(opt) ? "border-primary bg-primary/10 font-medium" : "border-border hover:bg-muted"}`}>
+                    {opt}
+                  </button>
+                ))}
+              </div>
+              <Textarea rows={2} value={kwAnswers[pendingQ.keyword] || ""}
+                onChange={e => setKwAnswers(prev => ({ ...prev, [pendingQ.keyword]: e.target.value }))}
+                placeholder={isSv ? "Med egna ord: läget → vad du gjorde → vad det ledde till" : "In your words: the situation → what you did → what it led to"} className="text-sm" />
+              <div className="flex gap-2">
+                <Button className="h-11 flex-1 text-sm" disabled={!canSubmitQ(pendingQ)}
+                  onClick={() => needsProbe ? setKwStage(prev => ({ ...prev, [pendingQ.keyword]: "probe" })) : submitOneAnswer(pendingQ)}>
+                  {needsProbe ? (isSv ? "Nästa" : "Next") : (isSv ? "Skicka" : "Submit")}
+                </Button>
+                <Button variant="outline" className="h-11 text-sm" onClick={() => dismissQuestion(pendingQ.keyword)}>{isSv ? "Har inte" : "Don't have it"}</Button>
+              </div>
+            </>) : (<>
+              <p className="text-lg font-semibold leading-snug [text-wrap:balance]">
+                {isSv ? "Ungefär hur stort var det?" : "Roughly how big was it?"}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {isSv ? "En siffra räcker och gör punkten trovärdig: antal personer, enheter, kronor eller procent. Cirka går bra." : "One number is enough and makes the bullet credible: people, units, money or percent. Approximate is fine."}
+              </p>
+              <Textarea rows={2} value={kwProbe[pendingQ.keyword] || ""}
+                onChange={e => setKwProbe(prev => ({ ...prev, [pendingQ.keyword]: e.target.value }))}
+                placeholder={isSv ? "T.ex. ~22 bolag, 6 chefer, 350 MSEK, 30 %…" : "E.g. ~22 companies, 6 managers, 30%…"} className="text-sm" />
+              <div className="flex gap-2">
+                <Button className="h-11 flex-1 text-sm" onClick={() => submitOneAnswer(pendingQ)}>{isSv ? "Skicka" : "Submit"}</Button>
+                <Button variant="outline" className="h-11 text-sm" onClick={() => submitOneAnswer(pendingQ)}>{isSv ? "Vet inte, skicka ändå" : "Not sure, submit anyway"}</Button>
+              </div>
+            </>)}
           </>);
         } else if (q.kind === "placement") {
           const p = placements![pIdx];
@@ -1154,19 +1210,17 @@ export function InsightsPanel({
               {isSv ? <>Annonsen kräver: {g.theme}</> : <>The ad requires: {g.theme}</>}
             </p>
             <p className="text-sm leading-relaxed text-muted-foreground">{g.evidence_note || (isSv ? "Ditt CV visar det inte än." : "Your CV doesn't show it yet.")}</p>
-            {/* What the NEXT level takes (SFIA logic) — the question targets exactly this. */}
+            {/* What convinces next, in plain words — the follow-up question chases this. */}
             {(() => {
               const nxt: Record<number, [string, string]> = {
-                1: ["grundbevis: var och när du gjort arbetet", "basic proof: where and when you did the work"],
-                2: ["eget ansvar: att du drev arbetet, inte bara deltog", "ownership: you drove the work, not just took part"],
-                3: ["ägarskap plus mätbart utfall, siffror på effekten", "ownership plus a measurable outcome, numbers on the effect"],
-                4: ["att CV:t självt visar det, femman kräver synlighet", "the CV itself showing it, a five requires visibility"],
+                1: ["Det som saknas: var och när du gjort det.", "What's missing: where and when you did it."],
+                2: ["Det som saknas: att det var du som drev arbetet.", "What's missing: that you drove the work."],
+                3: ["Det som saknas: en siffra på effekten.", "What's missing: a number on the effect."],
+                4: ["Det som saknas: att det syns i själva CV-texten.", "What's missing: it showing in the CV text itself."],
               };
               const t = nxt[Math.min(r, 4)];
               return t ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {isSv ? "För nivå" : "For level"} {Math.min(r + 1, 5)}: {isSv ? t[0] : t[1]}
-                </p>
+                <p className="text-[11px] text-muted-foreground">{isSv ? t[0] : t[1]}</p>
               ) : null;
             })()}
             <div className="space-y-2 pt-1">
