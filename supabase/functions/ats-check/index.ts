@@ -297,11 +297,11 @@ serve(async (req) => {
       const BRAND_RE = /^(mc\s?kinsey|bain|bcg|boston consulting group|mbb|big\s?(?:4|four)|deloitte|kpmg|pwc|ey|ernst\s*&\s*young|accenture|kearney|oliver wyman|roland berger|capgemini)(\s*(&|and)\s*(co|company|partners)\w*)?$/i;
       const proxySet = new Set<string>();
       for (const t of demand_profile?.competence_themes || []) {
-        for (const p of (t as any).proxy_terms || []) proxySet.add(normalize(String(p)));
+        for (const p of (t as any).proxy_terms || []) proxySet.add(normTM(String(p)));
       }
       const keepPhrase = (p: string) => {
         if (isPresent(p)) return false;
-        const n = normalize(p);
+        const n = normTM(p);
         if (!n || SOFT_TRAITS.has(n)) return false;
         if (proxySet.has(n) || BRAND_RE.test(String(p).trim())) return false;
         // Trait phrases led by a qualifier adjective are self-description, not keywords.
@@ -319,7 +319,7 @@ serve(async (req) => {
           // proof_bullet must quote a real CV sentence — anything else is a hallucination
           // and is dropped rather than shown as "your" text.
           if (typeof th?.proof_bullet === "string" && th.proof_bullet.trim()) {
-            const pb = normalize(th.proof_bullet);
+            const pb = normTM(th.proof_bullet);
             if (pb.length < 10 || !cvText.includes(pb)) { th.proof_bullet = ""; th.proof_gap = ""; }
           } else if (th) { th.proof_bullet = ""; th.proof_gap = ""; }
           // Clamp/derive the scorecard rating; keep evidence consistent with it.
