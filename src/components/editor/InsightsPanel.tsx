@@ -21,6 +21,7 @@ import { adviseSkills } from "@/lib/skills-advisor";
 import { estimatePages, profileCoverage, shortenTargets, valuesMirror } from "@/lib/readiness";
 import { cutPlan, applyCutPlan } from "@/lib/cut-plan";
 import { ratingOf } from "@/lib/text-match";
+import { nextCard, gapQueue, commGapQueue, cardsLeft as countCardsLeft, minutesLeft, pendingIndices, QueueState } from "@/lib/queue";
 import { CVMeta } from "@/types/cv";
 import {
   CheckCircle2, AlertTriangle, AlertOctagon, Loader2, ChevronDown, ChevronRight,
@@ -941,17 +942,29 @@ export function InsightsPanel({
 
       {/* ── FIX QUEUE: one card at a time (guided mode) ── */}
       {themes.length > 0 && !showDetails && (() => {
-        const accepted = new Set(cv.__meta?.acceptedGaps || []);
-        const gaps = [...themes]
-          .filter(t => ratingOf(t) < 4 && !accepted.has(t.theme) && !handledThemes.has(t.theme))
-          .sort((a, b) => ((a.importance === "must" ? 0 : 1) - (b.importance === "must" ? 0 : 1)) || (ratingOf(a) - ratingOf(b)));
+        // The DECISION lives in lib/queue.ts (Kortkön); this block only assembles its
+        // input and renders whatever it picks. Priority order is data there, not
+        // source order here.
+        const gaps = gapQueue(themes, cv.__meta?.acceptedGaps || [], handledThemes);
+        const commGaps = commGapQueue(themes, handledComm);
         const knockouts = cv.__meta?.demandProfile?.knockout_requirements || [];
         const pendingQ = (kwQuestions || [])[0] || null;
-        const pIdx = (placements || []).findIndex((_, i) => !appliedPlacements.has(i) && !dismissedPlacements.has(i));
-        const nbIdx = (newBullets || []).findIndex((_, i) => !appliedNew.has(i) && !dismissedNew.has(i));
-        const rfIdx = (reframes || []).findIndex((_, i) => !appliedReframes.has(i) && !dismissedReframes.has(i));
-        const rfLeft = (reframes || []).filter((_, i) => !appliedReframes.has(i) && !dismissedReframes.has(i)).length;
-        const busyQ = loadingQ || placing;
+        const qState: QueueState = {
+          knockouts: knockouts.length,
+          knockoutsAcked: !!cv.__meta?.knockoutsAcked,
+          busy: loadingQ || placing,
+          questions: (kwQuestions || []).length,
+          placementsPending: pendingIndices((placements || []).length, appliedPlacements, dismissedPlacements),
+          newBulletsPending: pendingIndices((newBullets || []).length, appliedNew, dismissedNew),
+          reframesPending: pendingIndices((reframes || []).length, appliedReframes, dismissedReframes),
+          gaps: gaps.length,
+          commGaps: commGaps.length,
+          readiness: readiness.length,
+        };
+        const q = nextCard(qState);
+        const pIdx = qState.placementsPending[0] ?? -1;
+        const nbIdx = qState.newBulletsPending[0] ?? -1;
+        const rfIdx = qState.reframesPending[0] ?? -1;
         const markHandled = (theme: string) => setHandledThemes(prev => new Set(prev).add(theme));
 
         // One persistent surface (never remounts); only the CONTENT animates in, keyed
@@ -969,13 +982,8 @@ export function InsightsPanel({
         const trailDone = Math.min(handledThemes.size, trailTotal);
         // Finite, shrinking goal (goal gradient): a concrete count plus a small time
         // estimate beats any percentage bar. ~45s per card is an honest pace here.
-        const cardsLeft =
-          (kwQuestions || []).length +
-          (placements || []).filter((_, i) => !appliedPlacements.has(i) && !dismissedPlacements.has(i)).length +
-          (newBullets || []).filter((_, i) => !appliedNew.has(i) && !dismissedNew.has(i)).length +
-          gaps.length + rfLeft + readiness.length +
-          themes.filter(t => (t as any).lifted_by_evidence && ratingOf(t) >= 4 && !handledComm.has(t.theme)).length;
-        const minsLeft = Math.max(1, Math.round(cardsLeft * 0.75));
+        const cardsLeft = countCardsLeft(qState);
+        const minsLeft = minutesLeft(cardsLeft);
         const trail = (trailTotal > 1 || cardsLeft > 0) ? (
           <div className="space-y-1 py-1">
             {trailTotal > 1 && (
@@ -994,7 +1002,7 @@ export function InsightsPanel({
         ) : null;
 
         let content: React.ReactNode;
-        if (knockouts.length > 0 && !cv.__meta?.knockoutsAcked) {
+        if (q.kind === "knockouts") {
           // Hard requirements answered one by one — the only true auto-rejections,
           // so a "no" is said out loud instead of discovered after four hours of tailoring.
           const answers = cv.__meta?.knockoutAnswers || {};
@@ -1042,9 +1050,9 @@ export function InsightsPanel({
               </Button>
             )}
           </>);
-        } else if (busyQ) {
+        } else if (q.kind === "busy") {
           content = card("busy", <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{loadingQ ? (isSv ? "Skapar fråga…" : "Creating question…") : (isSv ? "Letar ärliga placeringar…" : "Finding honest placements…")}</p>);
-        } else if (pendingQ) {
+        } else if (q.kind === "question" && pendingQ) {
           content = card(`q:${pendingQ.keyword}`, <>
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{isSv ? "Fråga" : "Question"}</span>
@@ -1075,7 +1083,7 @@ export function InsightsPanel({
               <Button variant="outline" className="h-11 text-sm" onClick={() => dismissQuestion(pendingQ.keyword)}>{isSv ? "Har inte" : "Don't have it"}</Button>
             </div>
           </>);
-        } else if (pIdx >= 0) {
+        } else if (q.kind === "placement") {
           const p = placements![pIdx];
           content = card(`p:${pIdx}`, <>
             <div className="flex items-center justify-between gap-2">
@@ -1089,7 +1097,7 @@ export function InsightsPanel({
               <Button variant="outline" className="h-11 text-sm" onClick={() => { track("card_actioned", { type: "placement", action: "dismiss" }); setDismissedPlacements(prev => new Set(prev).add(pIdx)); }}>{isSv ? "Avvisa" : "Dismiss"}</Button>
             </div>
           </>);
-        } else if (nbIdx >= 0) {
+        } else if (q.kind === "newBullet") {
           const nb = newBullets![nbIdx];
           content = card(`nb:${nbIdx}`, <>
             <div className="flex items-center justify-between gap-2">
@@ -1102,7 +1110,7 @@ export function InsightsPanel({
               <Button variant="outline" className="h-11 text-sm" onClick={() => { track("card_actioned", { type: "new_bullet", action: "dismiss" }); setDismissedNew(prev => new Set(prev).add(nbIdx)); }}>{isSv ? "Avvisa" : "Dismiss"}</Button>
             </div>
           </>);
-        } else if (gaps.length > 0) {
+        } else if (q.kind === "gap") {
           const g = gaps[0];
           const r = ratingOf(g);
           const terms = g.supporting_terms_missing || [];
@@ -1153,7 +1161,7 @@ export function InsightsPanel({
               </button>
             </div>
           </>);
-        } else if (rfIdx >= 0) {
+        } else if (q.kind === "reframe") {
           const rf = reframes![rfIdx];
           content = card(`rf:${rfIdx}`, <>
             <div className="flex items-center justify-between gap-2">
@@ -1173,10 +1181,10 @@ export function InsightsPanel({
               <Button variant="outline" className="h-11 text-sm" onClick={() => setDismissedReframes(prev => new Set(prev).add(rfIdx))}>{isSv ? "Avvisa" : "Dismiss"}</Button>
             </div>
           </>);
-        } else if ((() => themes.some(t => (t as any).lifted_by_evidence && ratingOf(t) >= 4 && !handledComm.has(t.theme)))()) {
+        } else if (q.kind === "commGap") {
           // Proven via answers but invisible in the CV — a communication gap, not a
           // competence gap. The recruiter only sees the CV; get it in there.
-          const g = themes.find(t => (t as any).lifted_by_evidence && ratingOf(t) >= 4 && !handledComm.has(t.theme))!;
+          const g = commGaps[0];
           content = card(`comm:${g.theme}`, <>
             <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-green-700 dark:text-green-500">{isSv ? "Bevisat" : "Proven"}</span>
             <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{g.theme}</p>
@@ -1196,7 +1204,7 @@ export function InsightsPanel({
               <Button variant="outline" className="h-11 text-sm" onClick={() => setHandledComm(prev => new Set(prev).add(g.theme))}>{isSv ? "Senare" : "Later"}</Button>
             </div>
           </>);
-        } else if (readiness.length > 0) {
+        } else if (q.kind === "readiness") {
           // Färdigmodellen as cards: document-level checks the score can't see —
           // top-third visibility, profile coverage, empty fields, page budget, skills.
           const rc = readiness[0];
