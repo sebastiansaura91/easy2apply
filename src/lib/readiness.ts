@@ -1,4 +1,5 @@
-import { CVContent } from "@/types/cv";
+import { CVContent, CVMeta } from "@/types/cv";
+import { detectLanguageOfText } from "@/lib/language-detection";
 
 /**
  * Färdigmodellen: deterministic document-level checks that gate "ready to send".
@@ -101,6 +102,84 @@ export function valuesMirror(
       const present = !!blob && (blob.includes(n) || (stem(n) !== n && blob.includes(stem(n))));
       return { word: w, present };
     });
+}
+
+export interface ScopeDupe {
+  expIndex: number;
+  bulletIdx: number;
+  bullet: string;
+}
+
+/**
+ * G4: the role-scope ingress and a bullet saying the same thing twice — reads as
+ * copy-paste sloppiness. Token overlap (stemmed) against every bullet; >=70% of
+ * the shorter side shared = duplicate.
+ */
+export function scopeDupes(cv: CVContent): ScopeDupe[] {
+  const toks = (s: string) => new Set(norm(s).split(" ").filter(w => w.length >= 3).map(stem));
+  const out: ScopeDupe[] = [];
+  (cv.experience || []).forEach((e, ei) => {
+    const scope = (e.roleScope || "").trim();
+    if (scope.length < 30) return;
+    const st = toks(scope);
+    if (st.size < 5) return;
+    (e.bullets || []).forEach((b, bi) => {
+      const bt = toks(b);
+      if (bt.size < 5) return;
+      const inter = [...bt].filter(w => st.has(w)).length;
+      if (inter / Math.min(bt.size, st.size) >= 0.7) out.push({ expIndex: ei, bulletIdx: bi, bullet: b });
+    });
+  });
+  return out;
+}
+
+export interface LeadershipEvidence {
+  verbHits: number;
+  teamSizes: number;
+  strong: boolean;
+}
+
+/**
+ * G2 (Altitudkollen): does the CV show leading THROUGH people, or only doing?
+ * Deterministic counts of leadership verbs and stated team sizes (headcount
+ * fields included). "Strong" needs at least one size AND repeated lead verbs.
+ */
+const LEAD_VERB_RE = /\b(ledde|leder|coachade|coachar|rekryterade|personalansvar|ledningsgrupp(en)?|utvecklingssamtal|direktrapporterande|managed|led|leading|coached|mentored|hired|direct reports?)\b/gi;
+const TEAM_SIZE_RE = /\b\d+\s*(direktrapporterande|medarbetare|chefer|utvecklare|personer|anställda|direct reports?|managers|developers|employees|people|fte)\b|\bteam\s+(of|på)\s+\d+\b/gi;
+
+export function leadershipEvidence(cv: CVContent): LeadershipEvidence {
+  const text = [
+    cv.profile || "",
+    ...(cv.experience || []).flatMap(e => [e.roleScope || "", e.headcount || "", ...(e.bullets || [])]),
+  ].join(" \n ");
+  const verbHits = (text.match(LEAD_VERB_RE) || []).length;
+  const sizeHits = (text.match(TEAM_SIZE_RE) || []).length
+    + (cv.experience || []).filter(e => (e.headcount || "").trim()).length;
+  return { verbHits, teamSizes: sizeHits, strong: sizeHits >= 1 && verbHits >= 3 };
+}
+
+/** The ad reads as a leadership hire: stored seniority, or the job title says chef. */
+export function isLeadershipAd(meta: CVMeta | undefined): boolean {
+  const s = meta?.demandProfile?.seniority || "";
+  if (s === "Management" || s === "Upper Management") return true;
+  return /(^|\s)(chef|chefen|head of|director|vp|vice president|manager|ledare)(\s|$|,)/i.test(meta?.tailoredForJob || "");
+}
+
+/**
+ * G3: Swedish ad, English CV (or vice versa) is silent friction. Ad language from
+ * the demand profile when stored, else detected from the pasted posting text.
+ * Returns the ad's language when it mismatches the CV, else null.
+ */
+export function adCvLanguageMismatch(meta: CVMeta | undefined, cvLanguage: "sv" | "en"): "sv" | "en" | null {
+  let ad = (meta?.demandProfile as { ad_language?: string } | undefined)?.ad_language;
+  if (ad !== "sv" && ad !== "en") {
+    const text = (meta?.jobPostingText || "").trim();
+    if (text.length < 80) return null;
+    const det = detectLanguageOfText(text);
+    if ((det.language !== "sv" && det.language !== "en") || det.confidence < 0.7) return null;
+    ad = det.language;
+  }
+  return ad !== cvLanguage ? ad : null;
 }
 
 export interface ShortenTarget {

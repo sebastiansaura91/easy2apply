@@ -110,6 +110,12 @@ export interface CVMeta {
      * vocabulary mirrored, not more KPI:er. values_language holds the ad's own words.
      */
     register?: { style: "values" | "metrics" | "mixed"; values_language: string[] };
+    /** ISO code of the posting's language — a Swedish ad wants a Swedish CV. */
+    ad_language?: string;
+    /** The posting's seniority read ("Management", "Upper Management"...). */
+    seniority?: string;
+    /** WHO the ad seeks, in its own language (max ~12 words) — the identity the profile must answer. */
+    role_archetype?: string | null;
   };
   /** Themes the user has consciously accepted as honest gaps — shown muted, never nagged. */
   acceptedGaps?: string[];

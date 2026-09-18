@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimatePages, profileCoverage, shortenTargets, valuesMirror } from "./readiness";
+import { estimatePages, profileCoverage, shortenTargets, valuesMirror, scopeDupes, leadershipEvidence, isLeadershipAd, adCvLanguageMismatch } from "./readiness";
 import { CVContent, emptyCV, sampleCV } from "@/types/cv";
 
 describe("estimatePages", () => {
@@ -91,5 +91,60 @@ describe("valuesMirror (Tonlägeslagret)", () => {
   it("does not look below the top three bullets", () => {
     const checks = valuesMirror(cvWith("", ["a", "b", "c", "byggde tillit i teamet"]), reg);
     expect(checks.find(c => c.word === "tillit")?.present).toBe(false);
+  });
+});
+
+describe("scopeDupes (G4)", () => {
+  const exp = (roleScope: string, bullets: string[]): CVContent => ({
+    ...emptyCV,
+    experience: [{ id: "a", title: "Chef", company: "", location: "", startDate: "2020-01", endDate: "", isPresent: true, roleScope, bullets }],
+  });
+  it("flags a bullet that repeats the scope ingress", () => {
+    const scope = "Ledde strategiska och kommersiella transformationsinitiativ som påverkade 20 000 kunder och 500 000 årliga serviceuppdrag.";
+    const d = scopeDupes(exp(scope, [scope + " Fokus på skalning.", "Helt annan punkt om prissättning av abonnemang."]));
+    expect(d).toHaveLength(1);
+    expect(d[0].bulletIdx).toBe(0);
+  });
+  it("leaves genuinely different bullets alone", () => {
+    const d = scopeDupes(exp("Ansvarade för regionens centrala affärsstödsfunktion med tydligt leveransansvar.",
+      ["Byggde om bokningsprocessen och höjde fyllnadsgraden med 30 procent."]));
+    expect(d).toEqual([]);
+  });
+});
+
+describe("leadershipEvidence + isLeadershipAd (G2)", () => {
+  it("reads doing-only CVs as weak", () => {
+    const cv: CVContent = { ...emptyCV, experience: [{ id: "a", title: "x", company: "", location: "", startDate: "", endDate: "", isPresent: false,
+      bullets: ["Optimerade kundresan och ökade merförsäljningen med 3 procent.", "Byggde ett analysverktyg för expansion."] }] };
+    expect(leadershipEvidence(cv).strong).toBe(false);
+  });
+  it("reads team sizes plus repeated lead verbs as strong, and 'enabled' never counts as 'led'", () => {
+    const cv: CVContent = { ...emptyCV, profile: "Enabled growth.", experience: [{ id: "a", title: "Chef", company: "", location: "", startDate: "", endDate: "", isPresent: true,
+      headcount: "6 direktrapporterande",
+      bullets: ["Ledde 6 chefer med personalansvar för 40 medarbetare.", "Coachade teamledare i utvecklingssamtal.", "Ledde förändringsarbetet."] }] };
+    const ev = leadershipEvidence(cv);
+    expect(ev.strong).toBe(true);
+    const weak: CVContent = { ...emptyCV, profile: "Enabled and failed and installed things." };
+    expect(leadershipEvidence(weak).verbHits).toBe(0);
+  });
+  it("isLeadershipAd: stored seniority or chef in the title", () => {
+    expect(isLeadershipAd({ demandProfile: { seniority: "Management" } } as never)).toBe(true);
+    expect(isLeadershipAd({ tailoredForJob: "Chef Affärsstöd" } as never)).toBe(true);
+    expect(isLeadershipAd({ tailoredForJob: "Senior Analyst" } as never)).toBe(false);
+  });
+});
+
+describe("adCvLanguageMismatch (G3)", () => {
+  const svAd = "Vi söker en chef som vill leda och utveckla vår centrala funktion för regionens avdelningar och filialer. Du har erfarenhet av att leda förändring och skapa förtroende i organisationen.";
+  it("stored ad language wins", () => {
+    expect(adCvLanguageMismatch({ demandProfile: { ad_language: "sv" } } as never, "en")).toBe("sv");
+    expect(adCvLanguageMismatch({ demandProfile: { ad_language: "sv" } } as never, "sv")).toBeNull();
+  });
+  it("falls back to detecting the pasted posting", () => {
+    expect(adCvLanguageMismatch({ jobPostingText: svAd } as never, "en")).toBe("sv");
+  });
+  it("stays silent without enough signal", () => {
+    expect(adCvLanguageMismatch({ jobPostingText: "short" } as never, "en")).toBeNull();
+    expect(adCvLanguageMismatch(undefined, "en")).toBeNull();
   });
 });

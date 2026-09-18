@@ -18,6 +18,18 @@ export function formatCvDate(value: string | undefined, lang: "sv" | "en"): stri
   return v;
 }
 
+/**
+ * Education dates in years only ("2011 – 2016"): recruiters never need the month,
+ * and a machine-looking "Jan 2011" hurts more than it informs.
+ */
+export function formatCvYearRange(start?: string, end?: string): string {
+  const y = (v?: string) => ((v || "").trim().match(/^(\d{4})/) || [])[1] || "";
+  const from = y(start);
+  const to = y(end);
+  if (from && to) return from === to ? from : `${from} – ${to}`;
+  return from || to || "";
+}
+
 /** "jan 2021 – nuvarande" / "Jan 2021 – Present" style range. */
 export function formatCvDateRange(
   start: string | undefined,

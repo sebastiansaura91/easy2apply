@@ -73,6 +73,13 @@ only capability words a CV could truthfully use. For a theme with proxy_terms, a
 proxy_translation: max 12 words in the posting's language stating the capability the
 pedigree stands for (e.g. "strukturerade analyser, beslutsunderlag till ledning, högt tempo").
 
+## ROLE ARCHETYPE (who the ad seeks)
+Set role_archetype: ONE phrase, max 12 words, in the posting's language, naming the IDENTITY
+the ad seeks - not the title, the function: "chef för central stödfunktion som möjliggör
+regionens affär", "kommersiell produktägare med eget P&L", "hands-on specialist inom X".
+Recruiters reject on identity mismatch before reading a single bullet; the profile text
+must answer THIS.
+
 ## KNOCKOUT REQUIREMENTS (the only real auto-rejectors)
 ONLY requirements the posting marks as ABSOLUTE: "krav:", "du måste", "ska ha", "förutsätter",
 "required", "must have". Typical true knockouts: work authorization, location/relocation,
@@ -148,6 +155,7 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
                   items: { type: "string" },
                   description: "Binary hard requirements (work authorization, location, required language, certifications) — the only real auto-rejectors",
                 },
+                role_archetype: { type: ["string", "null"], description: "WHO the ad seeks: the identity, max 12 words, in the posting's language. Never a title copy." },
                 register: {
                   type: "object",
                   description: "The posting's dominant register and its own value vocabulary",

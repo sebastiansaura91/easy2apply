@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import { CVContent, CVSection } from "@/types/cv";
 import { getTemplateStyle, withAccent } from "./templates";
-import { formatCvDateRange } from "./format-date";
+import { formatCvDateRange, formatCvYearRange } from "./format-date";
 
 /**
  * Renders CV data directly to PDF using jsPDF text rendering.
@@ -272,7 +272,7 @@ export function buildPdf(
           if (edu.field) titleLine += `, ${edu.field}`;
           drawH3(titleLine);
 
-          const dateLine = `${edu.school}  ·  ${formatCvDateRange(edu.startDate, edu.endDate, false, dateLang, "")}`;
+          const dateLine = `${edu.school}  ·  ${formatCvYearRange(edu.startDate, edu.endDate)}`;
           drawText(dateLine, marginL, y, { fontSize: 9, color: colors.gray });
           y += 3;
         }

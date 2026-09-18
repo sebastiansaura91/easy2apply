@@ -28,6 +28,8 @@ interface Props {
   profileEvidence?: (name: string) => { keyword: string; answer: string }[];
   /** Snapshot hook for one-step undo — see InsightsPanel. */
   onSnapshot?: (label: string) => void;
+  /** Editor-only: lets the language card switch the CV's language. */
+  onSwitchCvLanguage?: (lang: "sv" | "en") => void;
   /**
    * Docked mode: rendered as a fixed right column beside the document instead of an
    * overlay sheet — you watch the CV change while you answer (the Grammarly pattern).
@@ -42,7 +44,7 @@ interface Props {
  */
 export function TailorPanel({
   open, onOpenChange, cv, cvLanguage, t, seededJob, seededResult,
-  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit, onUpdateMeta, onDownload, profileEvidence, onSnapshot, docked,
+  onApplyReframe, onNavigateToSection, onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, onPersistRoleFit, onUpdateMeta, onDownload, profileEvidence, onSnapshot, onSwitchCvLanguage, docked,
 }: Props) {
   // Chrome follows the APP language, never the document's.
   const { language: appLanguage } = useLanguage();
@@ -66,6 +68,7 @@ export function TailorPanel({
       onDownload={onDownload}
       profileEvidence={profileEvidence}
       onSnapshot={onSnapshot}
+      onSwitchCvLanguage={onSwitchCvLanguage}
       onApplyReframe={onApplyReframe}
       onPersistRoleFit={onPersistRoleFit}
     />

@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CVContent, CVSection } from "@/types/cv";
 import { TemplateStyle } from "@/lib/templates";
-import { formatCvDateRange } from "@/lib/format-date";
+import { formatCvDateRange, formatCvYearRange } from "@/lib/format-date";
 
 interface A4PreviewProps {
   cv: CVContent;
@@ -193,7 +193,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
                 {cv.education.map((edu) => (
                   <div key={edu.id} style={{ marginBottom: "8pt" }}>
                     <h3>{edu.degree}{edu.field ? `, ${edu.field}` : ""}</h3>
-                    <p className="contact-line">{edu.school} · {formatCvDateRange(edu.startDate, edu.endDate, false, dateLang, "")}</p>
+                    <p className="contact-line">{edu.school} · {formatCvYearRange(edu.startDate, edu.endDate)}</p>
                   </div>
                 ))}
               </div>

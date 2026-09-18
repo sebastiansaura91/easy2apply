@@ -398,6 +398,7 @@ const CVEditor = () => {
   // and overlay sheet (narrow).
   const tailorPanelProps = {
     onSnapshot: takeSnapshot,
+    onSwitchCvLanguage: (lang: "sv" | "en") => setCvLanguage(lang),
     open: tailorOpen,
     onOpenChange: setTailorOpen,
     cv, cvLanguage, t,

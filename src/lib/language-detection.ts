@@ -47,7 +47,7 @@ const SV_PROPER_NOUNS_WITH_SPECIAL_CHARS = [
   "köping", "åkersberga", "strömsund",
 ];
 
-function detectLanguageOfText(text: string): { language: "sv" | "en" | "mixed" | "unknown"; confidence: number } {
+export function detectLanguageOfText(text: string): { language: "sv" | "en" | "mixed" | "unknown"; confidence: number } {
   if (!text || text.trim().length < 10) {
     return { language: "unknown", confidence: 0 };
   }

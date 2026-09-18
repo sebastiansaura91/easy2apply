@@ -18,7 +18,7 @@ import { parseYearsRequirement, yearsOfExperience } from "@/lib/experience-years
 import { collectProxyTerms, isPedigreeTerm } from "@/lib/pedigree";
 import { sixSecondTest } from "@/lib/six-second";
 import { adviseSkills } from "@/lib/skills-advisor";
-import { estimatePages, profileCoverage, shortenTargets, valuesMirror } from "@/lib/readiness";
+import { estimatePages, profileCoverage, shortenTargets, valuesMirror, scopeDupes, leadershipEvidence, isLeadershipAd, adCvLanguageMismatch } from "@/lib/readiness";
 import { cutPlan, applyCutPlan } from "@/lib/cut-plan";
 import { skillDupeKey } from "@/lib/skills-advisor";
 import { ratingOf } from "@/lib/text-match";
@@ -65,6 +65,8 @@ interface Props {
   onPersistRoleFit?: (hash: string, result: RoleFitResult) => void;
   /** Take a document snapshot right before an automatic change — powers one-step undo. */
   onSnapshot?: (label: string) => void;
+  /** Lets the language-mismatch card switch the CV's language (editor only). */
+  onSwitchCvLanguage?: (lang: "sv" | "en") => void;
 }
 
 interface SinceLast {
@@ -102,7 +104,7 @@ function CountUp({ from, value }: { from: number; value: number }) {
 
 export function InsightsPanel({
   cv, cvLanguage, t, jobPostingText, initialResult, onApplyBullet, onNavigateToSection,
-  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta, onDownload, profileEvidence, onApplyReframe, onPersistRoleFit, onSnapshot,
+  onUpdateProfile, onUpdateExperienceBullets, onUpdateSkills, onPersistScore, onPersistResult, autoRun, onUpdateMeta, onDownload, profileEvidence, onApplyReframe, onPersistRoleFit, onSnapshot, onSwitchCvLanguage,
 }: Props) {
   const { toast } = useToast();
   // Restore the stored full analysis so buckets are populated from the start.
@@ -414,11 +416,43 @@ export function InsightsPanel({
   const adQuoteFor = (theme: string) =>
     cv.__meta?.demandProfile?.competence_themes?.find(t => t.theme === theme)?.ad_quote || null;
   const trim = pageEst.pages > 2 ? cutPlan(cv, cv.__meta?.demandProfile) : null;
+  // G4/G3/G2/G1: sloppiness, language, altitude, angle — the recruiter's first reads.
+  const dupes = scopeDupes(cv);
+  const lead = leadershipEvidence(cv);
+  const adLangWanted = adCvLanguageMismatch(cv.__meta, cvLanguage === "en" ? "en" : "sv");
+  const archetype = cv.__meta?.demandProfile?.role_archetype || null;
   const valuesChecks = valuesMirror(cv, adRegister);
   const profMiss = profileCoverage(cv.profile, themes.filter(t => t.importance === "must").slice(0, 3)).filter(c => !c.mentioned);
   const blankScope = cv.experience.slice(0, 2).filter(e => (e.bullets || []).some(b => b.trim()) && !(e.roleScope || "").trim());
-  interface ReadyCheck { id: string; kind: "issues" | "six" | "profile" | "scope" | "length" | "skills" | "values"; title: string; body: string; theme?: string; expIndex?: number }
+  interface ReadyCheck { id: string; kind: "angle" | "dupe" | "cvlang" | "altitude" | "issues" | "six" | "profile" | "scope" | "length" | "skills" | "values"; title: string; body: string; theme?: string; expIndex?: number; bulletIdx?: number }
   const readiness: ReadyCheck[] = (!deepResult || !themes.length) ? [] : ([
+    // G1 Vinkeln: identity mismatch is the recruiter's six-second rejection — it
+    // outranks every keyword. Shown once per application, until acknowledged.
+    ...(archetype ? [{ id: "angle", kind: "angle" as const,
+      title: isSv ? "Vinkeln: vem annonsen söker" : "The angle: who the ad seeks",
+      body: (isSv
+        ? `Annonsen söker: ${archetype}. Läs din profiltext med de ögonen — svarar första meningen på det? Rekryteraren avgör identiteten på sex sekunder, före varje nyckelord.`
+        : `The ad seeks: ${archetype}. Read your profile with those eyes — does the first sentence answer it? The recruiter settles identity in six seconds, before any keyword.`) }] : []),
+    // G4 Dubbletten: the scope ingress and a bullet saying the same thing twice.
+    ...dupes.map(d => ({ id: `dupe:${cv.experience[d.expIndex]?.id}:${d.bulletIdx}`, kind: "dupe" as const, expIndex: d.expIndex, bulletIdx: d.bulletIdx,
+      title: isSv ? "Ingressen och en punkt säger samma sak" : "The intro line and a bullet say the same thing",
+      body: (isSv
+        ? `I ${cv.experience[d.expIndex]?.title || "rollen"} upprepar en punkt rollingressen nästan ordagrant: "${d.bullet.slice(0, 90)}…". En rekryterare läser det som slarv.`
+        : `In ${cv.experience[d.expIndex]?.title || "the role"} a bullet repeats the intro line almost verbatim: "${d.bullet.slice(0, 90)}…". A recruiter reads that as sloppiness.`) })),
+    // G3 Språket: a Swedish ad wants a Swedish CV.
+    ...(adLangWanted ? [{ id: "cvlang", kind: "cvlang" as const,
+      title: isSv
+        ? `Annonsen är på ${adLangWanted === "sv" ? "svenska" : "engelska"}, CV:t på ${adLangWanted === "sv" ? "engelska" : "svenska"}`
+        : `The ad is in ${adLangWanted === "sv" ? "Swedish" : "English"}, the CV in ${adLangWanted === "sv" ? "English" : "Swedish"}`,
+      body: isSv
+        ? "Rekryterare läser språkvalet som en signal: svensk annons, svenskt bolag — svenskt CV. Bytet översätter hela dokumentet."
+        : "Recruiters read the language choice as a signal: match the ad's language. Switching translates the whole document." }] : []),
+    // G2 Altituden: a leadership ad against a CV that mostly shows doing.
+    ...(isLeadershipAd(cv.__meta) && !lead.strong ? [{ id: "altitude", kind: "altitude" as const,
+      title: isSv ? "Annonsen söker en chef — CV:t visar mest vad du gjort själv" : "The ad seeks a leader — the CV mostly shows what you did yourself",
+      body: isSv
+        ? `Ledarskapssignaler i texten: ${lead.verbHits} ledarverb, ${lead.teamSizes} teamstorlekar. Sätt antal (medarbetare, chefer, budget) i rollomfången och låt ledde/utvecklade-verb leda punkterna där det är sant.`
+        : `Leadership signals in the text: ${lead.verbHits} lead verbs, ${lead.teamSizes} team sizes. Put counts (people, managers, budget) in the role scopes and let led/developed verbs lead the bullets where true.` }] : []),
     ...(errorCount > 0 ? [{ id: "issues", kind: "issues" as const,
       title: isSv ? `${errorCount} kritiska problem i dokumentet` : `${errorCount} critical document issues`,
       body: isSv ? "Kritiska fel gallrar innan innehållet ens läses." : "Critical issues screen you out before the content is even read." }] : []),
@@ -500,6 +534,29 @@ export function InsightsPanel({
     track("card_actioned", { type: "skills", action: "accept_all" });
     toast({ title: isSv ? "Skills-sektionen uppdaterad" : "Skills section updated", description: isSv ? "Ångra finns i menyn uppe till höger." : "Undo lives in the top-right menu." });
   };
+  // G1 CTA: rewrite the profile against the ad (draft-summary is ad-anchored and
+  // reads the demand profile + register from the CV's own meta).
+  const [rewritingProfile, setRewritingProfile] = useState(false);
+  const rewriteProfile = async () => {
+    setRewritingProfile(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("draft-summary", {
+        body: { resume_content_json: cv, system_language: cvLanguage || "sv" },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      if ((data as any)?.summary) {
+        onSnapshot?.(isSv ? "Profil mot annonsen" : "Profile toward the ad");
+        appliedSinceScanRef.current = true;
+        onUpdateProfile?.((data as any).summary);
+        track("card_actioned", { type: "angle", action: "accept" });
+        toast({ title: isSv ? "Profilen omskriven mot annonsen" : "Profile rewritten toward the ad", description: isSv ? "Läs igenom — ångra finns i menyn." : "Read it through — undo lives in the menu." });
+      }
+    } catch (e: any) {
+      toast({ title: isSv ? "Kunde inte skriva om" : "Couldn't rewrite", description: e.message, variant: "destructive" });
+    } finally { setRewritingProfile(false); }
+  };
+
   const skillsChangeCount = skillsAdvice ? skillsAdvice.add.length + skillsAdvice.reword.length + skillsAdvice.trim.length + skillsAdvice.dupes.length : 0;
   const skillsRows = () => skillsAdvice && (
     <div className="space-y-1.5">
@@ -1311,6 +1368,10 @@ export function InsightsPanel({
             length: ["Längden", "Length"],
             skills: ["Skills-sektionen", "Skills section"],
             values: ["Tonläget", "Register"],
+            angle: ["Vinkeln", "The angle"],
+            dupe: ["Dubblett", "Duplicate"],
+            cvlang: ["Språket", "Language"],
+            altitude: ["Ledarskapet", "Leadership"],
           };
           const sixFix = rc.kind === "six" && six?.suggestion && six.suggestion.theme === rc.theme;
           content = card(`ready:${rc.id}`, <>
@@ -1353,6 +1414,30 @@ export function InsightsPanel({
               ) : null;
             })()}
             <div className="flex gap-2">
+              {rc.kind === "angle" && (
+                <Button className="h-11 flex-1 text-sm" disabled={rewritingProfile} onClick={rewriteProfile}>
+                  {rewritingProfile ? (isSv ? "Skriver…" : "Writing…") : (isSv ? "Skriv om profilen mot annonsen" : "Rewrite the profile toward the ad")}
+                </Button>
+              )}
+              {rc.kind === "dupe" && typeof rc.expIndex === "number" && typeof rc.bulletIdx === "number" && onUpdateExperienceBullets && (
+                <Button className="h-11 flex-1 text-sm" onClick={() => {
+                  const exp = cv.experience[rc.expIndex!];
+                  if (!exp) return;
+                  onSnapshot?.(isSv ? "Dubblett borttagen" : "Duplicate removed");
+                  appliedSinceScanRef.current = true;
+                  onUpdateExperienceBullets(rc.expIndex!, exp.bullets.filter((_, i) => i !== rc.bulletIdx));
+                  track("card_actioned", { type: "dupe", action: "accept" });
+                }}>{isSv ? "Ta bort punkten" : "Remove the bullet"}</Button>
+              )}
+              {rc.kind === "cvlang" && onSwitchCvLanguage && adLangWanted && (
+                <Button className="h-11 flex-1 text-sm" onClick={() => {
+                  track("card_actioned", { type: "cvlang", action: "accept" });
+                  onSwitchCvLanguage(adLangWanted);
+                }}>{isSv ? `Byt CV-språk till ${adLangWanted === "sv" ? "svenska" : "engelska"}` : `Switch CV language to ${adLangWanted === "sv" ? "Swedish" : "English"}`}</Button>
+              )}
+              {rc.kind === "altitude" && (
+                <Button className="h-11 flex-1 text-sm" onClick={() => onNavigateToSection?.("experience")}>{isSv ? "Öppna erfarenheten" : "Open experience"}</Button>
+              )}
               {rc.kind === "issues" && (
                 <Button className="h-11 flex-1 text-sm" onClick={() => setShowDetails(true)}>{isSv ? "Visa problemen" : "Show the issues"}</Button>
               )}
@@ -1381,7 +1466,9 @@ export function InsightsPanel({
                 <Button className="h-11 flex-1 text-sm" onClick={() => acceptCheck(rc.id)}>{isSv ? "Klart för nu" : "Done for now"}</Button>
               )}
               {rc.kind !== "skills" && onUpdateMeta && (
-                <Button variant="outline" className="h-11 text-sm" onClick={() => acceptCheck(rc.id)}>{isSv ? "Lämna som det är" : "Leave as is"}</Button>
+                <Button variant="outline" className="h-11 text-sm" onClick={() => acceptCheck(rc.id)}>
+                  {rc.kind === "angle" ? (isSv ? "Vinkeln stämmer" : "The angle fits") : (isSv ? "Lämna som det är" : "Leave as is")}
+                </Button>
               )}
             </div>
           </>);
