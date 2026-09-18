@@ -238,7 +238,7 @@ ${lang === "en" ? "Generate 4-6 bullets per level (bas, skarpt, max). Return as 
     });
   } catch (error) {
     console.error("Error generating bullets:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
