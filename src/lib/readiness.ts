@@ -177,9 +177,9 @@ export function adCvLanguageMismatch(meta: CVMeta | undefined, cvLanguage: "sv" 
     if (text.length < 80) return null;
     const det = detectLanguageOfText(text);
     if ((det.language !== "sv" && det.language !== "en") || det.confidence < 0.7) return null;
-    ad = det.language;
+    ad = det.language as "sv" | "en";
   }
-  return ad !== cvLanguage ? ad : null;
+  return (ad === "sv" || ad === "en") && ad !== cvLanguage ? ad : null;
 }
 
 export interface ShortenTarget {
