@@ -411,6 +411,8 @@ export function InsightsPanel({
   };
   const pageEst = estimatePages(cv);
   const adRegister = cv.__meta?.demandProfile?.register;
+  const adQuoteFor = (theme: string) =>
+    cv.__meta?.demandProfile?.competence_themes?.find(t => t.theme === theme)?.ad_quote || null;
   const trim = pageEst.pages > 2 ? cutPlan(cv, cv.__meta?.demandProfile) : null;
   const valuesChecks = valuesMirror(cv, adRegister);
   const profMiss = profileCoverage(cv.profile, themes.filter(t => t.importance === "must").slice(0, 3)).filter(c => !c.mentioned);
@@ -675,7 +677,7 @@ export function InsightsPanel({
       const ratingOfT = ratingOf;
       const themesCtx = themes
         .filter(t => toAsk.includes(t.theme))
-        .map(t => ({ theme: t.theme, rating: ratingOfT(t), evidence_note: t.evidence_note }));
+        .map(t => ({ theme: t.theme, rating: ratingOfT(t), evidence_note: t.evidence_note, ad_quote: adQuoteFor(t.theme) }));
       const { data, error } = await supabase.functions.invoke("verify-keywords", {
         // The interview speaks the APP language (it is a conversation with you);
         // only the resulting CV text follows the document language.
@@ -1132,6 +1134,9 @@ export function InsightsPanel({
               </Button>
             </>) : stage === "story" ? (<>
               <p className="text-lg font-semibold leading-snug [text-wrap:balance]">{pendingQ.question}</p>
+              {adQuoteFor(pendingQ.keyword) && (
+                <p className="text-[11px] italic text-muted-foreground">{isSv ? "Annonsen: " : "The ad: "}"{adQuoteFor(pendingQ.keyword)}"</p>
+              )}
               {(kwRole[pendingQ.keyword] || "").length > 0 && (
                 <p className="text-[11px] text-muted-foreground">{isSv ? "På" : "At"} <span className="font-medium text-foreground">{kwRole[pendingQ.keyword]}</span></p>
               )}
@@ -1209,6 +1214,11 @@ export function InsightsPanel({
             <p className="text-lg font-semibold leading-snug [text-wrap:balance]">
               {isSv ? <>Annonsen kräver: {g.theme}</> : <>The ad requires: {g.theme}</>}
             </p>
+            {adQuoteFor(g.theme) && (
+              <p className="text-sm italic leading-relaxed text-muted-foreground">
+                {isSv ? "Så säger annonsen: " : "The ad's words: "}"{adQuoteFor(g.theme)}"
+              </p>
+            )}
             <p className="text-sm leading-relaxed text-muted-foreground">{g.evidence_note || (isSv ? "Ditt CV visar det inte än." : "Your CV doesn't show it yet.")}</p>
             {/* What convinces next, in plain words — the follow-up question chases this. */}
             {(() => {

@@ -732,7 +732,7 @@ const RESULT_SCHEMA = {
               lifted_by_evidence: { type: "boolean", description: "True when the rating rests on ledger evidence not visible in the CV" },
                       rating: { type: "number", description: "Anchored 1-5 recruiter-scorecard rating of the CV's evidence for this theme" },
               evidence: { type: "string", enum: ["strong", "partial", "missing"] },
-              evidence_note: { type: "string", description: "One short sentence: where the CV evidences this (or that it doesn't)" },
+              evidence_note: { type: "string", description: "1-2 short sentences TO the candidate, plain everyday words: what their CV already shows for this theme and what is not visible yet. Speak directly (du/you). FORBIDDEN words: ledger, evidenced, unevidenced, evidence base, rating - internal machinery never reaches the reader." },
               supporting_terms_present: { type: "array", items: { type: "string" } },
               supporting_terms_missing: { type: "array", items: { type: "string" } },
               proof_bullet: { type: "string", description: "Verbatim quote of the one CV bullet that best evidences this theme, or empty string" },

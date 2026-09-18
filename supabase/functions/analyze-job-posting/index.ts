@@ -57,6 +57,9 @@ separate buckets instead of merging them into one broad theme.
 Mark each "must" or "nice" by how the posting weights it (title + repeated emphasis +
 explicit requirements beat single mentions). For each theme list the posting's own
 supporting terms (3–6 short terms, the employer's exact words).
+For each theme also set ad_quote: ONE verbatim sentence/clause from the posting (max 25
+words, copied EXACTLY, no paraphrase) that shows HOW the employer talks about this theme —
+the tailoring mirrors its register. Null when nothing fits.
 THEMES ARE COMPETENCES, NEVER EMPLOYMENT PEDIGREES. If the posting asks for background at a
 type of firm ("erfarenhet från management- eller strategikonsulting, exempelvis McKinsey"),
 the theme is the underlying CAPABILITY ("Strukturerat strategi- och analysarbete") with the
@@ -126,6 +129,7 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
                       theme: { type: "string" },
                       importance: { type: "string", enum: ["must", "nice"] },
                       supporting_terms: { type: "array", items: { type: "string" } },
+                      ad_quote: { type: ["string", "null"], description: "ONE verbatim sentence or clause (max 25 words) from the posting that shows HOW it talks about this theme, copied exactly. Null when no single sentence carries it." },
                       proxy_terms: { type: "array", items: { type: "string" }, description: "Pedigree examples from the posting (firm names, MBB, Big 4, example degrees under 'or equivalent'). Class labels, never CV keywords." },
                       proxy_translation: { type: ["string", "null"], description: "What the pedigree examples stand for, max 12 words, in the posting's language. Null when proxy_terms is empty." },
                       canonical_id: { type: ["string", "null"], description: "Id from the candidate's registry this theme maps to, or null" },
@@ -254,6 +258,16 @@ ${registry.competences.slice(0, 30).map((c: any) => `- ${c.id}: ${c.name_sv} / $
       result.register.values_language = kept;
       if (!["values", "metrics", "mixed"].includes(result.register.style)) result.register.style = "mixed";
       if (kept.length === 0 && result.register.style === "values") result.register.style = "metrics";
+    }
+
+    // Ad-quote guard: "verbatim" is enforced, not trusted — a quote whose normalized
+    // text is not a substring of the posting is dropped (paraphrase = fabrication).
+    const normQ = (x: string) => String(x || "").toLowerCase().replace(/[\s"'–—-]+/g, " ").trim();
+    const postingQ = normQ(job_posting_text);
+    if (Array.isArray(result.competence_themes)) {
+      for (const t of result.competence_themes) {
+        if (t.ad_quote && !postingQ.includes(normQ(t.ad_quote))) t.ad_quote = null;
+      }
     }
 
     // Pedigree proxies are class labels, never CV keywords: if the model left a brand

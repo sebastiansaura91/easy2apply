@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { corsHeaders, makeGateway, HUMAN_WRITING_RULES, stripAiDashes } from "../_shared/gateway.ts";
+import { corsHeaders, makeGateway, HUMAN_WRITING_RULES, registerRules, stripAiDashes } from "../_shared/gateway.ts";
 
 
 
@@ -102,7 +102,7 @@ Return via the keyword_placements tool.`;
         // Deterministic: same CV + keywords must yield the same placements.
         ...(model.startsWith("google/") ? { temperature: 0 } : {}),
         messages: [
-          { role: "system", content: systemPrompt + HUMAN_WRITING_RULES },
+          { role: "system", content: systemPrompt + HUMAN_WRITING_RULES + registerRules(resume_content_json?.__meta?.demandProfile?.register) },
           { role: "user", content: userPrompt },
         ],
         tools: [{

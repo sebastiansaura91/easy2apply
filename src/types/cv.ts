@@ -94,6 +94,8 @@ export interface CVMeta {
   demandProfile?: {
     competence_themes?: {
       theme: string; importance: "must" | "nice"; supporting_terms: string[];
+      /** Verbatim sentence from the ad showing HOW it talks about this theme. */
+      ad_quote?: string | null;
       /** Pedigree examples from the ad (firm names, MBB, Big 4) — class labels, never CV keywords. */
       proxy_terms?: string[];
       /** What the pedigree stands for, in the ad's language — powers the "motsvarande" bridge. */

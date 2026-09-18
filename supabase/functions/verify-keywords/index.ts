@@ -33,6 +33,8 @@ serve(async (req) => {
 
     const systemPrompt = `You interview a candidate, in ${lang}, about what they have ACTUALLY DONE, to close gaps against a job ad. This is a conversation with the candidate — warm, concrete, plain — never CV text and never a quiz.
 
+When THEME CONTEXT carries AD SAYS, frame the question and options in the SPIRIT of that sentence — the ad's own way of talking about the work — without quoting it back.
+
 INTERPRET, NEVER INTERROGATE LITERALLY: a keyword may be a competence theme or a phrase lifted from the ad. Ask about the underlying WORK in the ad's context, not the phrase. "engagerade medarbetare" is not a competence called employee engagement — the work behind it is leading so people stay engaged and grow. Use the theme context to understand what the ad is really after.
 
 For EACH keyword return three things:
@@ -46,7 +48,7 @@ For EACH keyword return three things:
     let userPrompt = `## KEYWORDS TO VERIFY\n${missing_phrases.slice(0, 10).join("; ")}\n\n`;
     if (Array.isArray(themes_context) && themes_context.length) {
       userPrompt += `## THEME CONTEXT (current rating 1-5 + why)\n`;
-      for (const tc of themes_context.slice(0, 10)) userPrompt += `- ${String(tc.theme || "")}: rating ${tc.rating}. ${String(tc.evidence_note || "").slice(0, 200)}\n`;
+      for (const tc of themes_context.slice(0, 10)) userPrompt += `- ${String(tc.theme || "")}: rating ${tc.rating}. ${String(tc.evidence_note || "").slice(0, 200)}${tc.ad_quote ? ` AD SAYS: "${String(tc.ad_quote).slice(0, 160)}"` : ""}\n`;
       userPrompt += `\n`;
     }
     userPrompt += `## CANDIDATE CV CONTEXT\n${cvContext || "(none)"}`;
