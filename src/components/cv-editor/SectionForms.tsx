@@ -451,8 +451,12 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                         </div>
                       )}
                     </div>
+                      )}
+                    </SortableBulletItem>
                   );
                 })}
+                </SortableContext>
+              </DndContext>
                 <Button variant="ghost" size="sm" onClick={() => updateExperience(idx, { bullets: [...exp.bullets, ""] })}>
                   <Plus className="h-3 w-3 mr-1" />
                   {t("editorAddBullet")}
