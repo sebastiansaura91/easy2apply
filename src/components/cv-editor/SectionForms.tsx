@@ -356,6 +356,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                         );
                       })()}
                       <div className="flex gap-2">
+                        {grip}
                         <span className="text-muted-foreground mt-2">•</span>
                         <Textarea
                           rows={2}
