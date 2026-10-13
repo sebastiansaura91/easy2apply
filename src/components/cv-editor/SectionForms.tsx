@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ToastAction } from "@/components/ui/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2, Check, Undo2, MessageSquarePlus, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2, Check, Undo2, MessageSquarePlus, GripVertical } from "lucide-react";
 import { CVContent, ExperienceItem, EducationItem } from "@/types/cv";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
