@@ -343,7 +343,9 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                   const isImproving = improvingKey === key;
                   const preview = previews[key];
                   return (
-                    <div key={bIdx} className="space-y-0">
+                    <SortableBulletItem key={bIdx} id={`bullet-${bIdx}`} label={isSv ? "Dra för att ordna punkt" : "Drag to reorder bullet"}>
+                      {(grip) => (
+                    <div className="space-y-0">
                       {/* Inline bullet quality indicator */}
                       {bullet.trim() && (() => {
                         const quality = analyzeBullet(bullet, cvLanguage || "sv");
