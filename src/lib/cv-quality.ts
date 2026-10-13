@@ -56,10 +56,8 @@ export function analyzeBullet(text: string, lang: "sv" | "en"): { score: "good" 
   }
 
   // Check for strong verb start
-  const strongPattern = lang === "sv" ? STRONG_VERB_PATTERN_SV : STRONG_VERB_PATTERN_EN;
-  if (!strongPattern.test(text.trim()) && !issues.some(i => i.includes("generisk") || i.includes("generic"))) {
-    issues.push(lang === "sv" ? "Saknar starkt verb i början" : "Missing strong action verb");
-  }
+  // Strong-verb presence is intentionally not flagged here — the verb list is
+  // noisy and the note covered the bullet text while editing.
 
   // Check for metrics/numbers
   if (!NUMBER_PATTERN.test(text)) {
