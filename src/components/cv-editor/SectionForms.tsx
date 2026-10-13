@@ -338,6 +338,14 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                     </Tooltip>
                   </div>
                 </div>
+                <DndContext collisionDetection={closestCenter} onDragEnd={(e) => {
+                  const { active, over } = e;
+                  if (!over || active.id === over.id) return;
+                  const oldIndex = Number(String(active.id).replace("bullet-", ""));
+                  const newIndex = Number(String(over.id).replace("bullet-", ""));
+                  if (oldIndex !== newIndex) updateExperience(idx, { bullets: arrayMove(exp.bullets, oldIndex, newIndex) });
+                }}>
+                  <SortableContext items={exp.bullets.map((_, i) => `bullet-${i}`)} strategy={verticalListSortingStrategy}>
                 {exp.bullets.map((bullet, bIdx) => {
                   const key = `${idx}-${bIdx}`;
                   const isImproving = improvingKey === key;
