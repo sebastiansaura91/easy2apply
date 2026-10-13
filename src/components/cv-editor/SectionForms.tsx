@@ -389,30 +389,24 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                   return (
                     <SortableBulletItem key={bIdx} id={`bullet-${bIdx}`} label={isSv ? "Dra för att ordna punkt" : "Drag to reorder bullet"}>
                       {(grip) => (
-                    <div className="space-y-0">
-                      {/* Inline bullet quality indicator */}
-                      {bullet.trim() && (() => {
-                        const quality = analyzeBullet(bullet, cvLanguage || "sv");
-                        if (quality.score === "good") return null;
-                        return (
-                          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-t-md text-[10px] ${quality.score === "weak" ? "bg-destructive/5 text-destructive" : "bg-warning/5 text-warning"}`}>
-                            <span className={`inline-block h-1.5 w-1.5 rounded-full flex-shrink-0 ${quality.score === "weak" ? "bg-destructive" : "bg-warning"}`} />
-                            {quality.issues.slice(0, 2).join(" · ")}
-                          </div>
-                        );
-                      })()}
+                    <div className="space-y-1">
                       <div className="flex gap-2">
                         {grip}
-                        <span className="text-muted-foreground mt-2">•</span>
+                        <span className="text-muted-foreground mt-3">•</span>
                         <Textarea
-                          rows={2}
+                          rows={3}
                           value={bullet}
                           onChange={(e) => {
                             const newBullets = [...exp.bullets];
                             newBullets[bIdx] = e.target.value;
                             updateExperience(idx, { bullets: newBullets });
                           }}
-                          className="min-h-[40px]"
+                          className="min-h-[88px] resize-none overflow-hidden leading-relaxed"
+                          ref={(el) => {
+                            if (!el) return;
+                            el.style.height = "auto";
+                            el.style.height = `${el.scrollHeight}px`;
+                          }}
                         />
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -436,6 +430,17 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                           <X className="h-3 w-3" />
                         </Button>
                       </div>
+                      {/* Inline bullet quality indicator — below the box so it can never cover the text */}
+                      {bullet.trim() && (() => {
+                        const quality = analyzeBullet(bullet, cvLanguage || "sv");
+                        if (quality.score === "good") return null;
+                        return (
+                          <div className={`ml-5 flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] ${quality.score === "weak" ? "bg-destructive/5 text-destructive" : "bg-warning/5 text-warning"}`}>
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full flex-shrink-0 ${quality.score === "weak" ? "bg-destructive" : "bg-warning"}`} />
+                            {quality.issues.slice(0, 2).join(" · ")}
+                          </div>
+                        );
+                      })()}
                       {/* Inline preview card */}
                       {preview && (
                         <div className="ml-5 mt-1.5 rounded-md border border-primary/20 bg-primary/5 p-3 space-y-2">
