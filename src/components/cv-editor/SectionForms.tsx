@@ -401,12 +401,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                             newBullets[bIdx] = e.target.value;
                             updateExperience(idx, { bullets: newBullets });
                           }}
-                          className="min-h-[88px] resize-none overflow-hidden leading-relaxed"
-                          ref={(el) => {
-                            if (!el) return;
-                            el.style.height = "auto";
-                            el.style.height = `${el.scrollHeight}px`;
-                          }}
+                          className="min-h-[88px] leading-relaxed"
                         />
                         <Tooltip>
                           <TooltipTrigger asChild>
