@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ToastAction } from "@/components/ui/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2, Check, Undo2, MessageSquarePlus, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2, Check, Undo2, MessageSquarePlus, GripVertical } from "lucide-react";
 import { CVContent, ExperienceItem, EducationItem } from "@/types/cv";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,42 @@ import { useToast } from "@/hooks/use-toast";
 import { ExplainWizard } from "./ExplainWizard";
 import { analyzeBullet } from "@/lib/cv-quality";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+/**
+ * Drag handle wrapper for one experience bullet. Exposes the grip via a render
+ * prop so the row keeps its own markup; reordering runs in a nested DndContext
+ * inside the section-sorting one.
+ */
+function SortableBulletItem({ id, label, children }: {
+  id: string;
+  label: string;
+  children: (grip: ReactNode) => ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const grip = (
+    <button
+      type="button"
+      className="mt-2 flex h-7 w-4 flex-shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground/40 hover:text-muted-foreground active:cursor-grabbing"
+      aria-label={label}
+      title={label}
+      {...attributes}
+      {...listeners}
+    >
+      <GripVertical className="h-3.5 w-3.5" />
+    </button>
+  );
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+    >
+      {children(grip)}
+    </div>
+  );
+}
 
 const bulletTipsSv = [
   "💡 Kvantifiera resultat: \"Ökade försäljningen med 25% på 6 månader\"",
@@ -338,12 +374,22 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                     </Tooltip>
                   </div>
                 </div>
+                <DndContext collisionDetection={closestCenter} onDragEnd={(e) => {
+                  const { active, over } = e;
+                  if (!over || active.id === over.id) return;
+                  const oldIndex = Number(String(active.id).replace("bullet-", ""));
+                  const newIndex = Number(String(over.id).replace("bullet-", ""));
+                  if (oldIndex !== newIndex) updateExperience(idx, { bullets: arrayMove(exp.bullets, oldIndex, newIndex) });
+                }}>
+                  <SortableContext items={exp.bullets.map((_, i) => `bullet-${i}`)} strategy={verticalListSortingStrategy}>
                 {exp.bullets.map((bullet, bIdx) => {
                   const key = `${idx}-${bIdx}`;
                   const isImproving = improvingKey === key;
                   const preview = previews[key];
                   return (
-                    <div key={bIdx} className="space-y-0">
+                    <SortableBulletItem key={bIdx} id={`bullet-${bIdx}`} label={isSv ? "Dra för att ordna punkt" : "Drag to reorder bullet"}>
+                      {(grip) => (
+                    <div className="space-y-0">
                       {/* Inline bullet quality indicator */}
                       {bullet.trim() && (() => {
                         const quality = analyzeBullet(bullet, cvLanguage || "sv");
@@ -356,6 +402,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                         );
                       })()}
                       <div className="flex gap-2">
+                        {grip}
                         <span className="text-muted-foreground mt-2">•</span>
                         <Textarea
                           rows={2}
@@ -383,36 +430,6 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                             <p className="text-xs">{isSv ? "Förbättra med AI" : "Improve with AI"}</p>
                           </TooltipContent>
                         </Tooltip>
-                        <div className="flex flex-shrink-0 flex-col gap-0 mt-1" role="group" aria-label={isSv ? "Flytta punkt" : "Move bullet"}>
-                          <button
-                            type="button"
-                            className="flex h-4 w-7 items-center justify-center rounded text-muted-foreground/50 hover:bg-muted hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent"
-                            aria-label={isSv ? "Flytta upp" : "Move up"}
-                            title={isSv ? "Flytta upp" : "Move up"}
-                            disabled={bIdx === 0}
-                            onClick={() => {
-                              const newBullets = [...exp.bullets];
-                              [newBullets[bIdx - 1], newBullets[bIdx]] = [newBullets[bIdx], newBullets[bIdx - 1]];
-                              updateExperience(idx, { bullets: newBullets });
-                            }}
-                          >
-                            <ArrowUp className="h-3 w-3" />
-                          </button>
-                          <button
-                            type="button"
-                            className="flex h-4 w-7 items-center justify-center rounded text-muted-foreground/50 hover:bg-muted hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent"
-                            aria-label={isSv ? "Flytta ner" : "Move down"}
-                            title={isSv ? "Flytta ner" : "Move down"}
-                            disabled={bIdx === exp.bullets.length - 1}
-                            onClick={() => {
-                              const newBullets = [...exp.bullets];
-                              [newBullets[bIdx + 1], newBullets[bIdx]] = [newBullets[bIdx], newBullets[bIdx + 1]];
-                              updateExperience(idx, { bullets: newBullets });
-                            }}
-                          >
-                            <ArrowDown className="h-3 w-3" />
-                          </button>
-                        </div>
                         <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
                           updateExperience(idx, { bullets: exp.bullets.filter((_, i) => i !== bIdx) });
                         }}>
@@ -451,8 +468,12 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                         </div>
                       )}
                     </div>
+                      )}
+                    </SortableBulletItem>
                   );
                 })}
+                </SortableContext>
+              </DndContext>
                 <Button variant="ghost" size="sm" onClick={() => updateExperience(idx, { bullets: [...exp.bullets, ""] })}>
                   <Plus className="h-3 w-3 mr-1" />
                   {t("editorAddBullet")}
