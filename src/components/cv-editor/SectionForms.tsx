@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ToastAction } from "@/components/ui/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2, Check, Undo2, MessageSquarePlus } from "lucide-react";
+import { Plus, Trash2, X, Lightbulb, Sparkles, Loader2, Wand2, Check, Undo2, MessageSquarePlus, ArrowUp, ArrowDown } from "lucide-react";
 import { CVContent, ExperienceItem, EducationItem } from "@/types/cv";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/integrations/supabase/client";
@@ -383,6 +383,36 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
                             <p className="text-xs">{isSv ? "Förbättra med AI" : "Improve with AI"}</p>
                           </TooltipContent>
                         </Tooltip>
+                        <div className="flex flex-shrink-0 flex-col gap-0 mt-1" role="group" aria-label={isSv ? "Flytta punkt" : "Move bullet"}>
+                          <button
+                            type="button"
+                            className="flex h-4 w-7 items-center justify-center rounded text-muted-foreground/50 hover:bg-muted hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent"
+                            aria-label={isSv ? "Flytta upp" : "Move up"}
+                            title={isSv ? "Flytta upp" : "Move up"}
+                            disabled={bIdx === 0}
+                            onClick={() => {
+                              const newBullets = [...exp.bullets];
+                              [newBullets[bIdx - 1], newBullets[bIdx]] = [newBullets[bIdx], newBullets[bIdx - 1]];
+                              updateExperience(idx, { bullets: newBullets });
+                            }}
+                          >
+                            <ArrowUp className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            className="flex h-4 w-7 items-center justify-center rounded text-muted-foreground/50 hover:bg-muted hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent"
+                            aria-label={isSv ? "Flytta ner" : "Move down"}
+                            title={isSv ? "Flytta ner" : "Move down"}
+                            disabled={bIdx === exp.bullets.length - 1}
+                            onClick={() => {
+                              const newBullets = [...exp.bullets];
+                              [newBullets[bIdx + 1], newBullets[bIdx]] = [newBullets[bIdx], newBullets[bIdx + 1]];
+                              updateExperience(idx, { bullets: newBullets });
+                            }}
+                          >
+                            <ArrowDown className="h-3 w-3" />
+                          </button>
+                        </div>
                         <Button variant="ghost" size="icon" className="flex-shrink-0 mt-1" onClick={() => {
                           updateExperience(idx, { bullets: exp.bullets.filter((_, i) => i !== bIdx) });
                         }}>
