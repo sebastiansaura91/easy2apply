@@ -17,6 +17,42 @@ import { useToast } from "@/hooks/use-toast";
 import { ExplainWizard } from "./ExplainWizard";
 import { analyzeBullet } from "@/lib/cv-quality";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+/**
+ * Drag handle wrapper for one experience bullet. Exposes the grip via a render
+ * prop so the row keeps its own markup; reordering runs in a nested DndContext
+ * inside the section-sorting one.
+ */
+function SortableBulletItem({ id, label, children }: {
+  id: string;
+  label: string;
+  children: (grip: ReactNode) => ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const grip = (
+    <button
+      type="button"
+      className="mt-2 flex h-7 w-4 flex-shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground/40 hover:text-muted-foreground active:cursor-grabbing"
+      aria-label={label}
+      title={label}
+      {...attributes}
+      {...listeners}
+    >
+      <GripVertical className="h-3.5 w-3.5" />
+    </button>
+  );
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+    >
+      {children(grip)}
+    </div>
+  );
+}
 
 const bulletTipsSv = [
   "💡 Kvantifiera resultat: \"Ökade försäljningen med 25% på 6 månader\"",
