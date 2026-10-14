@@ -306,7 +306,7 @@ export function ExperienceForm({ cv, updateCv, t, cvLanguage }: SectionFormProps
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">{isSv ? "P&L-storlek? (t.ex. €120M)" : "P&L size? (e.g. €120M)"}</label>
+                  <label className="text-[11px] font-medium text-muted-foreground">{isSv ? "P&L / Portfolio storlek? (t.ex. €120M)" : "P&L / Portfolio size? (e.g. €120M)"}</label>
                   <Input value={exp.pnlSize || ""} onChange={(e) => updateExperience(idx, { pnlSize: e.target.value })} />
                 </div>
                 <div className="space-y-1">
