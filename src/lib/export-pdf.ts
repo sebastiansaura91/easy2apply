@@ -112,18 +112,19 @@ export function buildPdf(
 
   function drawH2(text: string) {
     y += 2.5 * spacing.gapScale;
-    checkPage(8);
+    checkPage(12);
     pdf.setFontSize(11);
     pdf.setFont(font,"bold");
     pdf.setTextColor(...tpl.accentRgb);
     const heading = tpl.uppercaseHeadings ? text.toUpperCase() : text;
     pdf.text(heading, marginL, y);
-    y += 1.5;
+    y += 2.5;
     // Accent rule under the heading
     pdf.setDrawColor(...tpl.accentRgb);
     pdf.setLineWidth(0.4);
     pdf.line(marginL, y, marginL + contentW, y);
-    y += 3.5 * spacing.gapScale;
+    // Never compress the rule-to-body gap: it must clear the next line's ascenders.
+    y += 4.5;
   }
 
   function drawH3(text: string) {

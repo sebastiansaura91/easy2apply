@@ -14,10 +14,12 @@ export function PdfSpacingPreview({ blob, sv }: { blob: Blob; sv: boolean }) {
     setLoading(true);
     setFailed(false);
     async function render() {
+      await import("core-js/proposals/map-upsert-v4.js");
       const pdfjs = await import("pdfjs-dist");
       const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
       pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-      const doc = await pdfjs.getDocument({ data: await blob.arrayBuffer() }).promise;
+      const task = pdfjs.getDocument({ data: await blob.arrayBuffer() });
+      const doc = await task.promise;
       try {
         for (let i = 1; i <= doc.numPages; i++) {
           if (cancelled || !host) return;
@@ -33,10 +35,10 @@ export function PdfSpacingPreview({ blob, sv }: { blob: Blob; sv: boolean }) {
           await page.render({ canvasContext: context, canvas, viewport }).promise;
           if (!cancelled) host.appendChild(canvas);
         }
-      } finally { await doc.destroy(); }
+      } finally { await task.destroy(); }
       if (!cancelled) setLoading(false);
     }
-    render().catch(() => { if (!cancelled) { setFailed(true); setLoading(false); } });
+    render().catch((error: unknown) => { if (!cancelled) { console.error("PDF spacing preview failed", error); setFailed(true); setLoading(false); } });
     return () => { cancelled = true; };
   }, [blob, sv]);
   return <div className="h-[60vh] min-h-[360px] overflow-auto rounded-md border border-border bg-muted p-3">
