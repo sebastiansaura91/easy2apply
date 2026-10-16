@@ -17,7 +17,8 @@ export function PdfSpacingPreview({ blob, sv }: { blob: Blob; sv: boolean }) {
       const pdfjs = await import("pdfjs-dist");
       const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
       pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-      const doc = await pdfjs.getDocument({ data: await blob.arrayBuffer() }).promise;
+      const task = pdfjs.getDocument({ data: await blob.arrayBuffer() });
+      const doc = await task.promise;
       try {
         for (let i = 1; i <= doc.numPages; i++) {
           if (cancelled || !host) return;
@@ -33,7 +34,7 @@ export function PdfSpacingPreview({ blob, sv }: { blob: Blob; sv: boolean }) {
           await page.render({ canvasContext: context, canvas, viewport }).promise;
           if (!cancelled) host.appendChild(canvas);
         }
-      } finally { await doc.destroy(); }
+      } finally { await task.destroy(); }
       if (!cancelled) setLoading(false);
     }
     render().catch(() => { if (!cancelled) { setFailed(true); setLoading(false); } });
