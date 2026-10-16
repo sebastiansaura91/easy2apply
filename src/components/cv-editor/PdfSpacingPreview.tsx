@@ -14,7 +14,7 @@ export function PdfSpacingPreview({ blob, sv }: { blob: Blob; sv: boolean }) {
     setLoading(true);
     setFailed(false);
     async function render() {
-      await import("core-js/proposals/upsert");
+      await import("core-js/proposals/map-upsert.js");
       const pdfjs = await import("pdfjs-dist");
       const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
       pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
