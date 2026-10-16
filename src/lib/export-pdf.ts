@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import { CVContent, CVSection } from "@/types/cv";
 import { getTemplateStyle, withAccent } from "./templates";
 import { formatCvDateRange, formatCvYearRange } from "./format-date";
+import { getCVSpacing } from "./cv-spacing";
 
 /**
  * Renders CV data directly to PDF using jsPDF text rendering.
@@ -21,15 +22,16 @@ export function buildPdf(
   // Fall back to detecting the CV language from the translated "present" label.
   const dateLang: "sv" | "en" = lang ?? (t("present") === "Nuvarande" ? "sv" : "en");
   const tpl = withAccent(getTemplateStyle(styleId), accentHex);
+  const spacing = getCVSpacing(cv.__meta?.spacingPreset);
   const font = tpl.pdfFont;
   const pdf = new jsPDF("p", "mm", "a4");
   const pageW = 210;
   const pageH = 297;
-  const marginL = 25;
-  const marginR = 25;
+  const marginL = spacing.marginX;
+  const marginR = spacing.marginX;
   // 17mm keeps a safe print margin while buying ~2 lines of content per page.
-  const marginTop = 17;
-  const marginBottom = 17;
+  const marginTop = spacing.marginY;
+  const marginBottom = spacing.marginY;
   const contentW = pageW - marginL - marginR;
   let y = marginTop;
 
@@ -63,7 +65,7 @@ export function buildPdf(
       fontStyle = "normal",
       color = colors.black,
       maxWidth = contentW,
-      lineHeight = 1.4,
+      lineHeight = spacing.lineHeight,
     } = opts;
 
     pdf.setFontSize(fontSize);
@@ -97,7 +99,7 @@ export function buildPdf(
     pdf.setTextColor(...color);
 
     const lines = pdf.splitTextToSize(text, maxWidth);
-    const lineHeightMm = fontSize * 1.4 * 0.3528;
+    const lineHeightMm = fontSize * spacing.lineHeight * 0.3528;
 
     for (const line of lines) {
       checkPage(lineHeightMm);
@@ -109,7 +111,7 @@ export function buildPdf(
   }
 
   function drawH2(text: string) {
-    y += 2.5;
+    y += 2.5 * spacing.gapScale;
     checkPage(8);
     pdf.setFontSize(11);
     pdf.setFont(font,"bold");
@@ -121,7 +123,7 @@ export function buildPdf(
     pdf.setDrawColor(...tpl.accentRgb);
     pdf.setLineWidth(0.4);
     pdf.line(marginL, y, marginL + contentW, y);
-    y += 3.5;
+    y += 3.5 * spacing.gapScale;
   }
 
   function drawH3(text: string) {
@@ -148,14 +150,14 @@ export function buildPdf(
     }
 
     const lines = pdf.splitTextToSize(text, bulletMaxW);
-    const lineHeightMm = 10 * 1.4 * 0.3528;
+    const lineHeightMm = 10 * spacing.lineHeight * 0.3528;
 
     for (const line of lines) {
       checkPage(lineHeightMm);
       pdf.text(line, textX, y);
       y += lineHeightMm;
     }
-    y += 0.5;
+    y += 0.5 * spacing.gapScale;
   }
 
   // === RENDER SECTIONS ===
@@ -212,7 +214,7 @@ export function buildPdf(
           // A role must never split across pages: measure its FULL height (wrapped lines
           // included) and start a fresh page when it doesn't fit — unless the role alone
           // is taller than a page, in which case it has to flow.
-          const mm = (pt: number, lines: number) => pt * 1.4 * 0.3528 * lines;
+          const mm = (pt: number, lines: number) => pt * spacing.lineHeight * 0.3528 * lines;
           const linesOf = (text: string, pt: number, width: number) => {
             pdf.setFontSize(pt);
             pdf.setFont(font, "normal");
@@ -224,8 +226,8 @@ export function buildPdf(
           fullH += mm(9, 1) + 1;
           if (metaLine) fullH += mm(9, linesOf(metaLine, 9, contentW)) + 0.5;
           if (exp.roleScope) fullH += mm(9.5, linesOf(exp.roleScope, 9.5, contentW)) + 1;
-          for (const b of validBullets) fullH += mm(10, linesOf(b, 10, contentW - 7)) + 0.5;
-          fullH += 2;
+          for (const b of validBullets) fullH += mm(10, linesOf(b, 10, contentW - 7)) + 0.5 * spacing.gapScale;
+          fullH += 2 * spacing.gapScale;
           const spaceLeft = pageH - marginBottom - y;
           const fullPage = pageH - marginTop - marginBottom;
           if (fullH > spaceLeft && fullH <= fullPage) {
@@ -259,7 +261,7 @@ export function buildPdf(
           validBullets.forEach((bullet, bi) => {
             drawBullet(bullet, numbered ? `${bi + 1}.` : undefined);
           });
-          y += 2;
+          y += 2 * spacing.gapScale;
         }
         break;
       }
@@ -274,7 +276,7 @@ export function buildPdf(
 
           const dateLine = `${edu.school}  ·  ${formatCvYearRange(edu.startDate, edu.endDate)}`;
           drawText(dateLine, marginL, y, { fontSize: 9, color: colors.gray });
-          y += 3;
+          y += 3 * spacing.gapScale;
         }
         break;
       }
@@ -284,7 +286,7 @@ export function buildPdf(
         drawH2(t("sectionSkills"));
         // One comma-separated paragraph (mirrors the preview): the densest honest
         // format, ~4 lines instead of a bulleted three-column grid, ATS-identical.
-        const lineH = 10 * 1.4 * 0.3528;
+        const lineH = 10 * spacing.lineHeight * 0.3528;
         pdf.setFontSize(10);
         pdf.setFont(font, "normal");
         pdf.setTextColor(...colors.black);
@@ -313,8 +315,8 @@ export function buildPdf(
         drawH2(t("sectionProjects"));
         for (const p of cv.projects) {
           // Keep project header together with its first line of content.
-          const headerH = 10 * 1.4 * 0.3528;
-          const firstLineH = (p.description || p.bullets[0]) ? 10 * 1.4 * 0.3528 : 0;
+          const headerH = 10 * spacing.lineHeight * 0.3528;
+          const firstLineH = (p.description || p.bullets[0]) ? 10 * spacing.lineHeight * 0.3528 : 0;
           const needed = headerH + firstLineH + 2;
           if (y + needed > pageH - marginBottom) {
             pdf.addPage();
@@ -327,7 +329,7 @@ export function buildPdf(
           for (const b of p.bullets.filter(Boolean)) {
             drawBullet(b);
           }
-          y += 2;
+          y += 2 * spacing.gapScale;
         }
         break;
       }

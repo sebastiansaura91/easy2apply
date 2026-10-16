@@ -24,6 +24,7 @@ import {
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { SortableEditorSection } from "@/components/cv-editor/SortableEditorSection";
 import { A4Preview } from "@/components/cv-editor/A4Preview";
+import { SpacingDialog } from "@/components/cv-editor/SpacingDialog";
 import { SectionFormRenderer } from "@/components/cv-editor/SectionForms";
 import { cvHeadings } from "@/i18n/cvHeadings";
 import { exportToPdf, buildPdf } from "@/lib/export-pdf";
@@ -73,6 +74,7 @@ const CVEditor = () => {
       return next;
     });
   const [styleOpen, setStyleOpen] = useState(false);
+  const [spacingOpen, setSpacingOpen] = useState(false);
   // Split view (category standard: form left, live document right). On narrow screens
   // or when the improve panel is docked, one pane at a time via the Redigera/Förhandsgranska toggle.
   const [view, setView] = useState<"edit" | "preview">("edit");
@@ -453,13 +455,16 @@ const CVEditor = () => {
                 className={`ml-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium ${
                   pageCount > 2 ? "border-warning/50 bg-warning/10 text-warning" : "border-border text-muted-foreground"
                 }`}
-                title={pageCount > 2 ? (!isSvApp ? "Aim for max 2 pages — shorten the longest bullets." : "Sikta på max 2 sidor — korta de längsta punkterna.") : undefined}
+                title={pageCount > 2 ? (!isSvApp ? "Try tighter spacing — keep all text." : "Prova tätare spacing — behåll all text.") : undefined}
               >
                 {pageCount} {!isSvApp ? (pageCount === 1 ? "page" : "pages") : (pageCount === 1 ? "sida" : "sidor")}{pageCount > 2 ? " ⚠" : ""}
               </span>
             )}
           </div>
           <div className="flex flex-shrink-0 items-center gap-1.5">
+            <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => setSpacingOpen(true)}>
+              <LayoutList className="mr-1.5 h-3.5 w-3.5" />{!isSvApp ? "Spacing" : "Spacing"}
+            </Button>
             <Button variant="outline" size="sm" className="h-9 whitespace-nowrap text-xs" onClick={() => { setTailorOpen(true); if (isWide) setView("preview"); }}>
               {!isSvApp ? "Improve" : "Förbättra"}
             </Button>
@@ -598,6 +603,9 @@ const CVEditor = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SpacingDialog open={spacingOpen} onOpenChange={setSpacingOpen} cv={cv} sections={enabledSections} t={tCv} language={cvLanguage} appLanguage={appLanguage}
+        onApply={(spacingPreset) => setCv(prev => ({ ...prev, __meta: { ...prev.__meta, spacingPreset } }))} />
 
       {/* Style dialog — template picker (drives preview + PDF export) */}
       <Dialog open={styleOpen} onOpenChange={setStyleOpen}>
