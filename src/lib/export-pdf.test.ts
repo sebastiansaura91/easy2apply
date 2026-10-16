@@ -55,3 +55,19 @@ describe("PDF export honors bullet style", () => {
     expect(out).not.toContain("(1.)");
   });
 });
+
+describe("layout-only spacing", () => {
+  it("keeps all text and does not mutate CV content for every preset", () => {
+    const cv = cvWith({ bullets: Array.from({ length: 50 }, (_, i) => `Unique evidence ${i}: Delivered commercial results across the international portfolio.`) });
+    const before = JSON.stringify(cv);
+    const originalPages = buildPdf(cv, experienceOnly, t).getNumberOfPages();
+    for (const spacingPreset of ["standard", "tight", "compact"] as const) {
+      const candidate = { ...cv, __meta: { spacingPreset } };
+      const pdf = buildPdf(candidate, experienceOnly, t);
+      const output = pdf.output();
+      for (let i = 0; i < 50; i++) expect(output).toContain(`Unique evidence ${i}:`);
+      expect(pdf.getNumberOfPages()).toBeLessThanOrEqual(originalPages);
+    }
+    expect(JSON.stringify(cv)).toBe(before);
+  });
+});
