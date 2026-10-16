@@ -4,6 +4,7 @@ import { CV_SPACING, CVSpacingId, getCVSpacing } from "@/lib/cv-spacing";
 import { buildPdf } from "@/lib/export-pdf";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PdfSpacingPreview } from "./PdfSpacingPreview";
 
 interface Props {
   open: boolean;
@@ -28,17 +29,10 @@ export function SpacingDialog({ open, onOpenChange, cv, sections, t, language, a
   }, [open, cv, sections, t, language]);
   const recommended = options.find(option => option.pages <= 2);
   const [selected, setSelected] = useState<CVSpacingId>("standard");
-  const [url, setUrl] = useState<string>();
   useEffect(() => {
     if (open) setSelected(recommended?.spacing.id ?? getCVSpacing(cv.__meta?.spacingPreset).id);
   }, [open, recommended?.spacing.id, cv.__meta?.spacingPreset]);
   const current = options.find(option => option.spacing.id === selected);
-  useEffect(() => {
-    if (!current) { setUrl(undefined); return; }
-    const next = URL.createObjectURL(current.blob);
-    setUrl(next);
-    return () => URL.revokeObjectURL(next);
-  }, [current]);
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
@@ -63,7 +57,7 @@ export function SpacingDialog({ open, onOpenChange, cv, sections, t, language, a
             <Button variant="outline" onClick={() => onOpenChange(false)}>{sv ? "Avbryt" : "Cancel"}</Button>
           </div>
         </div>
-        {url && <iframe title={sv ? "PDF med föreslagen spacing" : "PDF with suggested spacing"} src={url} className="h-[60vh] min-h-[360px] w-full rounded-md border border-border bg-muted" />}
+        {current && <PdfSpacingPreview blob={current.blob} sv={sv} />}
       </div>
     </DialogContent>
   </Dialog>;

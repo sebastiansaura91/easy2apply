@@ -83,7 +83,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
       style={{ transform: "scale(0.75)", transformOrigin: "top center", position: "relative", ...styleVars,
         padding: `${spacing.marginY}mm ${spacing.marginX}mm`, lineHeight: spacing.lineHeight,
         "--cv-gap-scale": spacing.gapScale,
-      } as React.CSSProperties}
+      } as React.CSSProperties & Record<string, string | number>}
     >
       {/* Page break indicators */}
       {pxPerMm > 0 && pageCount > 1 && Array.from({ length: pageCount - 1 }).map((_, i) => {
