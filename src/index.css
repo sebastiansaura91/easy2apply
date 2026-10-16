@@ -277,7 +277,16 @@
 }
 
 .a4-preview li {
-  margin-bottom: 2pt;
+  margin-bottom: calc(2pt * var(--cv-gap-scale, 1));
+}
+
+.a4-preview h2 {
+  margin-top: calc(12pt * var(--cv-gap-scale, 1));
+  margin-bottom: calc(7pt * var(--cv-gap-scale, 1));
+}
+
+.a4-preview [data-keep] {
+  margin-bottom: calc(10pt * var(--cv-gap-scale, 1)) !important;
 }
 
 /* Skills as ONE comma-separated paragraph — the densest honest format:

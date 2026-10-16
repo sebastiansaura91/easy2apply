@@ -164,6 +164,8 @@ export interface CVMeta {
   templateStyle?: string;
   /** Optional accent colour hex overriding the style's default accent. */
   templateAccent?: string;
+  /** Layout-only spacing preset; never changes document text. */
+  spacingPreset?: "standard" | "tight" | "compact";
 }
 
 export interface CVContent {

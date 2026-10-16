@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { CVContent, CVSection } from "@/types/cv";
 import { TemplateStyle } from "@/lib/templates";
 import { formatCvDateRange, formatCvYearRange } from "@/lib/format-date";
+import { getCVSpacing } from "@/lib/cv-spacing";
 
 interface A4PreviewProps {
   cv: CVContent;
@@ -15,6 +16,7 @@ interface A4PreviewProps {
 export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4Preview({ cv, enabledSections, t, style, highlight }, ref) {
   // Same detection as the PDF export: keep preview and export dates identical.
   const dateLang: "sv" | "en" = t("present") === "Nuvarande" ? "sv" : "en";
+  const spacing = getCVSpacing(cv.__meta?.spacingPreset);
   const styleVars = style
     ? {
         "--cv-font": style.cssFont,
@@ -43,7 +45,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
     const el = innerRef.current;
     if (!el || pxPerMm === 0) return;
     const pageHpx = 297 * pxPerMm;
-    const padTop = 17 * pxPerMm;
+    const padTop = spacing.marginY * pxPerMm;
     const blocks = el.querySelectorAll<HTMLElement>("[data-keep]");
     blocks.forEach((b) => { b.style.marginTop = ""; });
     blocks.forEach((b) => {
@@ -54,14 +56,14 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
         b.style.marginTop = `${boundary - top + padTop}px`;
       }
     });
-  }, [pxPerMm, cv, enabledSections, style]);
+  }, [pxPerMm, cv, enabledSections, style, spacing]);
 
   useEffect(() => {
     const el = innerRef.current;
     if (!el || pxPerMm === 0) return;
     const pageHeightPx = 297 * pxPerMm;
     const update = () => {
-      const h = el.getBoundingClientRect().height;
+      const h = el.offsetHeight;
       setPageCount(Math.max(1, Math.ceil(h / pageHeightPx)));
     };
     update();
@@ -78,7 +80,10 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
         else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
       className="a4-preview"
-      style={{ transform: "scale(0.75)", transformOrigin: "top center", position: "relative", ...styleVars } as React.CSSProperties}
+      style={{ transform: "scale(0.75)", transformOrigin: "top center", position: "relative", ...styleVars,
+        padding: `${spacing.marginY}mm ${spacing.marginX}mm`, lineHeight: spacing.lineHeight,
+        "--cv-gap-scale": spacing.gapScale,
+      } as React.CSSProperties}
     >
       {/* Page break indicators */}
       {pxPerMm > 0 && pageCount > 1 && Array.from({ length: pageCount - 1 }).map((_, i) => {
@@ -176,7 +181,7 @@ export const A4Preview = forwardRef<HTMLDivElement, A4PreviewProps>(function A4P
                       const li = (b: string, i: number) => {
                         if (!b) return null;
                         const hl = highlight && highlight.expId === exp.id && highlight.bulletIdx === i;
-                        return <li key={hl ? `hl-${highlight!.key}` : i} className={hl ? "text-morph" : undefined}>{b}</li>;
+                  return <li key={hl && highlight ? `hl-${highlight.key}` : i} className={hl ? "text-morph" : undefined}>{b}</li>;
                       };
                       return exp.bulletStyle === "numbered"
                         ? <ol>{exp.bullets.map(li)}</ol>
