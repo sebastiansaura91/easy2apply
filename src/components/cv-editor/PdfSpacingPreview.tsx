@@ -37,7 +37,7 @@ export function PdfSpacingPreview({ blob, sv }: { blob: Blob; sv: boolean }) {
       } finally { await task.destroy(); }
       if (!cancelled) setLoading(false);
     }
-    render().catch(() => { if (!cancelled) { setFailed(true); setLoading(false); } });
+    render().catch((error: unknown) => { if (!cancelled) { console.error("PDF spacing preview failed", error); setFailed(true); setLoading(false); } });
     return () => { cancelled = true; };
   }, [blob, sv]);
   return <div className="h-[60vh] min-h-[360px] overflow-auto rounded-md border border-border bg-muted p-3">

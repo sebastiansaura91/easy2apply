@@ -251,7 +251,7 @@
   letter-spacing: var(--cv-heading-spacing, 0.5pt);
   color: var(--cv-accent, #1a1a1a);
   border-bottom: 1.5pt solid var(--cv-accent, #1a1a1a);
-  padding-bottom: 3pt;
+  padding-bottom: 6pt;
   margin-top: 12pt;
   margin-bottom: 7pt;
   font-family: var(--cv-font, 'Inter', sans-serif);
@@ -282,7 +282,7 @@
 
 .a4-preview h2 {
   margin-top: calc(12pt * var(--cv-gap-scale, 1));
-  margin-bottom: calc(7pt * var(--cv-gap-scale, 1));
+  margin-bottom: 9pt;
 }
 
 .a4-preview [data-keep] {
